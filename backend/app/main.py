@@ -4,6 +4,7 @@ FastAPI 应用主入口
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
+from app.api.v1.router import api_router
 
 settings = get_settings()
 
@@ -23,6 +24,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 注册 API 路由
+app.include_router(api_router, prefix="/api/v1")
 
 
 @app.get("/")
