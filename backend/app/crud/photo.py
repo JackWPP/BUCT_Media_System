@@ -221,6 +221,15 @@ async def add_tags_to_photo(
         tag_ids: List of tag IDs to add
     """
     # Remove existing tags
+    from app.models.tag import Tag
+    
+    # Get current tags to decrease usage count
+    current_tags = await get_photo_tags(db, photo_id)
+    for tag in current_tags:
+        if tag.usage_count > 0:
+            tag.usage_count -= 1
+    
+    # Remove existing associations
     await db.execute(
         PhotoTag.__table__.delete().where(PhotoTag.photo_id == photo_id)
     )
@@ -229,6 +238,11 @@ async def add_tags_to_photo(
     for tag_id in tag_ids:
         photo_tag = PhotoTag(photo_id=photo_id, tag_id=tag_id)
         db.add(photo_tag)
+        
+        # Increase tag usage count
+        tag = await db.get(Tag, tag_id)
+        if tag:
+            tag.usage_count += 1
     
     await db.commit()
 

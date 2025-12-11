@@ -13,6 +13,7 @@ from app.schemas.photo import (
     PhotoUpdate
 )
 from app.crud import photo as photo_crud
+from app.crud import tag as tag_crud
 from app.services.storage import save_photo_file, delete_file
 from app.services.image_processing import process_uploaded_image
 import os
@@ -301,15 +302,232 @@ async def delete_photo(
     return None
 
 
-@router.post("/{photo_id}/tags", response_model=PhotoResponse)
-async def update_photo_tags(
+@router.post("/{photo_id}/approve", response_model=PhotoResponse)
+async def approve_photo(
     photo_id: str,
-    tag_ids: List[int],
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Update tags for a photo
+    Approve a photo (publish it)
+    
+    Only admins can approve photos
+    """
+    # Check admin permission
+    if current_user.role != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can approve photos"
+        )
+    
+    photo = await photo_crud.get_photo(db, photo_id)
+    
+    if not photo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Photo not found"
+        )
+    
+    # Update status to approved
+    from datetime import datetime
+    photo.status = 'approved'
+    photo.published_at = datetime.utcnow()
+    
+    await db.commit()
+    await db.refresh(photo)
+    
+    # Get tags
+    tags = await photo_crud.get_photo_tags(db, photo.id)
+    tag_names = [tag.name for tag in tags]
+    
+    # Convert to dict
+    photo_dict = {**photo.__dict__}
+    photo_dict.pop('_sa_instance_state', None)
+    photo_dict['tags'] = tag_names
+    photo_dict['uploader_name'] = None
+    
+    return PhotoResponse(**photo_dict)
+
+
+@router.post("/{photo_id}/reject", response_model=PhotoResponse)
+async def reject_photo(
+    photo_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Reject a photo (unpublish it)
+    
+    Only admins can reject photos
+    """
+    # Check admin permission
+    if current_user.role != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can reject photos"
+        )
+    
+    photo = await photo_crud.get_photo(db, photo_id)
+    
+    if not photo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Photo not found"
+        )
+    
+    # Update status to rejected
+    photo.status = 'rejected'
+    photo.published_at = None
+    
+    await db.commit()
+    await db.refresh(photo)
+    
+    # Get tags
+    tags = await photo_crud.get_photo_tags(db, photo.id)
+    tag_names = [tag.name for tag in tags]
+    
+    # Convert to dict
+    photo_dict = {**photo.__dict__}
+    photo_dict.pop('_sa_instance_state', None)
+    photo_dict['tags'] = tag_names
+    photo_dict['uploader_name'] = None
+    
+    return PhotoResponse(**photo_dict)
+
+
+@router.post("/batch-approve")
+async def batch_approve_photos(
+    photo_ids: List[str],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Batch approve multiple photos
+    
+    Only admins can approve photos
+    """
+    # Check admin permission
+    if current_user.role != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can approve photos"
+        )
+    
+    from datetime import datetime
+    updated_count = 0
+    
+    for photo_id in photo_ids:
+        photo = await photo_crud.get_photo(db, photo_id)
+        if photo:
+            photo.status = 'approved'
+            photo.published_at = datetime.utcnow()
+            updated_count += 1
+    
+    await db.commit()
+    
+    return {
+        "message": f"Successfully approved {updated_count} photos",
+        "updated_count": updated_count,
+        "total_requested": len(photo_ids)
+    }
+
+
+@router.post("/batch-reject")
+async def batch_reject_photos(
+    photo_ids: List[str],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Batch reject multiple photos
+    
+    Only admins can reject photos
+    """
+    # Check admin permission
+    if current_user.role != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can reject photos"
+        )
+    
+    updated_count = 0
+    
+    for photo_id in photo_ids:
+        photo = await photo_crud.get_photo(db, photo_id)
+        if photo:
+            photo.status = 'rejected'
+            photo.published_at = None
+            updated_count += 1
+    
+    await db.commit()
+    
+    return {
+        "message": f"Successfully rejected {updated_count} photos",
+        "updated_count": updated_count,
+        "total_requested": len(photo_ids)
+    }
+
+
+@router.post("/{photo_id}/tags", response_model=PhotoResponse)
+async def add_photo_tags(
+    photo_id: str,
+    tag_names: List[str],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Add tags to a photo by tag names
+    
+    Tags will be created automatically if they don't exist
+    Users can only update tags for their own photos unless they are admin
+    """
+    photo = await photo_crud.get_photo(db, photo_id)
+    
+    if not photo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Photo not found"
+        )
+    
+    # Check permission
+    if photo.uploader_id != current_user.id and current_user.role != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update tags for this photo"
+        )
+    
+    # Get or create tags
+    tag_ids = []
+    for tag_name in tag_names:
+        tag = await tag_crud.get_or_create_tag(db, tag_name)
+        tag_ids.append(tag.id)
+    
+    # Add tags to photo
+    await photo_crud.add_tags_to_photo(db, photo_id, tag_ids)
+    
+    # Get updated photo with tags
+    updated_photo = await photo_crud.get_photo(db, photo_id)
+    tags = await photo_crud.get_photo_tags(db, photo_id)
+    tag_names_list = [tag.name for tag in tags]
+    
+    # Convert to dict
+    photo_dict = {**updated_photo.__dict__}
+    photo_dict.pop('_sa_instance_state', None)
+    photo_dict['tags'] = tag_names_list
+    photo_dict['uploader_name'] = None
+    
+    return PhotoResponse(**photo_dict)
+
+
+@router.delete("/{photo_id}/tags/{tag_id}", response_model=PhotoResponse)
+async def remove_photo_tag(
+    photo_id: str,
+    tag_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Remove a tag from a photo
     
     Users can only update tags for their own photos unless they are admin
     """
@@ -328,18 +546,31 @@ async def update_photo_tags(
             detail="Not authorized to update tags for this photo"
         )
     
-    # Update tags
-    await photo_crud.add_tags_to_photo(db, photo_id, tag_ids)
+    # Remove tag from photo
+    from app.models.tag import PhotoTag
+    await db.execute(
+        PhotoTag.__table__.delete().where(
+            PhotoTag.photo_id == photo_id,
+            PhotoTag.tag_id == tag_id
+        )
+    )
+    await db.commit()
+    
+    # Update tag usage count
+    tag = await tag_crud.get_tag(db, tag_id)
+    if tag and tag.usage_count > 0:
+        tag.usage_count -= 1
+        await db.commit()
     
     # Get updated photo with tags
     updated_photo = await photo_crud.get_photo(db, photo_id)
     tags = await photo_crud.get_photo_tags(db, photo_id)
-    tag_names = [tag.name for tag in tags]
+    tag_names_list = [tag.name for tag in tags]
     
-    # Convert to dict and add tags
+    # Convert to dict
     photo_dict = {**updated_photo.__dict__}
     photo_dict.pop('_sa_instance_state', None)
-    photo_dict['tags'] = tag_names
+    photo_dict['tags'] = tag_names_list
     photo_dict['uploader_name'] = None
     
     return PhotoResponse(**photo_dict)
