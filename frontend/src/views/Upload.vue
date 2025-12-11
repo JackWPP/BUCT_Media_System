@@ -221,30 +221,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
+import { storeToRefs } from 'pinia'
 import { CloudUploadOutline, ImageOutline, SyncOutline, CheckmarkOutline, CloseOutline, ArrowBackOutline, ImagesOutline } from '@vicons/ionicons5'
-import { uploadPhoto } from '../api/photo'
 import type { UploadCustomRequestOptions } from 'naive-ui'
+import { useUploadStore } from '../stores/upload'
 
 const router = useRouter()
 const message = useMessage()
+const uploadStore = useUploadStore()
+const { fileList, uploading, metadata, pendingCount, successCount, errorCount, canUpload, allUploaded: storeAllUploaded } = storeToRefs(uploadStore)
 
-interface FileItem {
-  file: File
-  preview: string | null
-  status: 'pending' | 'uploading' | 'success' | 'error'
-  progress: number
-  errorMsg?: string
-}
-
-const fileList = ref<FileItem[]>([])
-const uploading = ref(false)
-const metadata = ref({
-  season: null as string | null,
-  category: null as string | null,
-  description: null as string | null,
+// 重新计算 allUploaded 以匹配 store 的状态 (如果 store 没有直接暴露 allUploaded)
+// storeToRefs 会解包 ref，如果 store getters 没有被正确解包，我们可以在这里重新定义 computed
+// 这里的 storeAllUploaded 应该是依然响应式的
+const allUploaded = computed(() => {
+  return fileList.value.length > 0 && 
+         pendingCount.value === 0 && 
+         !uploading.value &&
+         successCount.value > 0
 })
 
 const seasonOptions = [
@@ -261,39 +258,14 @@ const categoryOptions = [
   { label: 'Documentary', value: 'Documentary' },
 ]
 
-const pendingCount = computed(() => {
-  return fileList.value.filter(item => item.status === 'pending').length
-})
-
-const successCount = computed(() => {
-  return fileList.value.filter(item => item.status === 'success').length
-})
-
-const errorCount = computed(() => {
-  return fileList.value.filter(item => item.status === 'error').length
-})
-
-const canUpload = computed(() => {
-  return pendingCount.value > 0 && !uploading.value
-})
-
-const allUploaded = computed(() => {
-  return fileList.value.length > 0 && 
-         pendingCount.value === 0 && 
-         !uploading.value &&
-         successCount.value > 0
-})
-
-function handleBeforeUpload(options: { file: File; fileList: File[] }) {
+function handleBeforeUpload(options: { file: File }) {
   const { file } = options
   
-  // 检查文件类型
   if (!file.type.startsWith('image/')) {
     message.error(`${file.name} 不是图片文件`)
     return false
   }
   
-  // 检查文件大小 (20MB)
   if (file.size > 20 * 1024 * 1024) {
     message.error(`${file.name} 大小超过 20MB`)
     return false
@@ -302,99 +274,31 @@ function handleBeforeUpload(options: { file: File; fileList: File[] }) {
   return true
 }
 
-function handleFileChange(options: { fileList: Array<{ file: File }> }) {
-  // 这个方法在使用 custom-request 时不会被调用文件到列表
-  // 我们在 handleUploadRequest 中手动处理
+function handleFileChange() {
+  // Handled by custom request
 }
 
 function handleUploadRequest(options: UploadCustomRequestOptions) {
   const { file } = options
-  
-  // 创建预览
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    const preview = e.target?.result as string
-    fileList.value.push({
-      file: file.file as File,
-      preview,
-      status: 'pending',
-      progress: 0,
-    })
+  if (file.file) {
+    uploadStore.addFiles([file.file as File])
   }
-  reader.readAsDataURL(file.file as File)
-  
-  // 不实际上传，等待用户点击"开始上传"
-  return
 }
 
 function removeFile(index: number) {
-  fileList.value.splice(index, 1)
+  uploadStore.removeFile(index)
 }
 
 function clearAll() {
-  fileList.value = []
-  metadata.value = {
-    season: null,
-    category: null,
-    description: null,
-  }
+  uploadStore.clearAll()
 }
 
 async function startUpload() {
-  uploading.value = true
-  
-  const pendingFiles = fileList.value.filter(item => item.status === 'pending')
-  
-  for (const item of pendingFiles) {
-    await uploadSingleFile(item)
-  }
-  
-  uploading.value = false
-  
-  if (successCount.value === fileList.value.length) {
-    message.success('全部上传成功！')
-  } else {
-    message.warning(`上传完成，成功 ${successCount.value} 张，失败 ${fileList.value.length - successCount.value} 张`)
-  }
+  await uploadStore.startUpload(message)
 }
 
-async function uploadSingleFile(item: FileItem) {
-  item.status = 'uploading'
-  item.progress = 0
-  
-  try {
-    // 模拟进度
-    const progressInterval = setInterval(() => {
-      if (item.progress < 90) {
-        item.progress += 10
-      }
-    }, 200)
-    
-    const metadataToSend: any = {}
-    if (metadata.value.season) metadataToSend.season = metadata.value.season
-    if (metadata.value.category) metadataToSend.category = metadata.value.category
-    if (metadata.value.description) metadataToSend.description = metadata.value.description
-    
-    await uploadPhoto(item.file, metadataToSend)
-    
-    clearInterval(progressInterval)
-    item.progress = 100
-    item.status = 'success'
-  } catch (error: any) {
-    item.status = 'error'
-    item.errorMsg = error?.response?.data?.detail || '上传失败'
-    message.error(`${item.file.name} 上传失败: ${item.errorMsg}`)
-  }
-}
-
-async function retryUpload(index: number) {
-  const item = fileList.value[index]
-  if (item) {
-    item.status = 'pending'
-    item.progress = 0
-    item.errorMsg = undefined
-    await uploadSingleFile(item)
-  }
+function retryUpload(index: number) {
+  uploadStore.retryUpload(index)
 }
 
 function formatFileSize(bytes: number): string {

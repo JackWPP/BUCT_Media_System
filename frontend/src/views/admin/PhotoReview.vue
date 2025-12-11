@@ -138,6 +138,7 @@
     <PhotoDetail
       v-model:show="showDetail"
       :photo-id="selectedPhotoId"
+      admin-mode
       @updated="loadPhotos"
       @deleted="loadPhotos"
     />
@@ -298,8 +299,20 @@ function viewPhotoDetail(photo: Photo) {
 
 function getImageUrl(photo: Photo) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-  const path = photo.thumb_path || photo.original_path
-  return path ? `${baseUrl}${path.startsWith('/') ? '' : '/'}${path}` : ''
+  
+  // 优先使用缩略图 (thumb_path)
+  let path = (photo.thumb_path || photo.original_path || '').replace(/\\/g, '/')
+  
+  // 尝试从路径中提取 'uploads/' 开始的部分 (处理绝对路径)
+  const uploadsIndex = path.indexOf('uploads/')
+  if (uploadsIndex !== -1) {
+    path = path.substring(uploadsIndex)
+  }
+  
+  if (!path) return ''
+  if (path.startsWith('/')) path = path.substring(1)
+  
+  return `${baseUrl}/${path}`
 }
 
 function getStatusType(status: string): 'success' | 'warning' | 'error' | 'info' {

@@ -138,24 +138,29 @@
                 @action="router.push('/upload')"
               />
               <!-- 照片列表 -->
-              <n-grid v-else :cols="gridCols" :x-gap="16" :y-gap="16" responsive="screen">
-                <n-grid-item v-for="photo in photoStore.photos" :key="photo.id">
+              <MasonryLayout
+                v-else
+                :items="photoStore.photos"
+                :gap="16"
+              >
+                <template #default="{ item: photo }">
                   <div class="photo-card" @click="handlePhotoClick(photo)">
-                    <div class="photo-image">
+                    <div 
+                      class="photo-image" 
+                      :style="{ aspectRatio: photo.width && photo.height ? `${photo.width} / ${photo.height}` : '4 / 3' }"
+                    >
                       <img
                         :src="getImageUrl(photo)"
                         :alt="photo.filename"
                         loading="lazy"
-                        @error="handleImageError"
+                        class="masonry-img"
+                        @error="(e) => handleImageError(e, photo)"
                       />
                       <div class="photo-overlay">
                         <n-icon size="32" color="white" :component="EyeOutline" />
                       </div>
                     </div>
                     <div class="photo-info">
-                      <n-ellipsis :line-clamp="1" class="photo-name">
-                        {{ photo.filename }}
-                      </n-ellipsis>
                       <n-space size="small" style="margin-top: 8px;" wrap>
                         <n-tag v-if="photo.season" size="small" type="success">
                           {{ photo.season }}
@@ -175,8 +180,8 @@
                       </n-space>
                     </div>
                   </div>
-                </n-grid-item>
-              </n-grid>
+                </template>
+              </MasonryLayout>
             </n-spin>
           </div>
 
@@ -220,6 +225,7 @@ import { getPopularTags, type Tag } from '../api/tag'
 import PhotoDetail from '../components/photo/PhotoDetail.vue'
 import EmptyState from '../components/common/EmptyState.vue'
 import PhotoCardSkeleton from '../components/common/PhotoCardSkeleton.vue'
+import MasonryLayout from '../components/common/MasonryLayout.vue'
 
 const router = useRouter()
 const message = useMessage()
@@ -241,16 +247,6 @@ const popularTags = ref<Tag[]>([])
 const tagOptions = computed(() =>
   popularTags.value.map(tag => ({ label: tag.name, value: tag.name }))
 )
-
-// 响应式网格列数
-const gridCols = computed(() => {
-  if (typeof window === 'undefined') return 4
-  const width = window.innerWidth
-  if (width < 768) return 2
-  if (width < 1024) return 3
-  if (width < 1440) return 4
-  return 5
-})
 
 // 菜单选项
 const menuOptions = [
@@ -313,20 +309,74 @@ const categoryOptions = [
   { label: 'Documentary', value: 'Documentary' },
 ]
 
-
-
-// 获取图片URL
+// 获取图片URL - 增强兼容性处理
 function getImageUrl(photo: Photo) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-  return photo.thumb_path 
-    ? `${baseUrl}${photo.thumb_path.startsWith('/') ? '' : '/'}${photo.thumb_path}`
-    : `${baseUrl}${photo.original_path.startsWith('/') ? '' : '/'}${photo.original_path}`
+  
+  // 1. 尝试使用原图 (清晰度高)，但前提是路径必须安全 (在 uploads/ 下)
+  let path = (photo.original_path || '').replace(/\\/g, '/')
+  let isSafeOriginal = false
+  
+  const uploadsIndex = path.indexOf('uploads/')
+  if (uploadsIndex !== -1) {
+    path = path.substring(uploadsIndex)
+    isSafeOriginal = true
+  }
+  
+  // 2. 如果原图路径看似不安全 (例如旧数据的 F:/...), 则回退到缩略图
+  if (!isSafeOriginal && photo.thumb_path) {
+    path = photo.thumb_path.replace(/\\/g, '/')
+    // 缩略图通常都在 uploads/ 下，但也做一下处理
+    const thumbIndex = path.indexOf('uploads/')
+    if (thumbIndex !== -1) {
+      path = path.substring(thumbIndex)
+    }
+  }
+  
+  if (!path) return ''
+  
+  // 3. 构造最终 URL
+  if (path.startsWith('http')) return path
+  if (path.startsWith('/')) path = path.substring(1)
+  
+  return `${baseUrl}/${path}`
+}
+
+function getThumbnailUrl(photo: Photo) {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+  let path = (photo.thumb_path || '').replace(/\\/g, '/')
+  const uploadsIndex = path.indexOf('uploads/')
+  if (uploadsIndex !== -1) {
+    path = path.substring(uploadsIndex)
+  }
+  if (path.startsWith('/')) path = path.substring(1)
+  return path ? `${baseUrl}/${path}` : ''
 }
 
 // 图片加载错误处理
-function handleImageError(e: Event) {
+function handleImageError(e: Event, photo: Photo) {
   const img = e.target as HTMLImageElement
-  img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
+  
+  const thumbUrl = getThumbnailUrl(photo)
+  // 如果当前显示的不是缩略图，且缩略图存在，尝试降级
+  // 注意：需要构建完整的URL进行比较，或者简单判断 src 是否包含 thumbUrl 的关键部分
+  // 这里简化判断: 如果 src 已经是 data URL，或者已经是缩略图路径，则停止
+  
+  if (thumbUrl && !img.src.includes('data:image')) {
+     // 检查是否已经是缩略图 (防止无限循环，尽管 getThumbnailUrl 返回的不同)
+     // 简单起见，如果 load error 了，且之前尝试的是 getImageUrl 的结果(原图)，那么尝试缩略图
+     // 但为了避免判断 src 的复杂性，我们只尝试一次降级
+     // 更好的方式是设置一个属性标记
+     
+     if (img.getAttribute('data-tried-thumb') === 'true') {
+        img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
+     } else {
+        img.setAttribute('data-tried-thumb', 'true')
+        img.src = thumbUrl
+     }
+  } else {
+    img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
+  }
 }
 
 // 防抖搜索
@@ -363,7 +413,6 @@ function handlePageSizeChange(pageSize: number) {
 // 菜单选择
 function handleMenuSelect(key: string) {
   activeMenu.value = key
-  // 可以根据不同菜单加载不同数据
 }
 
 // 用户菜单选择
@@ -421,13 +470,12 @@ async function loadPopularTags() {
   }
 }
 
-// 加载照片 - 前台展示使用公开API（无需登录）
+// 加载照片
 onMounted(() => {
   photoStore.fetchPublicPhotos().catch((error) => {
     message.error('加载照片失败')
     console.error(error)
   })
-  // 加载热门标签
   loadPopularTags()
 })
 </script>
@@ -498,18 +546,21 @@ onMounted(() => {
 .photo-image {
   position: relative;
   width: 100%;
-  padding-top: 75%; /* 4:3 aspect ratio */
   overflow: hidden;
   background: #f5f5f5;
 }
 
-.photo-image img {
-  position: absolute;
-  top: 0;
-  left: 0;
+.masonry-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
+  transition: transform 0.3s ease;
+}
+
+/* Remove old absolute positioning if any */
+.photo-image img {
+  /* Inherit transition from masonry-img or keep here if not using class everywhere */
   transition: transform 0.3s ease;
 }
 

@@ -15,8 +15,8 @@ settings = get_settings()
 def create_thumbnail(
     image_path: str,
     thumb_path: str,
-    max_width: int = 400,
-    quality: int = 85
+    max_width: int = 800,
+    quality: int = 90
 ) -> tuple[str, int, int]:
     """
     Create thumbnail from image
@@ -70,7 +70,7 @@ def extract_exif(image_path: str) -> Dict[str, Any]:
     Extract EXIF metadata from image
     
     Returns:
-        dict: EXIF data with readable keys
+        dict: EXIF data with readable keys (JSON-serializable)
     """
     exif_data = {}
     
@@ -82,12 +82,31 @@ def extract_exif(image_path: str) -> Dict[str, Any]:
                 for tag_id, value in exif_raw.items():
                     tag = TAGS.get(tag_id, tag_id)
                     
+                    # 处理特殊类型以保证JSON可序列化
                     # Convert bytes to string
                     if isinstance(value, bytes):
                         try:
                             value = value.decode('utf-8', errors='ignore')
                         except:
                             value = str(value)
+                    # Convert IFDRational to float
+                    elif hasattr(value, '__class__') and value.__class__.__name__ == 'IFDRational':
+                        try:
+                            value = float(value)
+                        except:
+                            value = str(value)
+                    # Convert tuple of IFDRational to list of float
+                    elif isinstance(value, tuple):
+                        try:
+                            value = [
+                                float(v) if hasattr(v, '__class__') and v.__class__.__name__ == 'IFDRational' else v
+                                for v in value
+                            ]
+                        except:
+                            value = str(value)
+                    # Convert other non-serializable types
+                    elif not isinstance(value, (str, int, float, bool, list, dict, type(None))):
+                        value = str(value)
                     
                     exif_data[tag] = value
     except Exception as e:

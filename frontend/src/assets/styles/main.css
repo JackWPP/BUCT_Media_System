@@ -63,10 +63,6 @@ img {
   height: auto;
 }
 
-img[loading] {
-  opacity: 0.6;
-}
-
 /* ========== Naive UI 组件优化 ========== */
 /* 卡片悬停效果 */
 .n-card {

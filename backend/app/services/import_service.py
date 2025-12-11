@@ -12,6 +12,49 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
+def sanitize_exif_data(exif_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    清理EXIF数据，确保所有值都可JSON序列化
+    
+    Args:
+        exif_data: 原始EXIF数据
+        
+    Returns:
+        清理后的EXIF数据
+    """
+    sanitized = {}
+    
+    for key, value in exif_data.items():
+        # 处理IFDRational类型
+        if hasattr(value, '__class__') and value.__class__.__name__ == 'IFDRational':
+            try:
+                sanitized[key] = float(value)
+            except:
+                sanitized[key] = str(value)
+        # 处理tuple中的IFDRational
+        elif isinstance(value, (tuple, list)):
+            try:
+                sanitized[key] = [
+                    float(v) if hasattr(v, '__class__') and v.__class__.__name__ == 'IFDRational' else v
+                    for v in value
+                ]
+            except:
+                sanitized[key] = str(value)
+        # 处理bytes
+        elif isinstance(value, bytes):
+            try:
+                sanitized[key] = value.decode('utf-8', errors='ignore')
+            except:
+                sanitized[key] = str(value)
+        # 处理其他不可序列化类型
+        elif not isinstance(value, (str, int, float, bool, type(None))):
+            sanitized[key] = str(value)
+        else:
+            sanitized[key] = value
+    
+    return sanitized
+
+
 class ImportService:
     """导入服务类"""
     

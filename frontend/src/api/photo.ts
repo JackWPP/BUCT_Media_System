@@ -55,14 +55,18 @@ export function getPublicPhotoById(id: string): Promise<Photo> {
 /**
  * 上传照片
  */
-export function uploadPhoto(file: File, metadata?: {
-  description?: string
-  season?: string
-  category?: string
-}): Promise<PhotoUploadResponse> {
+export function uploadPhoto(
+  file: File,
+  metadata: {
+    description?: string
+    season?: string
+    category?: string
+  } = {},
+  onProgress?: (progressEvent: any) => void
+): Promise<PhotoUploadResponse> {
   const formData = new FormData()
   formData.append('file', file)
-  
+
   if (metadata?.description) {
     formData.append('description', metadata.description)
   }
@@ -80,6 +84,8 @@ export function uploadPhoto(file: File, metadata?: {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
+    timeout: 60000,
+    onUploadProgress: onProgress,
   })
 }
 

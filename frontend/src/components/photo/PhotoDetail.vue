@@ -18,6 +18,7 @@
                 :src="getImageUrl(photo)"
                 :alt="photo.filename"
                 class="preview-image"
+                @error="handleImageError"
               />
               <div class="image-actions">
                 <n-button-group>
@@ -184,11 +185,13 @@ import dayjs from 'dayjs'
 interface Props {
   photoId?: string | null
   show?: boolean
+  adminMode?: boolean  // 是否在管理后台使用（使用已认证 API）
 }
 
 const props = withDefaults(defineProps<Props>(), {
   photoId: null,
   show: false,
+  adminMode: false,
 })
 
 const emit = defineEmits<{
@@ -253,9 +256,50 @@ watch(showModal, (val) => {
 
 function getImageUrl(photo: Photo) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-  return photo.original_path
-    ? `${baseUrl}${photo.original_path.startsWith('/') ? '' : '/'}${photo.original_path}`
-    : ''
+  let path = (photo.original_path || '').replace(/\\/g, '/')
+  
+  // 尝试从路径中提取 'uploads/' 开始的部分
+  // 这可以处理后端存储了绝对路径的情况 (例如 D:/backend/uploads/...)
+  const uploadsIndex = path.indexOf('uploads/')
+  if (uploadsIndex !== -1) {
+    path = path.substring(uploadsIndex)
+  }
+  
+  // 确保没有前导 /
+  if (path.startsWith('/')) path = path.substring(1)
+  
+  return path ? `${baseUrl}/${path}` : ''
+}
+
+function getThumbnailUrl(photo: Photo) {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+  let path = (photo.thumb_path || '').replace(/\\/g, '/')
+  
+  const uploadsIndex = path.indexOf('uploads/')
+  if (uploadsIndex !== -1) {
+    path = path.substring(uploadsIndex)
+  }
+  
+  if (path.startsWith('/')) path = path.substring(1)
+  return path ? `${baseUrl}/${path}` : ''
+}
+
+function handleImageError(e: Event) {
+  const img = e.target as HTMLImageElement
+  if (!photo.value) return
+
+  const thumbUrl = getThumbnailUrl(photo.value)
+  // 如果当前显示的不是缩略图，且缩略图存在，尝试降级
+  if (thumbUrl && !img.src.includes('data:image')) {
+     if (img.getAttribute('data-tried-thumb') === 'true') {
+        img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
+     } else {
+        img.setAttribute('data-tried-thumb', 'true')
+        img.src = thumbUrl
+     }
+  } else {
+    img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
+  }
 }
 
 function formatFileSize(bytes: number | null): string {
@@ -300,8 +344,10 @@ async function loadPhotoDetail() {
   
   loading.value = true
   try {
-    // 使用公开API获取照片详情（无需登录）
-    const data = await photoStore.fetchPublicPhotoDetail(props.photoId)
+    // 根据模式选择 API：管理后台使用已认证 API，前台使用公开 API
+    const data = props.adminMode
+      ? await photoStore.fetchPhotoDetail(props.photoId)
+      : await photoStore.fetchPublicPhotoDetail(props.photoId)
     photo.value = data
     formData.value = {
       season: data.season,

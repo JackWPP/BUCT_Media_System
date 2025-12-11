@@ -11,7 +11,7 @@ import logging
 
 from app.core.deps import get_db, get_current_admin_user
 from app.models.user import User
-from app.services.import_service import scan_and_parse_json_files, import_service
+from app.services.import_service import scan_and_parse_json_files, import_service, sanitize_exif_data
 from app.services.storage import ensure_upload_dirs
 from app.services.image_processing import process_uploaded_image
 from app.crud import photo as photo_crud
@@ -137,6 +137,8 @@ async def import_photos(
             exif_data = import_service.extract_exif_from_data(photo_data)
             # 合并处理后的 EXIF
             exif_data.update(processing_result.get('exif_data', {}))
+            # 清理EXIF数据，确保可JSON序列化
+            exif_data = sanitize_exif_data(exif_data)
             
             # 创建照片记录
             new_photo_data = {
@@ -179,6 +181,8 @@ async def import_photos(
             logger.error(error_msg)
             errors.append(error_msg)
             error_count += 1
+            # 回滚事务，以便继续处理下一个
+            await db.rollback()
     
     # 返回结果
     message = f"导入完成: 总计 {total_count} 张, 成功 {imported_count} 张, 跳过 {skipped_count} 张, 失败 {error_count} 张"
