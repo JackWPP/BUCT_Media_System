@@ -1,8 +1,8 @@
-"""Initial database schema
+"""Initial schema
 
-Revision ID: 10df5091c272
+Revision ID: f9663193e169
 Revises: 
-Create Date: 2025-12-11 13:10:37.677988
+Create Date: 2025-12-11 13:53:31.587469
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '10df5091c272'
+revision: str = 'f9663193e169'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -32,7 +32,7 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_tags_name'), 'tags', ['name'], unique=True)
     op.create_table('users',
-    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('id', sa.String(length=36), nullable=False),
     sa.Column('email', sa.String(length=255), nullable=False),
     sa.Column('hashed_password', sa.String(length=255), nullable=False),
     sa.Column('full_name', sa.String(length=100), nullable=True),
@@ -43,21 +43,25 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
     op.create_table('photos',
-    sa.Column('id', sa.UUID(), nullable=False),
-    sa.Column('uploader_id', sa.UUID(), nullable=False),
+    sa.Column('id', sa.String(length=36), nullable=False),
+    sa.Column('uploader_id', sa.String(length=36), nullable=False),
     sa.Column('filename', sa.String(length=255), nullable=False),
     sa.Column('original_path', sa.Text(), nullable=True),
     sa.Column('processed_path', sa.Text(), nullable=True),
     sa.Column('thumb_path', sa.Text(), nullable=True),
     sa.Column('width', sa.Integer(), nullable=True),
     sa.Column('height', sa.Integer(), nullable=True),
+    sa.Column('file_size', sa.Integer(), nullable=True),
+    sa.Column('mime_type', sa.String(length=50), nullable=True),
     sa.Column('season', sa.String(length=20), nullable=True),
     sa.Column('category', sa.String(length=50), nullable=True),
     sa.Column('campus', sa.String(length=50), nullable=True),
+    sa.Column('description', sa.Text(), nullable=True),
     sa.Column('exif_data', sa.JSON(), nullable=True),
     sa.Column('status', sa.String(length=20), nullable=False),
     sa.Column('processing_status', sa.String(length=20), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.Column('updated_at', sa.DateTime(), nullable=False),
     sa.Column('captured_at', sa.DateTime(), nullable=True),
     sa.Column('published_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['uploader_id'], ['users.id'], ),
@@ -65,8 +69,8 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_photos_created_at'), 'photos', ['created_at'], unique=False)
     op.create_table('tasks',
-    sa.Column('id', sa.UUID(), nullable=False),
-    sa.Column('creator_id', sa.UUID(), nullable=False),
+    sa.Column('id', sa.String(length=36), nullable=False),
+    sa.Column('creator_id', sa.String(length=36), nullable=False),
     sa.Column('name', sa.String(length=200), nullable=False),
     sa.Column('description', sa.Text(), nullable=True),
     sa.Column('status', sa.String(length=20), nullable=False),
@@ -76,7 +80,7 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('photo_tags',
-    sa.Column('photo_id', sa.UUID(), nullable=False),
+    sa.Column('photo_id', sa.String(length=36), nullable=False),
     sa.Column('tag_id', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.ForeignKeyConstraint(['photo_id'], ['photos.id'], ),
@@ -84,8 +88,8 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('photo_id', 'tag_id')
     )
     op.create_table('task_photos',
-    sa.Column('task_id', sa.UUID(), nullable=False),
-    sa.Column('photo_id', sa.UUID(), nullable=False),
+    sa.Column('task_id', sa.String(length=36), nullable=False),
+    sa.Column('photo_id', sa.String(length=36), nullable=False),
     sa.Column('verification_status', sa.String(length=20), nullable=False),
     sa.Column('verified_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['photo_id'], ['photos.id'], ),

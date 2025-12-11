@@ -2,14 +2,15 @@
 Authentication API endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_db, get_current_active_user
 from app.core.security import create_access_token
-from app.schemas.token import LoginRequest, LoginResponse
+from app.schemas.token import LoginRequest, LoginResponse, Token
 from app.schemas.user import User
 from app.crud import user as user_crud
 
-router = APIRouter(prefix="/auth", tags=["authentication"])
+router = APIRouter(tags=["authentication"])
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -54,3 +55,33 @@ async def get_current_user_info(
     Get current authenticated user information
     """
     return current_user
+
+
+@router.post("/token", response_model=Token)
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    OAuth2 compatible token login endpoint
+    
+    Use username (email) and password to get access token
+    """
+    user = await user_crud.authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Inactive user"
+        )
+    
+    # Create access token
+    access_token = create_access_token(data={"sub": user.email})
+    
+    return Token(access_token=access_token, token_type="bearer")

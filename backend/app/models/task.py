@@ -4,7 +4,6 @@
 import uuid
 from datetime import datetime
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -13,8 +12,8 @@ class Task(Base):
     """任务表"""
     __tablename__ = "tasks"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    creator_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    creator_id = Column(String(36), ForeignKey("users.id"), nullable=False)
     name = Column(String(200), nullable=False)
     description = Column(Text)
     status = Column(String(20), default="pending", nullable=False)  # pending/in_progress/completed/archived
@@ -33,8 +32,8 @@ class TaskPhoto(Base):
     """任务照片关联表"""
     __tablename__ = "task_photos"
 
-    task_id = Column(UUID(as_uuid=True), ForeignKey("tasks.id"), primary_key=True)
-    photo_id = Column(UUID(as_uuid=True), ForeignKey("photos.id"), primary_key=True)
+    task_id = Column(String(36), ForeignKey("tasks.id"), primary_key=True)
+    photo_id = Column(String(36), ForeignKey("photos.id"), primary_key=True)
     verification_status = Column(String(20), default="unverified", nullable=False)  # unverified/verified/rejected
     verified_at = Column(DateTime)
 

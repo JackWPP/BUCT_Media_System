@@ -3,7 +3,6 @@
 """
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -30,7 +29,7 @@ class PhotoTag(Base):
     """照片标签关联表"""
     __tablename__ = "photo_tags"
 
-    photo_id = Column(UUID(as_uuid=True), ForeignKey("photos.id"), primary_key=True)
+    photo_id = Column(String(36), ForeignKey("photos.id"), primary_key=True)
     tag_id = Column(Integer, ForeignKey("tags.id"), primary_key=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
