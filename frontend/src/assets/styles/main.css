@@ -2,6 +2,9 @@
  * 全局样式 - 优化版
  */
 
+/* Tailwind CSS v4 */
+@import "tailwindcss";
+
 /* ========== 基础样式 ========== */
 * {
   margin: 0;
@@ -112,11 +115,11 @@ img[loading] {
   .n-layout-content {
     padding: 16px !important;
   }
-  
+
   .n-grid {
     gap: 12px !important;
   }
-  
+
   body {
     font-size: 14px;
   }
@@ -134,18 +137,17 @@ img[loading] {
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
 }
 
 .n-skeleton {
-  background: linear-gradient(
-    90deg,
-    #f0f0f0 25%,
-    #e0e0e0 50%,
-    #f0f0f0 75%
-  );
+  background: linear-gradient(90deg,
+      #f0f0f0 25%,
+      #e0e0e0 50%,
+      #f0f0f0 75%);
   background-size: 200% 100%;
   animation: skeleton-loading 1.5s ease-in-out infinite;
 }

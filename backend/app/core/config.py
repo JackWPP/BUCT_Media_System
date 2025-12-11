@@ -31,7 +31,12 @@ class Settings(BaseSettings):
     AI_ENABLED: bool = True
     
     # CORS 配置
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    ALLOWED_ORIGINS: list[str] = [
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
+        "http://localhost:3000"
+    ]
     
     class Config:
         env_file = ".env"
