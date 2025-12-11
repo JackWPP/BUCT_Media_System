@@ -2,8 +2,9 @@
 Photo API endpoints
 """
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
+import logging
 
 from app.core.deps import get_db, get_current_user
 from app.models.user import User
@@ -16,18 +17,92 @@ from app.crud import photo as photo_crud
 from app.crud import tag as tag_crud
 from app.services.storage import save_photo_file, delete_file
 from app.services.image_processing import process_uploaded_image
+from app.services.ai_tagging import analyze_photo_with_ai
 import os
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter()
 
 
+async def process_photo_ai_tagging(photo_id: str, original_path: str):
+    """
+    后台任务: 使用 AI 分析照片并更新标签
+    
+    Args:
+        photo_id: 照片 ID
+        original_path: 原始图片路径
+    """
+    from app.core.database import AsyncSessionLocal
+    
+    logger.info(f"开始 AI 分析照片: {photo_id}")
+    
+    async with AsyncSessionLocal() as db:
+        try:
+            # 更新状态为处理中
+            photo = await photo_crud.get_photo(db, photo_id)
+            if not photo:
+                logger.error(f"照片不存在: {photo_id}")
+                return
+            
+            photo.processing_status = 'processing'
+            await db.commit()
+            
+            # 调用 AI 分析
+            ai_result = await analyze_photo_with_ai(original_path)
+            
+            if not ai_result:
+                # AI 分析失败
+                photo.processing_status = 'failed'
+                await db.commit()
+                logger.error(f"AI 分析失败: {photo_id}")
+                return
+            
+            # 更新 season 和 category (如果未手动设置)
+            if not photo.season and 'season' in ai_result:
+                photo.season = ai_result['season']
+            if not photo.category and 'category' in ai_result:
+                photo.category = ai_result['category']
+            
+            # 处理 objects 标签
+            if 'objects' in ai_result and ai_result['objects']:
+                tag_ids = []
+                for tag_name in ai_result['objects']:
+                    # 获取或创建标签
+                    tag = await tag_crud.get_or_create_tag(db, tag_name.lower())
+                    tag_ids.append(tag.id)
+                
+                # 添加标签到照片
+                if tag_ids:
+                    await photo_crud.add_tags_to_photo(db, photo_id, tag_ids)
+            
+            # 更新状态为完成
+            photo.processing_status = 'completed'
+            await db.commit()
+            
+            logger.info(f"AI 分析完成: {photo_id}, season={photo.season}, category={photo.category}, tags={len(ai_result.get('objects', []))}")
+            
+        except Exception as e:
+            logger.error(f"AI 分析过程出错: {photo_id}, error={str(e)}")
+            # 更新状态为失败
+            try:
+                photo = await photo_crud.get_photo(db, photo_id)
+                if photo:
+                    photo.processing_status = 'failed'
+                    await db.commit()
+            except:
+                pass
+
+
 @router.post("/upload", response_model=PhotoUploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_photo(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(..., description="Photo file to upload"),
     description: Optional[str] = Form(None, max_length=500),
     season: Optional[str] = Form(None, description="Spring/Summer/Autumn/Winter"),
     category: Optional[str] = Form(None, description="Landscape/Portrait/Activity/Documentary"),
+    enable_ai: bool = Form(True, description="Enable AI auto-tagging"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -70,6 +145,9 @@ async def upload_photo(
         # Get file size
         file_size = os.path.getsize(original_path) if os.path.exists(original_path) else None
         
+        # Determine processing status based on AI enablement
+        processing_status = 'pending' if enable_ai and not season and not category else 'completed'
+        
         # Create photo record in database
         photo_data = {
             'id': photo_uuid,  # Already a string from save_photo_file
@@ -85,11 +163,19 @@ async def upload_photo(
             'description': description,
             'season': season,
             'category': category,
-            'status': 'active',
-            'processing_status': 'completed'
+            'status': 'pending',  # Default to pending, will be approved manually
+            'processing_status': processing_status
         }
         
         photo = await photo_crud.create_photo(db, photo_data, str(current_user.id))
+        
+        # Add AI tagging background task if enabled and season/category not provided
+        if enable_ai and (not season or not category):
+            background_tasks.add_task(
+                process_photo_ai_tagging,
+                photo_id=photo.id,
+                original_path=original_path
+            )
         
         return PhotoUploadResponse(
             id=photo.id,
