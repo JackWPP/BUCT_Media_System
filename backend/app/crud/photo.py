@@ -82,7 +82,8 @@ async def get_photos(
     status: Optional[str] = None,
     season: Optional[str] = None,
     category: Optional[str] = None,
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    tag: Optional[str] = None
 ) -> tuple[List[Photo], int]:
     """
     Get photos with filtering and pagination
@@ -95,13 +96,14 @@ async def get_photos(
         status: Filter by status
         season: Filter by season
         category: Filter by category
-        search: Search in filename and description
+        search: Search in filename, description, and tags
+        tag: Filter by specific tag name
     
     Returns:
         Tuple of (list of photos, total count)
     """
     query = select(Photo)
-    count_query = select(func.count(Photo.id))
+    count_query = select(func.count(Photo.id.distinct()))
     
     # Apply filters
     if uploader_id:
@@ -120,11 +122,29 @@ async def get_photos(
         query = query.where(Photo.category == category)
         count_query = count_query.where(Photo.category == category)
     
+    # 标签筛选 - 通过关联表查询
+    if tag:
+        tag_subquery = (
+            select(PhotoTag.photo_id)
+            .join(Tag)
+            .where(Tag.name.ilike(f"%{tag.lower()}%"))
+        )
+        query = query.where(Photo.id.in_(tag_subquery))
+        count_query = count_query.where(Photo.id.in_(tag_subquery))
+    
+    # 搜索 - 同时搜索文件名、描述和标签
     if search:
         search_pattern = f"%{search}%"
+        # 查找匹配标签的照片 ID
+        tag_photo_subquery = (
+            select(PhotoTag.photo_id)
+            .join(Tag)
+            .where(Tag.name.ilike(search_pattern))
+        )
         search_filter = or_(
             Photo.filename.ilike(search_pattern),
-            Photo.description.ilike(search_pattern)
+            Photo.description.ilike(search_pattern),
+            Photo.id.in_(tag_photo_subquery)
         )
         query = query.where(search_filter)
         count_query = count_query.where(search_filter)

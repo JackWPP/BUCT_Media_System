@@ -1,0 +1,352 @@
+/**
+ * 全局样式 - 优化版
+ */
+
+/* ========== 基础样式 ========== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    'Microsoft YaHei', '微软雅黑', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f5f7fa;
+  line-height: 1.6;
+}
+
+/* ========== 滚动条样式 ========== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d0d0d0;
+  border-radius: 4px;
+  transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #b0b0b0;
+}
+
+/* 暗色模式滚动条 */
+html.dark ::-webkit-scrollbar-thumb {
+  background: #4a4a4a;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #5a5a5a;
+}
+
+/* ========== 平滑滚动 ========== */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ========== 图片加载优化 ========== */
+img {
+  transition: opacity 0.3s ease-in-out;
+  max-width: 100%;
+  height: auto;
+}
+
+img[loading] {
+  opacity: 0.6;
+}
+
+/* ========== Naive UI 组件优化 ========== */
+/* 卡片悬停效果 */
+.n-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.n-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+}
+
+/* 按钮点击反馈 */
+.n-button:active {
+  transform: scale(0.98);
+}
+
+/* 表单优化 */
+.n-form-item {
+  margin-bottom: 18px;
+}
+
+/* 标签样式优化 */
+.n-tag {
+  cursor: default;
+  user-select: none;
+  font-weight: 500;
+}
+
+/* 分页器居中 */
+.n-pagination {
+  justify-content: center;
+}
+
+/* 对话框优化 */
+.n-dialog {
+  max-width: 90vw;
+}
+
+/* Spin 加载优化 */
+.n-spin-container {
+  min-height: 200px;
+}
+
+/* ========== 响应式设计 ========== */
+@media (max-width: 768px) {
+  .n-layout-content {
+    padding: 16px !important;
+  }
+  
+  .n-grid {
+    gap: 12px !important;
+  }
+  
+  body {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    font-size: 13px;
+  }
+}
+
+/* ========== 动画效果 ========== */
+/* 骨架屏加载动画 */
+@keyframes skeleton-loading {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.n-skeleton {
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 25%,
+    #e0e0e0 50%,
+    #f0f0f0 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+/* 淡入淡出 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* 滑动 */
+.slide-enter-active,
+.slide-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-enter-from {
+  transform: translateY(-10px);
+}
+
+.slide-leave-to {
+  transform: translateY(10px);
+}
+
+/* 缩放 */
+.scale-enter-active,
+.scale-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.scale-enter-from,
+.scale-leave-to {
+  transform: scale(0.95);
+}
+
+/* ========== 工具类 ========== */
+/* 布局 */
+.flex-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.flex-column {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 宽高 */
+.full-width {
+  width: 100%;
+}
+
+.full-height {
+  height: 100%;
+}
+
+/* 文本 */
+.text-center {
+  text-align: center;
+}
+
+.text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text-ellipsis-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.text-ellipsis-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 防止选中 */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 阴影 */
+.shadow-sm {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.shadow {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.shadow-lg {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.16);
+}
+
+/* 圆角 */
+.rounded {
+  border-radius: 4px;
+}
+
+.rounded-lg {
+  border-radius: 8px;
+}
+
+.rounded-xl {
+  border-radius: 12px;
+}
+
+/* ========== 特殊样式 ========== */
+/* 图片容器 */
+.image-container {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.image-container img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.image-container:hover img {
+  transform: scale(1.05);
+}
+
+/* 载入指示器 */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+/* 遮罩层 */
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  transition: opacity 0.3s ease;
+}
+
+/* 卡片内边距 */
+.card-padding {
+  padding: 16px;
+}
+
+.card-padding-lg {
+  padding: 24px;
+}
+
+/* ========== 全局颜色 ========== */
+:root {
+  --primary-color: #18a058;
+  --error-color: #d03050;
+  --warning-color: #f0a020;
+  --info-color: #2080f0;
+  --success-color: #18a058;
+  --text-color: #333;
+  --border-color: #e0e0e6;
+  --bg-color: #f5f7fa;
+}
+
+/* ========== 性能优化 ========== */
+/* GPU 加速 */
+.n-card,
+.photo-card,
+.n-button {
+  will-change: transform;
+}
+
+/* 减少重绘 */
+.n-layout-header,
+.n-layout-sider {
+  transform: translateZ(0);
+}

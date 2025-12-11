@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_db, get_current_active_user
 from app.core.security import create_access_token
 from app.schemas.token import LoginRequest, LoginResponse, Token
-from app.schemas.user import User
+from app.schemas.user import User, UserCreate
 from app.crud import user as user_crud
 
 router = APIRouter(tags=["authentication"])
@@ -85,3 +85,27 @@ async def login_for_access_token(
     access_token = create_access_token(data={"sub": user.email})
     
     return Token(access_token=access_token, token_type="bearer")
+
+
+@router.post("/register", response_model=User, status_code=status.HTTP_201_CREATED)
+async def register(
+    user_data: UserCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Register a new user
+    
+    Anyone can register, default role is 'user'
+    """
+    # Check if email already exists
+    existing_user = await user_crud.get_user_by_email(db, user_data.email)
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered"
+        )
+    
+    # Create new user with 'user' role by default
+    new_user = await user_crud.create_user(db, user_data, role="user")
+    
+    return User.model_validate(new_user)

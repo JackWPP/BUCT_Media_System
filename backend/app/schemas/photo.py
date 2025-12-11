@@ -3,7 +3,7 @@ Photo Pydantic schemas
 """
 from datetime import datetime
 from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 class PhotoBase(BaseModel):
@@ -56,6 +56,17 @@ class PhotoResponse(PhotoInDB):
     tags: List[str] = Field(default_factory=list, description="Associated tags")
     
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator('original_path', 'thumb_path', 'processed_path', mode='before')
+    @classmethod
+    def normalize_path(cls, v: Optional[str]) -> Optional[str]:
+        if v and isinstance(v, str):
+            # Replace backslashes with forward slashes
+            v = v.replace('\\', '/')
+            # Remove leading ./ if present (e.g. ./uploads/...)
+            if v.startswith('./'):
+                v = v[2:]
+            return v
 
 
 class PhotoListResponse(BaseModel):

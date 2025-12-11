@@ -14,6 +14,35 @@ from app.crud import tag as tag_crud
 router = APIRouter()
 
 
+@router.get("/public", response_model=TagListResponse)
+async def list_public_tags(
+    skip: int = 0,
+    limit: int = 100,
+    search: Optional[str] = None,
+    category: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    List tags with filtering and pagination (no authentication required)
+    """
+    limit = min(limit, 200)
+    
+    tags, total = await tag_crud.get_tags(
+        db,
+        skip=skip,
+        limit=limit,
+        search=search,
+        category=category
+    )
+    
+    tag_responses = [TagResponse.model_validate(tag) for tag in tags]
+    
+    return TagListResponse(
+        total=total,
+        items=tag_responses
+    )
+
+
 @router.get("", response_model=TagListResponse)
 async def list_tags(
     skip: int = 0,
@@ -53,11 +82,10 @@ async def list_tags(
 @router.get("/popular", response_model=list[TagResponse])
 async def get_popular_tags(
     limit: int = 20,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: AsyncSession = Depends(get_db)
 ):
     """
-    Get popular tags sorted by usage count
+    Get popular tags sorted by usage count (no authentication required)
     
     - **limit**: Maximum number of tags to return (max 50)
     """

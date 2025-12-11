@@ -8,13 +8,19 @@ import os
 # Add parent directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
-from app.core.database import AsyncSessionLocal
+from app.core.database import AsyncSessionLocal, init_db
 from app.crud.user import get_user_by_email, create_user
 from app.schemas.user import UserCreate
+# 导入所有模型以确保 Base.metadata 包含所有表定义
+import app.models
 
 
 async def create_admin():
     """Create initial admin user"""
+    # 确保数据库表已创建
+    print("Initializing database...")
+    await init_db()
+    
     admin_email = "admin@buct.edu.cn"
     admin_password = "admin123"
     admin_name = "System Administrator"

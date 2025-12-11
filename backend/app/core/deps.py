@@ -12,6 +12,7 @@ from app.models.user import User
 
 # OAuth2 scheme for token authentication
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -83,3 +84,26 @@ async def get_current_admin_user(
             detail="Not enough permissions"
         )
     return current_user
+
+
+async def get_optional_current_user(
+    token: Optional[str] = Depends(oauth2_scheme_optional),
+    db: AsyncSession = Depends(get_db)
+) -> Optional[User]:
+    """
+    Get current user if authenticated, otherwise return None
+    Used for public endpoints that behave differently for logged-in users
+    """
+    if not token:
+        return None
+    
+    payload = decode_access_token(token)
+    if payload is None:
+        return None
+    
+    email: Optional[str] = payload.get("sub")
+    if email is None:
+        return None
+    
+    user = await user_crud.get_user_by_email(db, email=email)
+    return user

@@ -73,3 +73,5 @@ htmlcov/
 
 # Alembic
 backend/alembic/versions/*.pyc
+
+.qoder

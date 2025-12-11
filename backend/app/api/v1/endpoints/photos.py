@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, s
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
-from app.core.deps import get_db, get_current_user
+from app.core.deps import get_db, get_current_user, get_optional_current_user
 from app.models.user import User
 from app.models.photo import Photo
 from app.schemas.photo import (
@@ -24,6 +24,97 @@ logger = logging.getLogger(__name__)
 
 
 router = APIRouter()
+
+
+@router.get("/public", response_model=PhotoListResponse)
+async def list_public_photos(
+    skip: int = 0,
+    limit: int = 20,
+    season: Optional[str] = None,
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+    tag: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    List approved photos for public access (no authentication required)
+    
+    Only returns photos with status='approved'
+    """
+    # Limit maximum page size
+    limit = min(limit, 100)
+    
+    photos, total = await photo_crud.get_photos(
+        db,
+        skip=skip,
+        limit=limit,
+        status='approved',  # Only approved photos
+        season=season,
+        category=category,
+        search=search,
+        tag=tag
+    )
+    
+    # Convert to response format
+    photo_responses = []
+    for photo in photos:
+        # Get tags for this photo
+        tags = await photo_crud.get_photo_tags(db, photo.id)
+        tag_names = [tag.name for tag in tags]
+        
+        # Convert to dict and add tag names
+        photo_dict = {**photo.__dict__}
+        photo_dict.pop('_sa_instance_state', None)
+        photo_dict['tags'] = tag_names
+        photo_dict['uploader_name'] = None
+        
+        photo_response = PhotoResponse(**photo_dict)
+        photo_responses.append(photo_response)
+    
+    page = skip // limit + 1 if limit > 0 else 1
+    
+    return PhotoListResponse(
+        total=total,
+        page=page,
+        page_size=limit,
+        items=photo_responses
+    )
+
+
+@router.get("/public/{photo_id}", response_model=PhotoResponse)
+async def get_public_photo(
+    photo_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get a specific approved photo by ID (no authentication required)
+    """
+    photo = await photo_crud.get_photo_with_tags(db, photo_id)
+    
+    if not photo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Photo not found"
+        )
+    
+    # Only allow access to approved photos
+    if photo.status != 'approved':
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Photo not found"
+        )
+    
+    # Get tags for this photo
+    tags = await photo_crud.get_photo_tags(db, photo.id)
+    tag_names = [tag.name for tag in tags]
+    
+    # Convert photo to dict and add tag names
+    photo_dict = {**photo.__dict__}
+    photo_dict.pop('_sa_instance_state', None)
+    photo_dict['tags'] = tag_names
+    photo_dict['uploader_name'] = None
+    
+    return PhotoResponse(**photo_dict)
 
 
 async def process_photo_ai_tagging(photo_id: str, original_path: str):
@@ -209,6 +300,7 @@ async def list_photos(
     season: Optional[str] = None,
     category: Optional[str] = None,
     search: Optional[str] = None,
+    tag: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -220,7 +312,8 @@ async def list_photos(
     - **status**: Filter by status
     - **season**: Filter by season
     - **category**: Filter by category
-    - **search**: Search in filename and description
+    - **search**: Search in filename, description, and tags
+    - **tag**: Filter by specific tag name
     """
     # Limit maximum page size
     limit = min(limit, 100)
@@ -232,7 +325,8 @@ async def list_photos(
         status=status,
         season=season,
         category=category,
-        search=search
+        search=search,
+        tag=tag
     )
     
     # Convert to response format
