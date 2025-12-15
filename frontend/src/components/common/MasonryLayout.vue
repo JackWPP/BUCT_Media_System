@@ -55,10 +55,30 @@ const columnCount = computed(() => {
 const columns = computed(() => {
   const count = columnCount.value
   const res = Array.from({ length: count }, () => [] as any[])
+  const colHeights = new Array(count).fill(0)
   
-  // Round-robin distribution
-  props.items.forEach((item, index) => {
-    res[index % count].push(item)
+  props.items.forEach((item) => {
+    // 找到当前高度最小的列
+    let minHeight = colHeights[0]
+    let minIndex = 0
+    
+    for (let i = 1; i < count; i++) {
+      if (colHeights[i] < minHeight) {
+        minHeight = colHeights[i]
+        minIndex = i
+      }
+    }
+    
+    // 将图片添加到该列
+    res[minIndex].push(item)
+    
+    // 更新列高度
+    // 默认假设宽高比为 4:3 (0.75)
+    let aspectRatio = 0.75
+    if (item.width && item.height) {
+      aspectRatio = item.height / item.width
+    }
+    colHeights[minIndex] += aspectRatio
   })
   
   return res

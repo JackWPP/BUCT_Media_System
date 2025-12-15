@@ -14,7 +14,15 @@
           <!-- 左侧:图片展示 -->
           <n-grid-item>
             <div class="image-preview">
+              <div class="nav-btn prev" v-if="hasPrev" @click="$emit('prev')">
+                <n-icon size="30" color="white" :component="ChevronBackOutline" />
+              </div>
+              <div class="nav-btn next" v-if="hasNext" @click="$emit('next')">
+                <n-icon size="30" color="white" :component="ChevronForwardOutline" />
+              </div>
+              
               <img
+                :key="photo.id"
                 :src="getImageUrl(photo)"
                 :alt="photo.filename"
                 class="preview-image"
@@ -174,9 +182,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useMessage } from 'naive-ui'
-import { DownloadOutline, ShareSocialOutline } from '@vicons/ionicons5'
+import { DownloadOutline, ShareSocialOutline, ChevronBackOutline, ChevronForwardOutline } from '@vicons/ionicons5'
 import type { Photo, PhotoUpdate } from '../../types/photo'
 import { usePhotoStore } from '../../stores/photo'
 import { getPopularTags, getPublicTags, addPhotoTags, removePhotoTag, type Tag } from '../../api/tag'
@@ -185,20 +193,45 @@ import dayjs from 'dayjs'
 interface Props {
   photoId?: string | null
   show?: boolean
-  adminMode?: boolean  // 是否在管理后台使用（使用已认证 API）
+  adminMode?: boolean
+  hasPrev?: boolean
+  hasNext?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   photoId: null,
   show: false,
   adminMode: false,
+  hasPrev: false,
+  hasNext: false,
 })
 
 const emit = defineEmits<{
   'update:show': [value: boolean]
   'deleted': []
   'updated': []
+  'prev': []
+  'next': []
 }>()
+
+// Keyboard navigation
+function handleKeydown(e: KeyboardEvent) {
+  if (!props.show) return
+  
+  if (e.key === 'ArrowLeft' && props.hasPrev) {
+    emit('prev')
+  } else if (e.key === 'ArrowRight' && props.hasNext) {
+    emit('next')
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+})
 
 const message = useMessage()
 const photoStore = usePhotoStore()
@@ -238,6 +271,13 @@ const hasChanges = computed(() => {
 watch(() => props.show, (val) => {
   showModal.value = val
   if (val && props.photoId) {
+    loadPhotoDetail()
+  }
+})
+
+// 当 photoId 变化时（导航切换），重新加载照片详情
+watch(() => props.photoId, (newId, oldId) => {
+  if (newId && newId !== oldId && props.show) {
     loadPhotoDetail()
   }
 })
@@ -557,6 +597,41 @@ function copyToClipboard(text: string) {
   border-radius: 12px;
   overflow: hidden;
   background: #000;
+  position: relative;
+}
+
+.nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 10;
+  opacity: 0;
+}
+
+.image-preview:hover .nav-btn {
+  opacity: 1;
+}
+
+.nav-btn:hover {
+  background: rgba(0, 0, 0, 0.6);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.nav-btn.prev {
+  left: 16px;
+}
+
+.nav-btn.next {
+  right: 16px;
 }
 
 .preview-image {

@@ -205,6 +205,10 @@
     <PhotoDetail
       v-model:show="showPhotoDetail"
       :photo-id="selectedPhotoId"
+      :has-prev="hasPrevPhoto"
+      :has-next="hasNextPhoto"
+      @prev="handlePrevPhoto"
+      @next="handleNextPhoto"
       @deleted="handlePhotoDeleted"
       @updated="handlePhotoUpdated"
     />
@@ -431,6 +435,29 @@ function handleUserMenuSelect(key: string) {
 function handlePhotoClick(photo: Photo) {
   selectedPhotoId.value = photo.id
   showPhotoDetail.value = true
+}
+
+// 导航逻辑
+const currentPhotoIndex = computed(() => {
+  if (!selectedPhotoId.value) return -1
+  return photoStore.photos.findIndex(p => p.id === selectedPhotoId.value)
+})
+
+const hasPrevPhoto = computed(() => currentPhotoIndex.value > 0)
+const hasNextPhoto = computed(() => currentPhotoIndex.value !== -1 && currentPhotoIndex.value < photoStore.photos.length - 1)
+
+function handlePrevPhoto() {
+  if (hasPrevPhoto.value) {
+    const prevPhoto = photoStore.photos[currentPhotoIndex.value - 1]
+    selectedPhotoId.value = prevPhoto.id
+  }
+}
+
+function handleNextPhoto() {
+  if (hasNextPhoto.value) {
+    const nextPhoto = photoStore.photos[currentPhotoIndex.value + 1]
+    selectedPhotoId.value = nextPhoto.id
+  }
 }
 
 // 照片删除后
