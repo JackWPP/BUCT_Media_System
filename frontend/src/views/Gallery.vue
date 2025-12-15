@@ -163,10 +163,10 @@
                     <div class="photo-info">
                       <n-space size="small" style="margin-top: 8px;" wrap>
                         <n-tag v-if="photo.season" size="small" type="success">
-                          {{ photo.season }}
+                          {{ SEASON_MAP[photo.season] || photo.season }}
                         </n-tag>
                         <n-tag v-if="photo.category" size="small" type="info">
-                          {{ photo.category }}
+                          {{ CATEGORY_MAP[photo.category] || photo.category }}
                         </n-tag>
                         <n-tag 
                           v-for="tag in photo.tags?.slice(0, 3)" 
@@ -238,6 +238,7 @@ const searchKeyword = ref('')
 const activeMenu = ref('all')
 const showPhotoDetail = ref(false)
 const selectedPhotoId = ref<string | null>(null)
+const gridCols = ref(4)
 
 // 标签相关
 const loadingTags = ref(false)
@@ -294,20 +295,12 @@ const userMenuOptions = computed(() => {
 })
 
 // 季节选项
-const seasonOptions = [
-  { label: 'Spring', value: 'Spring' },
-  { label: 'Summer', value: 'Summer' },
-  { label: 'Autumn', value: 'Autumn' },
-  { label: 'Winter', value: 'Winter' },
-]
+import { SEASON_OPTIONS, CATEGORY_OPTIONS, SEASON_MAP, CATEGORY_MAP } from '../constants/options'
+
+const seasonOptions = SEASON_OPTIONS
 
 // 类别选项
-const categoryOptions = [
-  { label: 'Landscape', value: 'Landscape' },
-  { label: 'Portrait', value: 'Portrait' },
-  { label: 'Activity', value: 'Activity' },
-  { label: 'Documentary', value: 'Documentary' },
-]
+const categoryOptions = CATEGORY_OPTIONS
 
 // 获取图片URL - 增强兼容性处理
 function getImageUrl(photo: Photo) {

@@ -232,7 +232,7 @@ import { useUploadStore } from '../stores/upload'
 const router = useRouter()
 const message = useMessage()
 const uploadStore = useUploadStore()
-const { fileList, uploading, metadata, pendingCount, successCount, errorCount, canUpload, allUploaded: storeAllUploaded } = storeToRefs(uploadStore)
+const { fileList, uploading, metadata, pendingCount, successCount, errorCount, canUpload } = storeToRefs(uploadStore)
 
 // 重新计算 allUploaded 以匹配 store 的状态 (如果 store 没有直接暴露 allUploaded)
 // storeToRefs 会解包 ref，如果 store getters 没有被正确解包，我们可以在这里重新定义 computed
@@ -244,19 +244,11 @@ const allUploaded = computed(() => {
          successCount.value > 0
 })
 
-const seasonOptions = [
-  { label: 'Spring', value: 'Spring' },
-  { label: 'Summer', value: 'Summer' },
-  { label: 'Autumn', value: 'Autumn' },
-  { label: 'Winter', value: 'Winter' },
-]
+import { SEASON_OPTIONS, CATEGORY_OPTIONS } from '../constants/options'
 
-const categoryOptions = [
-  { label: 'Landscape', value: 'Landscape' },
-  { label: 'Portrait', value: 'Portrait' },
-  { label: 'Activity', value: 'Activity' },
-  { label: 'Documentary', value: 'Documentary' },
-]
+const seasonOptions = SEASON_OPTIONS
+
+const categoryOptions = CATEGORY_OPTIONS
 
 function handleBeforeUpload(options: { file: File }) {
   const { file } = options

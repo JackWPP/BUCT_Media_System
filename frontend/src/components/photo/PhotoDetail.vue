@@ -220,19 +220,11 @@ const formData = ref({
   description: null as string | null,
 })
 
-const seasonOptions = [
-  { label: 'Spring', value: 'Spring' },
-  { label: 'Summer', value: 'Summer' },
-  { label: 'Autumn', value: 'Autumn' },
-  { label: 'Winter', value: 'Winter' },
-]
+import { SEASON_OPTIONS, CATEGORY_OPTIONS } from '../../constants/options'
 
-const categoryOptions = [
-  { label: 'Landscape', value: 'Landscape' },
-  { label: 'Portrait', value: 'Portrait' },
-  { label: 'Activity', value: 'Activity' },
-  { label: 'Documentary', value: 'Documentary' },
-]
+const seasonOptions = SEASON_OPTIONS
+
+const categoryOptions = CATEGORY_OPTIONS
 
 const hasChanges = computed(() => {
   if (!photo.value) return false
