@@ -44,7 +44,8 @@ import {
   ImagesOutline, 
   PricetagsOutline, 
   CloudUploadOutline,
-  CheckmarkCircleOutline
+  CheckmarkCircleOutline,
+  BarChartOutline
 } from '@vicons/ionicons5'
 import type { MenuOption } from 'naive-ui'
 import { useAuthStore } from '../stores/auth'
@@ -63,6 +64,11 @@ function renderMenuIcon(icon: any) {
 }
 
 const menuOptions: MenuOption[] = [
+  {
+    label: '仪表盘',
+    key: 'Dashboard',
+    icon: renderMenuIcon(BarChartOutline),
+  },
   {
     label: '照片审核',
     key: 'PhotoReview',

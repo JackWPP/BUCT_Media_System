@@ -23,9 +23,11 @@
     "@vueuse/core": "^14.1.0",
     "axios": "^1.13.2",
     "dayjs": "^1.11.19",
+    "echarts": "^6.0.0",
     "naive-ui": "^2.43.2",
     "pinia": "^3.0.4",
     "vue": "^3.5.25",
+    "vue-echarts": "^8.0.1",
     "vue-router": "^4.6.3"
   }
 }

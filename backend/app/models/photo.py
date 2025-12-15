@@ -33,6 +33,7 @@ class Photo(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     captured_at = Column(DateTime)  # 拍摄时间
     published_at = Column(DateTime)  # 上线时间
+    views = Column(Integer, default=0)  # 浏览量
 
     # 关系
     uploader = relationship("User", back_populates="photos")

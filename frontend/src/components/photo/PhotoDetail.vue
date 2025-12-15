@@ -188,6 +188,7 @@ import { DownloadOutline, ShareSocialOutline, ChevronBackOutline, ChevronForward
 import type { Photo, PhotoUpdate } from '../../types/photo'
 import { usePhotoStore } from '../../stores/photo'
 import { getPopularTags, getPublicTags, addPhotoTags, removePhotoTag, type Tag } from '../../api/tag'
+import { incrementView } from '../../api/stats'
 import dayjs from 'dayjs'
 
 interface Props {
@@ -386,6 +387,11 @@ async function loadPhotoDetail() {
       category: data.category,
       description: data.description,
     }
+
+    // 增加浏览量
+    incrementView(props.photoId).catch(err => {
+      console.error('Failed to increment view count', err)
+    })
     
     // 加载所有标签（用于删除时获取 ID）
     await loadAllTags()
