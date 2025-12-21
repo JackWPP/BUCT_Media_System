@@ -55,7 +55,7 @@ async def health_check():
     return {"status": "healthy"}
 
 
-@app.get("/api/v1/download/{folder}/{filename}")
+@app.get("/api/v1/download/{folder}/{filename:path}")
 async def download_file(folder: str, filename: str):
     """
     文件下载API端点，支持CORS

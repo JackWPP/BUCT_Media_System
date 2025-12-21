@@ -289,32 +289,27 @@ watch(showModal, (val) => {
 
 function getImageUrl(photo: Photo) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-  let path = (photo.original_path || '').replace(/\\/g, '/')
   
-  // 尝试从路径中提取 'uploads/' 开始的部分
-  // 这可以处理后端存储了绝对路径的情况 (例如 D:/backend/uploads/...)
-  const uploadsIndex = path.indexOf('uploads/')
-  if (uploadsIndex !== -1) {
-    path = path.substring(uploadsIndex)
-  }
+  // 获取文件后缀
+  const filename = photo.filename || ''
+  const extIndex = filename.lastIndexOf('.')
+  const ext = extIndex !== -1 ? filename.substring(extIndex) : ''
   
-  // 确保没有前导 /
-  if (path.startsWith('/')) path = path.substring(1)
-  
-  return path ? `${baseUrl}/${path}` : ''
+  // 构造标准路径: /uploads/originals/{uuid}{ext}
+  // 注意：后端静态挂载点是 /uploads
+  // 这种方式规避了数据库中存储绝对路径(如F:/...)导致的问题
+  return `${baseUrl}/uploads/originals/${photo.id}${ext}`
 }
 
 function getThumbnailUrl(photo: Photo) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-  let path = (photo.thumb_path || '').replace(/\\/g, '/')
   
-  const uploadsIndex = path.indexOf('uploads/')
-  if (uploadsIndex !== -1) {
-    path = path.substring(uploadsIndex)
-  }
-  
-  if (path.startsWith('/')) path = path.substring(1)
-  return path ? `${baseUrl}/${path}` : ''
+  const filename = photo.filename || ''
+  const extIndex = filename.lastIndexOf('.')
+  const ext = extIndex !== -1 ? filename.substring(extIndex) : ''
+
+  // 缩略图路径规范
+  return `${baseUrl}/uploads/thumbnails/${photo.id}${ext}`
 }
 
 function handleImageError(e: Event) {
@@ -532,16 +527,7 @@ async function downloadImage() {
   try {
     // 使用下载API端点（支持CORS）
     const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-    // original_path 格式为 /uploads/originals/xxx.jpg
-    // 转换为 /api/v1/download/originals/xxx.jpg
-    const pathParts = photo.value.original_path?.replace('/uploads/', '').split('/') || []
-    if (pathParts.length < 2) {
-      message.error('无效的文件路径')
-      return
-    }
-    const folder = pathParts[0]
-    const filename = pathParts.slice(1).join('/')
-    const downloadUrl = `${baseUrl}/api/v1/download/${folder}/${filename}`
+    const downloadUrl = `${baseUrl}/api/v1/photos/${photo.value.id}/download`
     
     const response = await fetch(downloadUrl)
     if (!response.ok) {

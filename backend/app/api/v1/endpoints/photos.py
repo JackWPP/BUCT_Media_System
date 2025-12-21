@@ -3,6 +3,7 @@ Photo API endpoints
 """
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status, BackgroundTasks
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
@@ -753,4 +754,54 @@ async def remove_photo_tag(
     photo_dict['tags'] = tag_names_list
     photo_dict['uploader_name'] = None
     
+    
+    
     return PhotoResponse(**photo_dict)
+
+
+@router.get("/{photo_id}/download")
+async def download_photo(
+    photo_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Download photo by ID. Handles both relative and absolute paths.
+    """
+    photo = await photo_crud.get_photo(db, photo_id)
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    
+    file_path = photo.original_path
+    
+    # Check if file exists
+    if not os.path.exists(file_path):
+        # Fallback: check standard uploads directory
+        # Import settings to get UPLOAD_DIR
+        from app.core.config import get_settings
+        settings = get_settings()
+        
+        # Try to find file with UUID name in originals folder
+        # We need the extension from the original filename
+        _, ext = os.path.splitext(photo.filename)
+        fallback_path = os.path.join(settings.UPLOAD_DIR, "originals", f"{photo.id}{ext}")
+        
+        if os.path.exists(fallback_path):
+            file_path = fallback_path
+        else:
+            # Try lowercase extension if not found
+            fallback_path_lower = os.path.join(settings.UPLOAD_DIR, "originals", f"{photo.id}{ext.lower()}")
+            if os.path.exists(fallback_path_lower):
+                 file_path = fallback_path_lower
+            else:
+                 # Last resort: try just UUID (some files might not have extensions in storage or different case)
+                 # This is tricky without knowing exact extension. 
+                 # Let's list files in directory matching UUID? No, that's slow.
+                 # Just report not found if these attempts fail.
+                 logger.error(f"File not found at {photo.original_path} or {fallback_path}")
+                 raise HTTPException(status_code=404, detail="File not found on server")
+
+    return FileResponse(
+        path=file_path,
+        filename=photo.filename,
+        media_type="application/octet-stream"
+    )
