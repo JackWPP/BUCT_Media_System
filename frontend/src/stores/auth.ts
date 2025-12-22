@@ -57,10 +57,10 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // 用户登录
-  async function login(email: string, password: string) {
+  // 用户登录（支持学号或邮箱）
+  async function login(identifier: string, password: string) {
     try {
-      const response = await authApi.login({ email, password })
+      const response = await authApi.login({ identifier, password })
       token.value = response.access_token
       user.value = response.user
 

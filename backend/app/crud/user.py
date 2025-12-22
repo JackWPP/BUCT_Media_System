@@ -21,6 +21,16 @@ async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
     return result.scalar_one_or_none()
 
 
+async def get_user_by_student_id(db: AsyncSession, student_id: str) -> Optional[User]:
+    """
+    Get user by student_id
+    
+    通过学号/工号查询用户。
+    """
+    result = await db.execute(select(User).filter(User.student_id == student_id))
+    return result.scalar_one_or_none()
+
+
 async def get_user_by_id(db: AsyncSession, user_id: str) -> Optional[User]:
     """
     Get user by ID
@@ -36,9 +46,11 @@ async def create_user(db: AsyncSession, user: UserCreate, role: str = "user") ->
     Create a new user
     
     创建新用户（普通注册）。
+    必须包含 student_id。
     """
     hashed_password = get_password_hash(user.password)
     db_user = User(
+        student_id=user.student_id,
         email=user.email,
         hashed_password=hashed_password,
         full_name=user.full_name,
@@ -54,7 +66,7 @@ async def create_user_by_admin(db: AsyncSession, user_data: UserCreateByAdmin) -
     """
     管理员创建用户
     
-    支持指定角色。
+    支持指定角色和学号。
     """
     hashed_password = get_password_hash(user_data.password)
     db_user = User(
@@ -62,6 +74,7 @@ async def create_user_by_admin(db: AsyncSession, user_data: UserCreateByAdmin) -
         hashed_password=hashed_password,
         full_name=user_data.full_name,
         role=user_data.role.value,  # 从枚举获取字符串值
+        student_id=user_data.student_id,  # 学号
     )
     db.add(db_user)
     await db.commit()
@@ -69,13 +82,22 @@ async def create_user_by_admin(db: AsyncSession, user_data: UserCreateByAdmin) -
     return db_user
 
 
-async def authenticate_user(db: AsyncSession, email: str, password: str) -> Optional[User]:
+async def authenticate_user(db: AsyncSession, identifier: str, password: str) -> Optional[User]:
     """
-    Authenticate user by email and password
+    Authenticate user by email/student_id and password
     
-    验证用户凭据。
+    支持邮箱或学号登录。
+    
+    Args:
+        db: 数据库会话
+        identifier: 邮箱或学号
+        password: 密码
     """
-    user = await get_user_by_email(db, email)
+    # 先尝试邮箱查找
+    user = await get_user_by_email(db, identifier)
+    if not user:
+        # 再尝试学号查找
+        user = await get_user_by_student_id(db, identifier)
     if not user:
         return None
     if not verify_password(password, user.hashed_password):
@@ -108,7 +130,12 @@ async def get_users(
     
     # 搜索过滤
     if search:
-        search_filter = (User.email.ilike(f"%{search}%")) | (User.full_name.ilike(f"%{search}%"))
+        # 支持搜索邮箱、姓名或学号
+        search_filter = (
+            (User.email.ilike(f"%{search}%")) | 
+            (User.full_name.ilike(f"%{search}%")) |
+            (User.student_id.ilike(f"%{search}%"))
+        )
         query = query.filter(search_filter)
         count_query = count_query.filter(search_filter)
     

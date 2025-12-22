@@ -44,10 +44,11 @@ async def get_current_user(
     Get current authenticated user from token
     
     从 JWT token 中解析并验证当前用户。
+    JWT subject 为 student_id。
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
+        detail="无法验证凭据",
         headers={"WWW-Authenticate": "Bearer"},
     )
     
@@ -55,11 +56,14 @@ async def get_current_user(
     if payload is None:
         raise credentials_exception
     
-    email: Optional[str] = payload.get("sub")
-    if email is None:
+    student_id: Optional[str] = payload.get("sub")
+    if student_id is None:
         raise credentials_exception
     
-    user = await user_crud.get_user_by_email(db, email=email)
+    # 优先按 student_id 查找，回退到 email（兼容旧 token）
+    user = await user_crud.get_user_by_student_id(db, student_id=student_id)
+    if user is None:
+        user = await user_crud.get_user_by_email(db, email=student_id)
     if user is None:
         raise credentials_exception
     
@@ -130,11 +134,14 @@ async def get_optional_current_user(
     if payload is None:
         return None
     
-    email: Optional[str] = payload.get("sub")
-    if email is None:
+    student_id: Optional[str] = payload.get("sub")
+    if student_id is None:
         return None
     
-    user = await user_crud.get_user_by_email(db, email=email)
+    # 优先按 student_id 查找，回退到 email
+    user = await user_crud.get_user_by_student_id(db, student_id=student_id)
+    if user is None:
+        user = await user_crud.get_user_by_email(db, email=student_id)
     return user
 
 

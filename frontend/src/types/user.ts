@@ -15,13 +15,14 @@ export interface User {
   id: string
   email: string
   full_name: string | null
+  student_id: string | null  // 学号/工号，核心身份标识
   role: UserRole
   is_active: boolean
   created_at: string
 }
 
 export interface LoginRequest {
-  email: string
+  identifier: string  // 学号或邮箱
   password: string
 }
 
@@ -39,6 +40,7 @@ export interface UserCreateRequest {
   full_name?: string
   password: string
   role?: UserRole
+  student_id?: string  // 学号/工号
 }
 
 /**
@@ -50,6 +52,7 @@ export interface UserUpdateRequest {
   password?: string
   is_active?: boolean
   role?: UserRole
+  student_id?: string
 }
 
 /**

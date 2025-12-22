@@ -6,9 +6,9 @@
         <n-space>
           <n-input
             v-model:value="searchQuery"
-            placeholder="搜索用户..."
+            placeholder="搜索学号/邮箱/姓名..."
             clearable
-            style="width: 200px"
+            style="width: 220px"
             @keyup.enter="fetchUsers"
           >
             <template #prefix>
@@ -59,8 +59,11 @@
         label-placement="left"
         label-width="80px"
       >
+        <n-form-item label="学号" path="student_id">
+          <n-input v-model:value="createForm.student_id" placeholder="请输入学号/工号（必填）" />
+        </n-form-item>
         <n-form-item label="邮箱" path="email">
-          <n-input v-model:value="createForm.email" placeholder="请输入邮箱" />
+          <n-input v-model:value="createForm.email" placeholder="请输入邮箱（可选）" />
         </n-form-item>
         <n-form-item label="姓名" path="full_name">
           <n-input v-model:value="createForm.full_name" placeholder="请输入姓名（可选）" />
@@ -99,6 +102,9 @@
         label-placement="left"
         label-width="80px"
       >
+        <n-form-item label="学号">
+          <n-input v-model:value="editForm.student_id" placeholder="请输入学号/工号" />
+        </n-form-item>
         <n-form-item label="邮箱">
           <n-input v-model:value="editForm.email" placeholder="请输入邮箱" />
         </n-form-item>
@@ -172,6 +178,7 @@ const editingUserId = ref<string | null>(null)
 
 // 表单数据
 const createForm = reactive<UserCreateRequest>({
+  student_id: '',
   email: '',
   full_name: '',
   password: '',
@@ -179,6 +186,7 @@ const createForm = reactive<UserCreateRequest>({
 })
 
 const editForm = reactive<UserUpdateRequest & { is_active: boolean }>({
+  student_id: '',
   email: '',
   full_name: '',
   password: '',
@@ -194,9 +202,9 @@ const roleOptions = [
   { label: '普通用户', value: 'user' },
 ]
 
-// 表单验证规则
+// 表单验证规则 - 学号必填，邮箱可选
 const createRules = {
-  email: [{ required: true, message: '请输入邮箱', trigger: 'blur' }],
+  student_id: [{ required: true, message: '请输入学号/工号', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
 }
 
@@ -208,8 +216,9 @@ const roleTagMap: Record<UserRole, { label: string; type: 'success' | 'warning' 
   user: { label: '普通用户', type: 'default' },
 }
 
-// 表格列定义
+// 表格列定义 - 学号作为第一列
 const columns: DataTableColumns<User> = [
+  { title: '学号', key: 'student_id', width: 120, ellipsis: { tooltip: true } },
   { title: '邮箱', key: 'email', ellipsis: { tooltip: true } },
   { title: '姓名', key: 'full_name', width: 120 },
   {
@@ -303,6 +312,7 @@ async function handleCreate() {
 
 function openEditModal(user: User) {
   editingUserId.value = user.id
+  editForm.student_id = user.student_id || ''
   editForm.email = user.email
   editForm.full_name = user.full_name || ''
   editForm.password = ''
@@ -317,6 +327,7 @@ async function handleUpdate() {
   submitting.value = true
   try {
     const updateData: UserUpdateRequest = {
+      student_id: editForm.student_id,
       email: editForm.email,
       full_name: editForm.full_name,
       role: editForm.role,
@@ -355,6 +366,7 @@ function handleDelete(user: User) {
 }
 
 function resetCreateForm() {
+  createForm.student_id = ''
   createForm.email = ''
   createForm.full_name = ''
   createForm.password = ''
