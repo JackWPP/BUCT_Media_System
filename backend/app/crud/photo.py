@@ -83,7 +83,8 @@ async def get_photos(
     season: Optional[str] = None,
     category: Optional[str] = None,
     search: Optional[str] = None,
-    tag: Optional[str] = None
+    tag: Optional[str] = None,
+    exclude_categories: Optional[List[str]] = None
 ) -> tuple[List[Photo], int]:
     """
     Get photos with filtering and pagination
@@ -98,6 +99,7 @@ async def get_photos(
         category: Filter by category
         search: Search in filename, description, and tags
         tag: Filter by specific tag name
+        exclude_categories: 排除的类别列表（用于权限控制，如排除 Portrait）
     
     Returns:
         Tuple of (list of photos, total count)
@@ -121,6 +123,12 @@ async def get_photos(
     if category:
         query = query.where(Photo.category == category)
         count_query = count_query.where(Photo.category == category)
+    
+    # 排除特定类别（用于人像可见性控制）
+    if exclude_categories:
+        for exc_cat in exclude_categories:
+            query = query.where(Photo.category != exc_cat)
+            count_query = count_query.where(Photo.category != exc_cat)
     
     # 标签筛选 - 通过关联表查询
     if tag:

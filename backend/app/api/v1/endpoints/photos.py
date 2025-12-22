@@ -1,5 +1,8 @@
 """
 Photo API endpoints
+
+照片相关 API 端点，包括公开访问、上传、审核等功能。
+支持基于系统配置的人像照片可见性控制。
 """
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status, BackgroundTasks
@@ -7,9 +10,13 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
-from app.core.deps import get_db, get_current_user, get_optional_current_user
+from app.core.deps import (
+    get_db, get_current_user, get_optional_current_user,
+    get_portrait_visibility
+)
 from app.models.user import User
 from app.models.photo import Photo
+from app.models.system_config import PortraitVisibility
 from app.schemas.photo import (
     PhotoResponse, PhotoListResponse, PhotoUploadResponse,
     PhotoUpdate
@@ -35,15 +42,47 @@ async def list_public_photos(
     category: Optional[str] = None,
     search: Optional[str] = None,
     tag: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    portrait_visibility: str = Depends(get_portrait_visibility)
 ):
     """
-    List approved photos for public access (no authentication required)
+    List approved photos for public access
     
-    Only returns photos with status='approved'
+    根据系统配置的人像可见性设置，对 Portrait 类别照片进行过滤：
+    - public: 所有人可见
+    - login_required: 仅登录用户可见
+    - authorized_only: 仅授权用户可见（暂同 login_required）
+    
+    如果用户未登录且请求 Portrait 类别，该类别将被自动排除。
     """
     # Limit maximum page size
     limit = min(limit, 100)
+    
+    # 检查是否需要过滤人像照片
+    should_filter_portrait = False
+    
+    if portrait_visibility == PortraitVisibility.LOGIN_REQUIRED:
+        # 需要登录才能查看人像
+        if not current_user:
+            should_filter_portrait = True
+    elif portrait_visibility == PortraitVisibility.AUTHORIZED_ONLY:
+        # 仅授权用户可见（暂时实现为需要登录）
+        if not current_user:
+            should_filter_portrait = True
+    # portrait_visibility == 'public' 时不过滤
+    
+    # 如果用户明确请求 Portrait 类别但无权访问
+    if category == 'Portrait' and should_filter_portrait:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="人像照片需要登录后才能查看"
+        )
+    
+    # 构建排除类别列表
+    exclude_categories = []
+    if should_filter_portrait:
+        exclude_categories.append('Portrait')
     
     photos, total = await photo_crud.get_photos(
         db,
@@ -53,7 +92,8 @@ async def list_public_photos(
         season=season,
         category=category,
         search=search,
-        tag=tag
+        tag=tag,
+        exclude_categories=exclude_categories if exclude_categories else None
     )
     
     # Convert to response format
@@ -85,10 +125,14 @@ async def list_public_photos(
 @router.get("/public/{photo_id}", response_model=PhotoResponse)
 async def get_public_photo(
     photo_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    portrait_visibility: str = Depends(get_portrait_visibility)
 ):
     """
-    Get a specific approved photo by ID (no authentication required)
+    Get a specific approved photo by ID
+    
+    根据系统配置的人像可见性设置，对 Portrait 类别照片进行权限检查。
     """
     photo = await photo_crud.get_photo_with_tags(db, photo_id)
     
@@ -104,6 +148,22 @@ async def get_public_photo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Photo not found"
         )
+    
+    # 检查人像照片访问权限
+    if photo.category == 'Portrait':
+        should_block = False
+        if portrait_visibility == PortraitVisibility.LOGIN_REQUIRED:
+            if not current_user:
+                should_block = True
+        elif portrait_visibility == PortraitVisibility.AUTHORIZED_ONLY:
+            if not current_user:
+                should_block = True
+        
+        if should_block:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="人像照片需要登录后才能查看"
+            )
     
     # Get tags for this photo
     tags = await photo_crud.get_photo_tags(db, photo.id)
