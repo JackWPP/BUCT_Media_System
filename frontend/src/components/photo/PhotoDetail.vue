@@ -287,29 +287,14 @@ watch(showModal, (val) => {
   emit('update:show', val)
 })
 
+import { getPhotoUrl } from '../../utils/format'
+
 function getImageUrl(photo: Photo) {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-  
-  // 获取文件后缀
-  const filename = photo.filename || ''
-  const extIndex = filename.lastIndexOf('.')
-  const ext = extIndex !== -1 ? filename.substring(extIndex) : ''
-  
-  // 构造标准路径: /uploads/originals/{uuid}{ext}
-  // 注意：后端静态挂载点是 /uploads
-  // 这种方式规避了数据库中存储绝对路径(如F:/...)导致的问题
-  return `${baseUrl}/uploads/originals/${photo.id}${ext}`
+  return getPhotoUrl(photo.id, 'original')
 }
 
 function getThumbnailUrl(photo: Photo) {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-  
-  const filename = photo.filename || ''
-  const extIndex = filename.lastIndexOf('.')
-  const ext = extIndex !== -1 ? filename.substring(extIndex) : ''
-
-  // 缩略图路径规范
-  return `${baseUrl}/uploads/thumbnails/${photo.id}${ext}`
+  return getPhotoUrl(photo.id, 'thumbnail')
 }
 
 function handleImageError(e: Event) {
@@ -526,7 +511,7 @@ async function downloadImage() {
   
   try {
     // 使用下载API端点（支持CORS）
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '/api')
     const downloadUrl = `${baseUrl}/api/v1/photos/${photo.value.id}/download`
     
     const response = await fetch(downloadUrl)

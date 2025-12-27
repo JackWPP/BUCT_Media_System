@@ -55,6 +55,8 @@ export interface PhotoListParams {
   category?: string
   search?: string
   tag?: string
+  sort_by?: string
+  sort_order?: string
 }
 
 export interface PhotoListResponse {
@@ -70,4 +72,6 @@ export interface PhotoFilters {
   status?: string | null
   search?: string
   tag?: string | null
+  sortBy?: string
+  sortOrder?: string
 }

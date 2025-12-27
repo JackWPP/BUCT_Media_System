@@ -136,6 +136,49 @@
         </n-space>
       </template>
     </n-modal>
+
+    <!-- 权限管理弹窗 -->
+    <n-modal
+      v-model:show="showPermissionModal"
+      preset="card"
+      title="权限管理"
+      style="width: 700px"
+    >
+      <template #header-extra>
+        当前用户: {{ activeUser?.full_name }} ({{ activeUser?.student_id }})
+      </template>
+
+      <n-space vertical size="large">
+        <!-- 现有权限列表 -->
+        <n-card size="small" title="已授予权限">
+          <n-data-table
+            :columns="permissionColumns"
+            :data="userPermissions"
+            :loading="permissionLoading"
+            size="small"
+            :max-height="200"
+          />
+        </n-card>
+
+        <!-- 新增授权 -->
+        <n-card size="small" title="新增授权">
+          <n-form inline :model="permissionForm" label-placement="left">
+            <n-form-item label="资源类别">
+              <n-input value="人像摄影 (Portrait)" disabled style="width: 140px" />
+            </n-form-item>
+            <n-form-item label="有效期(天)">
+              <n-input-number v-model:value="permissionForm.days" :min="1" style="width: 100px" />
+            </n-form-item>
+            <n-form-item label="备注">
+              <n-input v-model:value="permissionForm.note" placeholder="选填" />
+            </n-form-item>
+            <n-form-item>
+              <n-button type="primary" :loading="submitting" @click="handleGrantPermission">授予权限</n-button>
+            </n-form-item>
+          </n-form>
+        </n-card>
+      </n-space>
+    </n-modal>
   </div>
 </template>
 
@@ -146,6 +189,8 @@ import { Search as SearchIcon, Add as AddIcon } from '@vicons/ionicons5'
 import type { DataTableColumns } from 'naive-ui'
 import type { User, UserRole, UserCreateRequest, UserUpdateRequest } from '../../types/user'
 import * as usersApi from '../../api/users'
+import * as permissionApi from '../../api/permissions'
+import type { PermissionResponse, PermissionGrantRequest } from '../../api/permissions'
 import { useAuthStore } from '../../stores/auth'
 
 const message = useMessage()
@@ -192,6 +237,20 @@ const editForm = reactive<UserUpdateRequest & { is_active: boolean }>({
   password: '',
   role: 'user',
   is_active: true,
+})
+
+// 权限管理状态
+const showPermissionModal = ref(false)
+const permissionLoading = ref(false)
+const activeUser = ref<User | null>(null)
+const userPermissions = ref<PermissionResponse[]>([])
+const permissionForm = reactive<PermissionGrantRequest>({
+  student_id: '',
+  resource_type: 'category',
+  resource_key: 'Portrait',
+  permission_type: 'view',
+  days: 30,
+  note: ''
 })
 
 // 角色选项
@@ -250,6 +309,7 @@ const columns: DataTableColumns<User> = [
       const isSelf = row.id === authStore.user?.id
       return h(NSpace, {}, {
         default: () => [
+          h(NButton, { size: 'small', type: 'info', onClick: () => openPermissionModal(row) }, { default: () => '授权' }),
           h(NButton, { size: 'small', onClick: () => openEditModal(row) }, { default: () => '编辑' }),
           h(NButton, { size: 'small', type: 'error', disabled: isSelf, onClick: () => handleDelete(row) }, { default: () => '删除' }),
         ],
@@ -372,6 +432,73 @@ function resetCreateForm() {
   createForm.password = ''
   createForm.role = 'user'
 }
+
+// 权限管理方法
+async function openPermissionModal(user: User) {
+  if (!user.student_id) {
+    message.warning('该用户未绑定学号，无法进行授权管理')
+    return
+  }
+  activeUser.value = user
+  showPermissionModal.value = true
+  permissionForm.student_id = user.student_id
+  permissionForm.days = 30
+  permissionForm.note = ''
+  await fetchUserPermissions(user.student_id)
+}
+
+async function fetchUserPermissions(studentId: string) {
+  permissionLoading.value = true
+  try {
+    const res = await permissionApi.getUserPermissions(studentId)
+    userPermissions.value = res.permissions
+  } catch (error) {
+    message.error('加载权限列表失败')
+  } finally {
+    permissionLoading.value = false
+  }
+}
+
+async function handleGrantPermission() {
+  if (!activeUser.value?.student_id) return
+  
+  submitting.value = true
+  try {
+    await permissionApi.grantPermission(permissionForm)
+    message.success('授权成功')
+    await fetchUserPermissions(activeUser.value.student_id)
+    permissionForm.note = '' // 重置备注
+  } catch (error: any) {
+    message.error(error?.response?.data?.detail || '授权失败')
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function handleRevokePermission(permissionId: string) {
+  try {
+    await permissionApi.revokePermission(permissionId)
+    message.success('已撤销权限')
+    if (activeUser.value?.student_id) {
+      await fetchUserPermissions(activeUser.value.student_id)
+    }
+  } catch (error: any) {
+    message.error(error?.response?.data?.detail || '撤销失败')
+  }
+}
+
+const permissionColumns = [
+  { title: '资源类型', key: 'resource_type', width: 100 },
+  { title: '资源键值', key: 'resource_key', width: 100 },
+  { title: '有效期至', key: 'end_time', width: 180, render: (row: any) => row.end_time ? new Date(row.end_time).toLocaleString() : '永久' },
+  { title: '状态', key: 'is_active', width: 80, render: (row: any) => h(NTag, { type: row.is_active ? 'success' : 'error', size: 'small' }, { default: () => row.is_active ? '有效' : '过期' }) },
+  {
+    title: '操作',
+    key: 'actions',
+    width: 80,
+    render: (row: any) => h(NButton, { size: 'small', type: 'error', onClick: () => handleRevokePermission(row.id) }, { default: () => '撤销' })
+  }
+]
 </script>
 
 <style scoped>

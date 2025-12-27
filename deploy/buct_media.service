@@ -1,0 +1,27 @@
+[Unit]
+Description=BUCT Media System Backend API
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/buct_media/backend
+Environment="PATH=/var/www/buct_media/venv/bin"
+ExecStart=/var/www/buct_media/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+
+# 自动重启
+Restart=always
+RestartSec=5
+
+# 日志
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=buct_media
+
+# 安全配置
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

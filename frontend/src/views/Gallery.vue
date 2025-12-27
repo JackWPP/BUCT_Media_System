@@ -107,6 +107,13 @@
                 :loading="loadingTags"
                 @update:value="handleFilterChange"
               />
+              <n-select
+                v-model:value="photoStore.filters.sortBy"
+                placeholder="排序方式"
+                style="width: 140px;"
+                :options="sortOptions"
+                @update:value="handleFilterChange"
+              />
               <n-button @click="handleClearFilters" secondary>
                 <template #icon>
                   <n-icon :component="RefreshOutline" />
@@ -306,48 +313,23 @@ const seasonOptions = SEASON_OPTIONS
 // 类别选项
 const categoryOptions = CATEGORY_OPTIONS
 
+// 排序选项
+const sortOptions = [
+  { label: '最新上传', value: 'created_at' },
+  { label: '最热门', value: 'views' },
+  { label: '最近发布', value: 'published_at' },
+]
+
 // 获取图片URL - 增强兼容性处理
+// 获取图片URL - 增强兼容性处理
+import { getPhotoUrl } from '../utils/format'
+
 function getImageUrl(photo: Photo) {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-  
-  // 1. 尝试使用原图 (清晰度高)，但前提是路径必须安全 (在 uploads/ 下)
-  let path = (photo.original_path || '').replace(/\\/g, '/')
-  let isSafeOriginal = false
-  
-  const uploadsIndex = path.indexOf('uploads/')
-  if (uploadsIndex !== -1) {
-    path = path.substring(uploadsIndex)
-    isSafeOriginal = true
-  }
-  
-  // 2. 如果原图路径看似不安全 (例如旧数据的 F:/...), 则回退到缩略图
-  if (!isSafeOriginal && photo.thumb_path) {
-    path = photo.thumb_path.replace(/\\/g, '/')
-    // 缩略图通常都在 uploads/ 下，但也做一下处理
-    const thumbIndex = path.indexOf('uploads/')
-    if (thumbIndex !== -1) {
-      path = path.substring(thumbIndex)
-    }
-  }
-  
-  if (!path) return ''
-  
-  // 3. 构造最终 URL
-  if (path.startsWith('http')) return path
-  if (path.startsWith('/')) path = path.substring(1)
-  
-  return `${baseUrl}/${path}`
+  return getPhotoUrl(photo.id, 'original')
 }
 
 function getThumbnailUrl(photo: Photo) {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-  let path = (photo.thumb_path || '').replace(/\\/g, '/')
-  const uploadsIndex = path.indexOf('uploads/')
-  if (uploadsIndex !== -1) {
-    path = path.substring(uploadsIndex)
-  }
-  if (path.startsWith('/')) path = path.substring(1)
-  return path ? `${baseUrl}/${path}` : ''
+   return getPhotoUrl(photo.id, 'thumbnail')
 }
 
 // 图片加载错误处理

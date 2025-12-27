@@ -27,6 +27,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/Upload.vue'),
     meta: { requiresAuth: true },  // 上传需要登录
   },
+  {
+    path: '/my-submissions',
+    name: 'MySubmissions',
+    component: () => import('../views/MySubmissions.vue'),
+    meta: { requiresAuth: true },
+  },
   // 后台管理路由
   {
     path: '/admin',

@@ -39,7 +39,7 @@ export function formatRelativeTime(date: string | Date | null): string {
   if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`
   if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`
   if (diff < 604800) return `${Math.floor(diff / 86400)} 天前`
-  
+
   return target.format('YYYY-MM-DD')
 }
 
@@ -56,6 +56,13 @@ export function truncate(text: string, maxLength: number): string {
  */
 export function getImageUrl(path: string | null, baseUrl?: string): string {
   if (!path) return ''
-  const base = baseUrl || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+  const base = baseUrl || import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '/api')
   return `${base}${path.startsWith('/') ? '' : '/'}${path}`
+}
+
+export function getPhotoUrl(photoId: string, type: 'original' | 'thumbnail' = 'original'): string {
+  // In production, use empty base (relative path) since Nginx handles /api proxy
+  // In development, use full localhost URL
+  const base = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')
+  return `${base}/api/v1/photos/${photoId}/image/${type}`
 }
