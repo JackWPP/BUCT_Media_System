@@ -143,7 +143,6 @@ async def list_public_photos(
     
     page = skip // limit + 1 if limit > 0 else 1
     
-    
     return PhotoListResponse(
         total=total,
         page=page,
@@ -155,65 +154,96 @@ async def list_public_photos(
 @router.get("/{photo_id}/image/original")
 async def get_photo_image(
     photo_id: str,
-    db: AsyncSession = Depends(get_db),
-    # Optional auth for public access control if needed, but keeping simple for now
-    settings = Depends(get_settings)
+    db: AsyncSession = Depends(get_db)
 ):
     """
-    Get original photo image file
+    获取原始照片文件
+    
+    通过照片ID查找并返回原始图片文件。
+    使用 UPLOAD_DIR 配置构建路径，忽略数据库中的绝对路径。
     """
+    from app.core.config import get_settings
+    settings = get_settings()
+    
     photo = await photo_crud.get_photo(db, photo_id)
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
-        
-    # Construct paths robustly ignoring DB's absolute path
-    # Extract filename from stored path or construct if possible
-    # We rely on stored original_path basename being correct (uuid.ext)
-    if not photo.original_path:
-        raise HTTPException(status_code=404, detail="Image path missing")
-        
-    filename = os.path.basename(photo.original_path)
-    upload_dir = settings.UPLOAD_DIR
-    file_path = os.path.join(upload_dir, "originals", filename)
     
-    if not os.path.exists(file_path):
-        # Fallback: check if it's directly in upload_dir or other structure
-        # If DB absolute path exists on THIS system (unlikely in migration case but possible)
-        if os.path.exists(photo.original_path):
-             file_path = photo.original_path
-        else:
-             raise HTTPException(status_code=404, detail="Image file not found on server")
-             
-    return FileResponse(file_path)
+    # 策略 1: 尝试使用 UUID 文件名 (标准 storage.py 行为: uuid.ext)
+    # 需要获取后缀
+    ext = ""
+    if photo.filename:
+        _, ext = os.path.splitext(photo.filename)
+    if not ext and photo.original_path:
+        _, ext = os.path.splitext(photo.original_path)
+    
+    candidates = []
+    
+    # 1. UUID + 后缀
+    if ext:
+        candidates.append(f"{photo.id}{ext}")
+        # 有些情况下后缀可能不一致，尝试 .jpg
+        if ext.lower() != '.jpg':
+            candidates.append(f"{photo.id}.jpg")
+            
+    # 2. 从 original_path 提取文件名 (处理 Windows 路径分隔符)
+    if photo.original_path:
+        clean_path = photo.original_path.replace('\\', '/')
+        basename = os.path.basename(clean_path)
+        if basename not in candidates:
+            candidates.append(basename)
+            
+    # 3. 数据库中存储的 filename
+    if photo.filename and photo.filename not in candidates:
+        candidates.append(photo.filename)
+        
+    upload_dir = settings.UPLOAD_DIR
+    
+    for filename in candidates:
+        file_path = os.path.join(upload_dir, "originals", filename)
+        if os.path.exists(file_path):
+            return FileResponse(file_path)
+            
+    # 如果都找不到，记录错误并尝试返回 404
+    logger.error(f"Image not found for photo {photo.id}. Tried: {candidates} in {upload_dir}/originals")
+    
+    # 最后尝试一下 absolute path (如果数据库存的是服务器上的绝对路径)
+    if photo.original_path and os.path.exists(photo.original_path):
+        return FileResponse(photo.original_path)
+        
+    raise HTTPException(status_code=404, detail="Image file not found on server")
 
 
 @router.get("/{photo_id}/image/thumbnail")
 async def get_photo_thumbnail(
     photo_id: str,
-    db: AsyncSession = Depends(get_db),
-    settings = Depends(get_settings)
+    db: AsyncSession = Depends(get_db)
 ):
     """
-    Get photo thumbnail file
+    获取照片缩略图
+    
+    缩略图文件名格式为 {photo_id}_thumb.jpg
     """
+    from app.core.config import get_settings
+    settings = get_settings()
+    
     photo = await photo_crud.get_photo(db, photo_id)
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
-        
-    # Thumbnail is always uuid_thumb.jpg
+    
+    # 缩略图总是 uuid_thumb.jpg 格式
     filename = f"{photo.id}_thumb.jpg"
     upload_dir = settings.UPLOAD_DIR
     file_path = os.path.join(upload_dir, "thumbnails", filename)
     
     if not os.path.exists(file_path):
-         # Try logic from stored path if exists
-         if photo.thumb_path and os.path.exists(photo.thumb_path):
-             file_path = photo.thumb_path
-         else:
-             # If thumbnail missing, maybe serve original? Or 404. 
-             # Let's 404 to encourage regeneration or fallback on client.
-             raise HTTPException(status_code=404, detail="Thumbnail not found")
-             
+        # 尝试使用数据库中存储的缩略图路径
+        if photo.thumb_path and os.path.exists(photo.thumb_path):
+            file_path = photo.thumb_path
+        else:
+            logger.error(f"Thumbnail not found: {file_path}")
+            raise HTTPException(status_code=404, detail="Thumbnail not found")
+    
     return FileResponse(file_path)
 
 
