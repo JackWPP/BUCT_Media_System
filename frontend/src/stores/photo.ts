@@ -20,6 +20,8 @@ export const usePhotoStore = defineStore('photo', () => {
     status: null,
     search: '',
     tag: null,
+    sortBy: 'created_at',
+    sortOrder: 'desc',
   })
 
   // 获取照片列表
@@ -30,23 +32,23 @@ export const usePhotoStore = defineStore('photo', () => {
         skip: ((currentPage.value - 1) * pageSize.value),
         limit: pageSize.value,
       }
-      
+
       // 只添加非 null 的筛选条件
       if (filters.value.season) queryParams.season = filters.value.season
       if (filters.value.category) queryParams.category = filters.value.category
       if (filters.value.status) queryParams.status = filters.value.status
       if (filters.value.search) queryParams.search = filters.value.search
       if (filters.value.tag) queryParams.tag = filters.value.tag
-      
+
       // 添加额外参数
       if (params) {
         Object.assign(queryParams, params)
       }
-      
+
       const response = await photoApi.getPhotos(queryParams)
       photos.value = response.items
       total.value = response.total
-      
+
       return response
     } catch (error) {
       throw error
@@ -63,22 +65,24 @@ export const usePhotoStore = defineStore('photo', () => {
         skip: ((currentPage.value - 1) * pageSize.value),
         limit: pageSize.value,
       }
-      
+
       // 只添加非 null 的筛选条件（不包括status，公开API固定返回approved）
       if (filters.value.season) queryParams.season = filters.value.season
       if (filters.value.category) queryParams.category = filters.value.category
       if (filters.value.search) queryParams.search = filters.value.search
       if (filters.value.tag) queryParams.tag = filters.value.tag
-      
+      if (filters.value.sortBy) queryParams.sort_by = filters.value.sortBy
+      if (filters.value.sortOrder) queryParams.sort_order = filters.value.sortOrder
+
       // 添加额外参数
       if (params) {
         Object.assign(queryParams, params)
       }
-      
+
       const response = await photoApi.getPublicPhotos(queryParams)
       photos.value = response.items
       total.value = response.total
-      
+
       return response
     } catch (error) {
       throw error
@@ -158,6 +162,8 @@ export const usePhotoStore = defineStore('photo', () => {
       status: null,
       search: '',
       tag: null,
+      sortBy: 'created_at',
+      sortOrder: 'desc',
     }
     currentPage.value = 1
   }

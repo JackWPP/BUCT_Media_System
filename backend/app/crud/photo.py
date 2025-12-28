@@ -83,7 +83,10 @@ async def get_photos(
     season: Optional[str] = None,
     category: Optional[str] = None,
     search: Optional[str] = None,
-    tag: Optional[str] = None
+    tag: Optional[str] = None,
+    exclude_categories: Optional[List[str]] = None,
+    sort_by: str = "created_at",
+    sort_order: str = "desc"
 ) -> tuple[List[Photo], int]:
     """
     Get photos with filtering and pagination
@@ -98,6 +101,9 @@ async def get_photos(
         category: Filter by category
         search: Search in filename, description, and tags
         tag: Filter by specific tag name
+        exclude_categories: 排除的类别列表（用于权限控制，如排除 Portrait）
+        sort_by: 排序字段 (created_at, views, published_at)
+        sort_order: 排序方向 (desc, asc)
     
     Returns:
         Tuple of (list of photos, total count)
@@ -121,6 +127,12 @@ async def get_photos(
     if category:
         query = query.where(Photo.category == category)
         count_query = count_query.where(Photo.category == category)
+    
+    # 排除特定类别（用于人像可见性控制）
+    if exclude_categories:
+        for exc_cat in exclude_categories:
+            query = query.where(Photo.category != exc_cat)
+            count_query = count_query.where(Photo.category != exc_cat)
     
     # 标签筛选 - 通过关联表查询
     if tag:
@@ -153,8 +165,15 @@ async def get_photos(
     total_result = await db.execute(count_query)
     total = total_result.scalar_one()
     
-    # Apply pagination and ordering
-    query = query.order_by(Photo.created_at.desc()).offset(skip).limit(limit)
+    # Apply sorting
+    sort_column = getattr(Photo, sort_by, Photo.created_at)
+    if sort_order == "asc":
+        query = query.order_by(sort_column.asc())
+    else:
+        query = query.order_by(sort_column.desc())
+    
+    # Apply pagination
+    query = query.offset(skip).limit(limit)
     
     # Execute query
     result = await db.execute(query)

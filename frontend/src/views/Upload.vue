@@ -8,11 +8,11 @@
         class="upload-sidebar"
       >
         <div class="sidebar-content">
-          <n-button text size="large" @click="router.push('/')" class="back-button">
+          <n-button text size="large" @click="handleBack" class="back-button">
             <template #icon>
               <n-icon :component="ArrowBackOutline" />
             </template>
-            返回图库
+            返回
           </n-button>
           <n-divider />
           <div class="upload-stats">
@@ -210,6 +210,9 @@
                     </template>
                     查看照片
                   </n-button>
+                  <n-button @click="router.push('/my-submissions')" size="large">
+                    查看我的投稿
+                  </n-button>
                 </n-space>
               </template>
             </n-result>
@@ -228,11 +231,21 @@ import { storeToRefs } from 'pinia'
 import { CloudUploadOutline, ImageOutline, SyncOutline, CheckmarkOutline, CloseOutline, ArrowBackOutline, ImagesOutline } from '@vicons/ionicons5'
 import type { UploadCustomRequestOptions } from 'naive-ui'
 import { useUploadStore } from '../stores/upload'
+import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
 const message = useMessage()
 const uploadStore = useUploadStore()
+const authStore = useAuthStore()
 const { fileList, uploading, metadata, pendingCount, successCount, errorCount, canUpload } = storeToRefs(uploadStore)
+
+function handleBack() {
+  if (router.options.history.state.back === '/my-submissions') {
+    router.back()
+  } else {
+    router.push('/')
+  }
+}
 
 // 重新计算 allUploaded 以匹配 store 的状态 (如果 store 没有直接暴露 allUploaded)
 // storeToRefs 会解包 ref，如果 store getters 没有被正确解包，我们可以在这里重新定义 computed

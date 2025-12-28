@@ -2,24 +2,10 @@
   <div class="gallery-container">
     <n-layout has-sider>
       <!-- 侧边栏 -->
-      <n-layout-sider
-        bordered
-        :collapsed="appStore.sidebarCollapsed"
-        collapse-mode="width"
-        :collapsed-width="64"
-        :width="240"
-        show-trigger
-        @collapse="appStore.toggleSidebar"
-        @expand="appStore.toggleSidebar"
-      >
-        <n-menu
-          :collapsed="appStore.sidebarCollapsed"
-          :collapsed-width="64"
-          :collapsed-icon-size="22"
-          :options="menuOptions"
-          :value="activeMenu"
-          @update:value="handleMenuSelect"
-        />
+      <n-layout-sider bordered :collapsed="appStore.sidebarCollapsed" collapse-mode="width" :collapsed-width="64"
+        :width="240" show-trigger @collapse="appStore.toggleSidebar" @expand="appStore.toggleSidebar">
+        <n-menu :collapsed="appStore.sidebarCollapsed" :collapsed-width="64" :collapsed-icon-size="22"
+          :options="menuOptions" :value="activeMenu" @update:value="handleMenuSelect" />
       </n-layout-sider>
 
       <!-- 主内容区 -->
@@ -28,13 +14,8 @@
         <n-layout-header bordered class="gallery-header">
           <div class="header-left">
             <h2 class="header-title">BUCT Media HUB</h2>
-            <n-input
-              v-model:value="searchKeyword"
-              placeholder="搜索照片..."
-              clearable
-              class="search-input"
-              @update:value="handleSearch"
-            >
+            <n-input v-model:value="searchKeyword" placeholder="搜索照片..." clearable class="search-input"
+              @update:value="handleSearch">
               <template #prefix>
                 <n-icon :component="SearchOutline" />
               </template>
@@ -81,32 +62,14 @@
           <!-- 筛选器 -->
           <div class="filters-container">
             <n-space>
-              <n-select
-                v-model:value="photoStore.filters.season"
-                placeholder="选择季节"
-                clearable
-                style="width: 150px;"
-                :options="seasonOptions"
-                @update:value="handleFilterChange"
-              />
-              <n-select
-                v-model:value="photoStore.filters.category"
-                placeholder="选择类别"
-                clearable
-                style="width: 150px;"
-                :options="categoryOptions"
-                @update:value="handleFilterChange"
-              />
-              <n-select
-                v-model:value="photoStore.filters.tag"
-                placeholder="按标签筛选"
-                clearable
-                filterable
-                style="width: 180px;"
-                :options="tagOptions"
-                :loading="loadingTags"
-                @update:value="handleFilterChange"
-              />
+              <n-select v-model:value="photoStore.filters.season" placeholder="选择季节" clearable style="width: 150px;"
+                :options="seasonOptions" @update:value="handleFilterChange" />
+              <n-select v-model:value="photoStore.filters.category" placeholder="选择类别" clearable style="width: 150px;"
+                :options="categoryOptions" @update:value="handleFilterChange" />
+              <n-select v-model:value="photoStore.filters.tag" placeholder="按标签筛选" clearable filterable
+                style="width: 180px;" :options="tagOptions" :loading="loadingTags" @update:value="handleFilterChange" />
+              <n-select v-model:value="photoStore.filters.sortBy" placeholder="排序方式" style="width: 140px;"
+                :options="sortOptions" @update:value="handleFilterChange" />
               <n-button @click="handleClearFilters" secondary>
                 <template #icon>
                   <n-icon :component="RefreshOutline" />
@@ -129,33 +92,16 @@
                 </n-grid-item>
               </n-grid>
               <!-- 空状态 -->
-              <EmptyState
-                v-else-if="photoStore.photos.length === 0"
-                description="暂无照片"
-                :icon="ImagesOutline"
-                action
-                action-text="上传照片"
-                @action="router.push('/upload')"
-              />
+              <EmptyState v-else-if="photoStore.photos.length === 0" description="暂无照片" :icon="ImagesOutline" action
+                action-text="上传照片" @action="router.push('/upload')" />
               <!-- 照片列表 -->
-              <MasonryLayout
-                v-else
-                :items="photoStore.photos"
-                :gap="16"
-              >
+              <MasonryLayout v-else :items="photoStore.photos" :gap="16">
                 <template #default="{ item: photo }">
                   <div class="photo-card" @click="handlePhotoClick(photo)">
-                    <div 
-                      class="photo-image" 
-                      :style="{ aspectRatio: photo.width && photo.height ? `${photo.width} / ${photo.height}` : '4 / 3' }"
-                    >
-                      <img
-                        :src="getImageUrl(photo)"
-                        :alt="photo.filename"
-                        loading="lazy"
-                        class="masonry-img"
-                        @error="(e) => handleImageError(e, photo)"
-                      />
+                    <div class="photo-image"
+                      :style="{ aspectRatio: photo.width && photo.height ? `${photo.width} / ${photo.height}` : '4 / 3' }">
+                      <img :src="getImageUrl(photo)" :alt="photo.filename" loading="lazy" class="masonry-img"
+                        @error="(e) => handleImageError(e, photo)" />
                       <div class="photo-overlay">
                         <n-icon size="32" color="white" :component="EyeOutline" />
                       </div>
@@ -168,13 +114,8 @@
                         <n-tag v-if="photo.category" size="small" type="info">
                           {{ CATEGORY_MAP[photo.category] || photo.category }}
                         </n-tag>
-                        <n-tag 
-                          v-for="tag in photo.tags?.slice(0, 3)" 
-                          :key="tag" 
-                          size="small"
-                          class="clickable-tag"
-                          @click.stop="handleTagClick(tag)"
-                        >
+                        <n-tag v-for="tag in photo.tags?.slice(0, 3)" :key="tag" size="small" class="clickable-tag"
+                          @click.stop="handleTagClick(tag)">
                           {{ tag }}
                         </n-tag>
                       </n-space>
@@ -187,31 +128,18 @@
 
           <!-- 分页 -->
           <div v-if="photoStore.total > photoStore.pageSize" class="pagination-container">
-            <n-pagination
-              v-model:page="photoStore.currentPage"
-              :item-count="photoStore.total"
-              :page-size="photoStore.pageSize"
-              show-size-picker
-              :page-sizes="[20, 50, 100]"
-              @update:page="handlePageChange"
-              @update:page-size="handlePageSizeChange"
-            />
+            <n-pagination v-model:page="photoStore.currentPage" :item-count="photoStore.total"
+              :page-size="photoStore.pageSize" show-size-picker :page-sizes="[20, 50, 100]"
+              @update:page="handlePageChange" @update:page-size="handlePageSizeChange" />
           </div>
         </n-layout-content>
       </n-layout>
     </n-layout>
 
     <!-- 照片详情模态框 -->
-    <PhotoDetail
-      v-model:show="showPhotoDetail"
-      :photo-id="selectedPhotoId"
-      :has-prev="hasPrevPhoto"
-      :has-next="hasNextPhoto"
-      @prev="handlePrevPhoto"
-      @next="handleNextPhoto"
-      @deleted="handlePhotoDeleted"
-      @updated="handlePhotoUpdated"
-    />
+    <PhotoDetail v-model:show="showPhotoDetail" :photo-id="selectedPhotoId" :has-prev="hasPrevPhoto"
+      :has-next="hasNextPhoto" @prev="handlePrevPhoto" @next="handleNextPhoto" @deleted="handlePhotoDeleted"
+      @updated="handlePhotoUpdated" />
   </div>
 </template>
 
@@ -306,71 +234,47 @@ const seasonOptions = SEASON_OPTIONS
 // 类别选项
 const categoryOptions = CATEGORY_OPTIONS
 
+// 排序选项
+const sortOptions = [
+  { label: '最新上传', value: 'created_at' },
+  { label: '最热门', value: 'views' },
+  { label: '最近发布', value: 'published_at' },
+]
+
 // 获取图片URL - 增强兼容性处理
+// 获取图片URL - 增强兼容性处理
+import { getPhotoUrl } from '../utils/format'
+
 function getImageUrl(photo: Photo) {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-  
-  // 1. 尝试使用原图 (清晰度高)，但前提是路径必须安全 (在 uploads/ 下)
-  let path = (photo.original_path || '').replace(/\\/g, '/')
-  let isSafeOriginal = false
-  
-  const uploadsIndex = path.indexOf('uploads/')
-  if (uploadsIndex !== -1) {
-    path = path.substring(uploadsIndex)
-    isSafeOriginal = true
-  }
-  
-  // 2. 如果原图路径看似不安全 (例如旧数据的 F:/...), 则回退到缩略图
-  if (!isSafeOriginal && photo.thumb_path) {
-    path = photo.thumb_path.replace(/\\/g, '/')
-    // 缩略图通常都在 uploads/ 下，但也做一下处理
-    const thumbIndex = path.indexOf('uploads/')
-    if (thumbIndex !== -1) {
-      path = path.substring(thumbIndex)
-    }
-  }
-  
-  if (!path) return ''
-  
-  // 3. 构造最终 URL
-  if (path.startsWith('http')) return path
-  if (path.startsWith('/')) path = path.substring(1)
-  
-  return `${baseUrl}/${path}`
+  // 瀑布流使用缩略图，节省带宽
+  return getPhotoUrl(photo.id, 'thumbnail')
 }
 
 function getThumbnailUrl(photo: Photo) {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-  let path = (photo.thumb_path || '').replace(/\\/g, '/')
-  const uploadsIndex = path.indexOf('uploads/')
-  if (uploadsIndex !== -1) {
-    path = path.substring(uploadsIndex)
-  }
-  if (path.startsWith('/')) path = path.substring(1)
-  return path ? `${baseUrl}/${path}` : ''
+  return getPhotoUrl(photo.id, 'thumbnail')
 }
 
 // 图片加载错误处理
 function handleImageError(e: Event, photo: Photo) {
   const img = e.target as HTMLImageElement
-  
+
   const thumbUrl = getThumbnailUrl(photo)
   // 如果当前显示的不是缩略图，且缩略图存在，尝试降级
   // 注意：需要构建完整的URL进行比较，或者简单判断 src 是否包含 thumbUrl 的关键部分
   // 这里简化判断: 如果 src 已经是 data URL，或者已经是缩略图路径，则停止
-  
+
   if (thumbUrl && !img.src.includes('data:image')) {
-     // 检查是否已经是缩略图 (防止无限循环，尽管 getThumbnailUrl 返回的不同)
-     // 简单起见，如果 load error 了，且之前尝试的是 getImageUrl 的结果(原图)，那么尝试缩略图
-     // 但为了避免判断 src 的复杂性，我们只尝试一次降级
-     // 更好的方式是设置一个属性标记
-     
-     if (img.getAttribute('data-tried-thumb') === 'true') {
-        img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
-     } else {
-        img.setAttribute('data-tried-thumb', 'true')
-        img.src = thumbUrl
-     }
+    // 检查是否已经是缩略图 (防止无限循环，尽管 getThumbnailUrl 返回的不同)
+    // 简单起见，如果 load error 了，且之前尝试的是 getImageUrl 的结果(原图)，那么尝试缩略图
+    // 但为了避免判断 src 的复杂性，我们只尝试一次降级
+    // 更好的方式是设置一个属性标记
+
+    if (img.getAttribute('data-tried-thumb') === 'true') {
+      img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
+    } else {
+      img.setAttribute('data-tried-thumb', 'true')
+      img.src = thumbUrl
+    }
   } else {
     img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
   }
@@ -637,11 +541,11 @@ onMounted(() => {
     align-items: flex-start;
     gap: 8px;
   }
-  
+
   .search-input {
     width: 100%;
   }
-  
+
   .filters-container {
     flex-direction: column;
     align-items: stretch;

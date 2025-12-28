@@ -1,5 +1,7 @@
 /**
  * Vue Router 配置
+ * 
+ * 包含路由定义和权限守卫。
  */
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
@@ -25,11 +27,17 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/Upload.vue'),
     meta: { requiresAuth: true },  // 上传需要登录
   },
+  {
+    path: '/my-submissions',
+    name: 'MySubmissions',
+    component: () => import('../views/MySubmissions.vue'),
+    meta: { requiresAuth: true },
+  },
   // 后台管理路由
   {
     path: '/admin',
     component: () => import('../layouts/AdminLayout.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true },
+    meta: { requiresAuth: true, requiresAuditor: true },
     children: [
       {
         path: '',
@@ -39,24 +47,37 @@ const routes: RouteRecordRaw[] = [
         path: 'dashboard',
         name: 'Dashboard',
         component: () => import('../views/admin/Dashboard.vue'),
-        meta: { requiresAuth: true, requiresAdmin: true },
+        meta: { requiresAuth: true, requiresAuditor: true },
       },
       {
         path: 'review',
         name: 'PhotoReview',
         component: () => import('../views/admin/PhotoReview.vue'),
-        meta: { requiresAuth: true, requiresAdmin: true },
+        meta: { requiresAuth: true, requiresAuditor: true },
       },
       {
         path: 'tags',
         name: 'TagManagement',
         component: () => import('../views/admin/TagManagement.vue'),
-        meta: { requiresAuth: true, requiresAdmin: true },
+        meta: { requiresAuth: true, requiresAuditor: true },
       },
       {
         path: 'import',
         name: 'PhotoImport',
         component: () => import('../views/admin/PhotoImport.vue'),
+        meta: { requiresAuth: true, requiresAuditor: true },
+      },
+      // 仅限管理员访问的路由
+      {
+        path: 'users',
+        name: 'UserManagement',
+        component: () => import('../views/admin/UserManagement.vue'),
+        meta: { requiresAuth: true, requiresAdmin: true },
+      },
+      {
+        path: 'settings',
+        name: 'SystemSettings',
+        component: () => import('../views/admin/SystemSettings.vue'),
         meta: { requiresAuth: true, requiresAdmin: true },
       },
     ],
@@ -79,6 +100,7 @@ router.beforeEach((to, _from, next) => {
   const authStore = useAuthStore()
   const requiresAuth = to.meta.requiresAuth !== false
   const requiresAdmin = to.meta.requiresAdmin === true
+  const requiresAuditor = to.meta.requiresAuditor === true
 
   if (requiresAuth && !authStore.isAuthenticated) {
     // 需要认证但未登录，跳转到登录页
@@ -86,8 +108,16 @@ router.beforeEach((to, _from, next) => {
       path: '/login',
       query: { redirect: to.fullPath },
     })
-  } else if (requiresAdmin && authStore.user?.role !== 'admin') {
+  } else if (requiresAdmin && !authStore.isAdmin) {
     // 需要管理员权限但不是管理员
+    // 如果是审核员，重定向到仪表盘；否则回首页
+    if (authStore.isAuditor) {
+      next('/admin/dashboard')
+    } else {
+      next('/')
+    }
+  } else if (requiresAuditor && !authStore.isAuditor) {
+    // 需要审核员权限但既不是管理员也不是审核员
     next('/')
   } else if (to.path === '/login' && authStore.isAuthenticated) {
     // 已登录用户访问登录页，跳转到首页
@@ -99,3 +129,4 @@ router.beforeEach((to, _from, next) => {
 })
 
 export default router
+

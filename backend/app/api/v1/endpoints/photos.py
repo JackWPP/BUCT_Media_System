@@ -1,5 +1,8 @@
 """
 Photo API endpoints
+
+照片相关 API 端点，包括公开访问、上传、审核等功能。
+支持基于系统配置的人像照片可见性控制。
 """
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status, BackgroundTasks
@@ -7,16 +10,21 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
-from app.core.deps import get_db, get_current_user, get_optional_current_user
+from app.core.deps import (
+    get_db, get_current_user, get_optional_current_user,
+    get_portrait_visibility
+)
 from app.models.user import User
 from app.models.photo import Photo
+from app.models.system_config import PortraitVisibility
 from app.schemas.photo import (
     PhotoResponse, PhotoListResponse, PhotoUploadResponse,
     PhotoUpdate
 )
 from app.crud import photo as photo_crud
 from app.crud import tag as tag_crud
-from app.services.storage import save_photo_file, delete_file
+from app.crud import permission as permission_crud
+from app.services.storage import save_photo_file, delete_file, ensure_upload_dirs, get_settings
 from app.services.image_processing import process_uploaded_image
 from app.services.ai_tagging import analyze_photo_with_ai
 import os
@@ -35,15 +43,73 @@ async def list_public_photos(
     category: Optional[str] = None,
     search: Optional[str] = None,
     tag: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
+    sort_by: str = "created_at",
+    sort_order: str = "desc",
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    portrait_visibility: str = Depends(get_portrait_visibility)
 ):
     """
-    List approved photos for public access (no authentication required)
+    List approved photos for public access
     
-    Only returns photos with status='approved'
+    根据系统配置的人像可见性设置，对 Portrait 类别照片进行过滤：
+    - public: 所有人可见
+    - login_required: 仅登录用户可见
+    - authorized_only: 仅授权用户可见（暂同 login_required）
+    
+    如果用户未登录且请求 Portrait 类别，该类别将被自动排除。
+    
+    排序参数：
+    - sort_by: created_at (默认), views, published_at
+    - sort_order: desc (默认), asc
     """
     # Limit maximum page size
     limit = min(limit, 100)
+    
+    # Validate sort_by
+    if sort_by not in ["created_at", "views", "published_at"]:
+        sort_by = "created_at"
+    if sort_order not in ["asc", "desc"]:
+        sort_order = "desc"
+    
+    # 检查是否需要过滤人像照片
+    should_filter_portrait = False
+    has_portrait_permission = False
+    
+    if portrait_visibility == PortraitVisibility.LOGIN_REQUIRED:
+        # 需要登录才能查看人像
+        if not current_user:
+            should_filter_portrait = True
+    elif portrait_visibility == PortraitVisibility.AUTHORIZED_ONLY:
+        # 仅授权用户可见 - 检查 ResourcePermission
+        if not current_user:
+            should_filter_portrait = True
+        else:
+            # 检查用户是否有 Portrait 类别的查看权限
+            has_portrait_permission = await permission_crud.check_permission(
+                db, current_user.id, "category", "Portrait", "view"
+            )
+            if not has_portrait_permission:
+                should_filter_portrait = True
+    # portrait_visibility == 'public' 时不过滤
+    
+    # 如果用户明确请求 Portrait 类别但无权访问
+    if category == 'Portrait' and should_filter_portrait:
+        if portrait_visibility == PortraitVisibility.AUTHORIZED_ONLY:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="人像照片需要授权后才能查看，请联系管理员获取权限"
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="人像照片需要登录后才能查看"
+            )
+    
+    # 构建排除类别列表
+    exclude_categories = []
+    if should_filter_portrait:
+        exclude_categories.append('Portrait')
     
     photos, total = await photo_crud.get_photos(
         db,
@@ -53,7 +119,10 @@ async def list_public_photos(
         season=season,
         category=category,
         search=search,
-        tag=tag
+        tag=tag,
+        exclude_categories=exclude_categories if exclude_categories else None,
+        sort_by=sort_by,
+        sort_order=sort_order
     )
     
     # Convert to response format
@@ -82,13 +151,113 @@ async def list_public_photos(
     )
 
 
-@router.get("/public/{photo_id}", response_model=PhotoResponse)
-async def get_public_photo(
+@router.get("/{photo_id}/image/original")
+async def get_photo_image(
     photo_id: str,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Get a specific approved photo by ID (no authentication required)
+    获取原始照片文件
+    
+    通过照片ID查找并返回原始图片文件。
+    使用 UPLOAD_DIR 配置构建路径，忽略数据库中的绝对路径。
+    """
+    from app.core.config import get_settings
+    settings = get_settings()
+    
+    photo = await photo_crud.get_photo(db, photo_id)
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    
+    # 策略 1: 尝试使用 UUID 文件名 (标准 storage.py 行为: uuid.ext)
+    # 需要获取后缀
+    ext = ""
+    if photo.filename:
+        _, ext = os.path.splitext(photo.filename)
+    if not ext and photo.original_path:
+        _, ext = os.path.splitext(photo.original_path)
+    
+    candidates = []
+    
+    # 1. UUID + 后缀
+    if ext:
+        candidates.append(f"{photo.id}{ext}")
+        # 有些情况下后缀可能不一致，尝试 .jpg
+        if ext.lower() != '.jpg':
+            candidates.append(f"{photo.id}.jpg")
+            
+    # 2. 从 original_path 提取文件名 (处理 Windows 路径分隔符)
+    if photo.original_path:
+        clean_path = photo.original_path.replace('\\', '/')
+        basename = os.path.basename(clean_path)
+        if basename not in candidates:
+            candidates.append(basename)
+            
+    # 3. 数据库中存储的 filename
+    if photo.filename and photo.filename not in candidates:
+        candidates.append(photo.filename)
+        
+    upload_dir = settings.UPLOAD_DIR
+    
+    for filename in candidates:
+        file_path = os.path.join(upload_dir, "originals", filename)
+        if os.path.exists(file_path):
+            return FileResponse(file_path)
+            
+    # 如果都找不到，记录错误并尝试返回 404
+    logger.error(f"Image not found for photo {photo.id}. Tried: {candidates} in {upload_dir}/originals")
+    
+    # 最后尝试一下 absolute path (如果数据库存的是服务器上的绝对路径)
+    if photo.original_path and os.path.exists(photo.original_path):
+        return FileResponse(photo.original_path)
+        
+    raise HTTPException(status_code=404, detail="Image file not found on server")
+
+
+@router.get("/{photo_id}/image/thumbnail")
+async def get_photo_thumbnail(
+    photo_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取照片缩略图
+    
+    缩略图文件名格式为 {photo_id}_thumb.jpg
+    """
+    from app.core.config import get_settings
+    settings = get_settings()
+    
+    photo = await photo_crud.get_photo(db, photo_id)
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    
+    # 缩略图总是 uuid_thumb.jpg 格式
+    filename = f"{photo.id}_thumb.jpg"
+    upload_dir = settings.UPLOAD_DIR
+    file_path = os.path.join(upload_dir, "thumbnails", filename)
+    
+    if not os.path.exists(file_path):
+        # 尝试使用数据库中存储的缩略图路径
+        if photo.thumb_path and os.path.exists(photo.thumb_path):
+            file_path = photo.thumb_path
+        else:
+            logger.error(f"Thumbnail not found: {file_path}")
+            raise HTTPException(status_code=404, detail="Thumbnail not found")
+    
+    return FileResponse(file_path)
+
+
+@router.get("/public/{photo_id}", response_model=PhotoResponse)
+async def get_public_photo(
+    photo_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    portrait_visibility: str = Depends(get_portrait_visibility)
+):
+    """
+    Get a specific approved photo by ID
+    
+    根据系统配置的人像可见性设置，对 Portrait 类别照片进行权限检查。
     """
     photo = await photo_crud.get_photo_with_tags(db, photo_id)
     
@@ -104,6 +273,34 @@ async def get_public_photo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Photo not found"
         )
+    
+    # 检查人像照片访问权限
+    if photo.category == 'Portrait':
+        should_block = False
+        block_reason = ""
+        
+        if portrait_visibility == PortraitVisibility.LOGIN_REQUIRED:
+            if not current_user:
+                should_block = True
+                block_reason = "人像照片需要登录后才能查看"
+        elif portrait_visibility == PortraitVisibility.AUTHORIZED_ONLY:
+            if not current_user:
+                should_block = True
+                block_reason = "人像照片需要授权后才能查看"
+            else:
+                # 检查用户是否有 Portrait 类别的查看权限
+                has_permission = await permission_crud.check_permission(
+                    db, current_user.id, "category", "Portrait", "view"
+                )
+                if not has_permission:
+                    should_block = True
+                    block_reason = "您没有查看人像照片的权限，请联系管理员获取授权"
+        
+        if should_block:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=block_reason
+            )
     
     # Get tags for this photo
     tags = await photo_crud.get_photo_tags(db, photo.id)
@@ -328,6 +525,59 @@ async def list_photos(
         category=category,
         search=search,
         tag=tag
+    )
+    
+    # Convert to response format
+    photo_responses = []
+    for photo in photos:
+        # Get tags for this photo
+        tags = await photo_crud.get_photo_tags(db, photo.id)
+        tag_names = [tag.name for tag in tags]
+        
+        # Convert to dict and add tag names
+        photo_dict = {**photo.__dict__}
+        photo_dict.pop('_sa_instance_state', None)
+        photo_dict['tags'] = tag_names
+        photo_dict['uploader_name'] = None
+        
+        photo_response = PhotoResponse(**photo_dict)
+        photo_responses.append(photo_response)
+    
+    page = skip // limit + 1 if limit > 0 else 1
+    
+    return PhotoListResponse(
+        total=total,
+        page=page,
+        page_size=limit,
+        items=photo_responses
+    )
+
+
+@router.get("/my-submissions", response_model=PhotoListResponse)
+async def list_my_submissions(
+    skip: int = 0,
+    limit: int = 20,
+    status: Optional[str] = None,
+    season: Optional[str] = None,
+    category: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    List current user's submissions (all statuses)
+    """
+    # Limit maximum page size
+    limit = min(limit, 100)
+    
+    # Force filter by current user
+    photos, total = await photo_crud.get_photos(
+        db,
+        skip=skip,
+        limit=limit,
+        status=status,
+        season=season,
+        category=category,
+        uploader_id=current_user.id
     )
     
     # Convert to response format
@@ -645,6 +895,50 @@ async def batch_reject_photos(
     return {
         "message": f"Successfully rejected {updated_count} photos",
         "updated_count": updated_count,
+        "total_requested": len(photo_ids)
+    }
+
+
+@router.post("/batch-delete")
+async def batch_delete_photos(
+    photo_ids: List[str],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Batch delete multiple photos
+    
+    Only admins can delete photos in batch
+    """
+    # Check admin permission
+    if current_user.role != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can delete photos in batch"
+        )
+    
+    deleted_count = 0
+    
+    for photo_id in photo_ids:
+        photo = await photo_crud.get_photo(db, photo_id)
+        if photo:
+            # Delete physical files
+            if photo.original_path and os.path.exists(photo.original_path):
+                delete_file(photo.original_path)
+            
+            if photo.thumb_path and os.path.exists(photo.thumb_path):
+                delete_file(photo.thumb_path)
+            
+            if photo.processed_path and os.path.exists(photo.processed_path):
+                delete_file(photo.processed_path)
+            
+            # Delete database record
+            await photo_crud.delete_photo(db, photo)
+            deleted_count += 1
+    
+    return {
+        "message": f"Successfully deleted {deleted_count} photos",
+        "deleted_count": deleted_count,
         "total_requested": len(photo_ids)
     }
 

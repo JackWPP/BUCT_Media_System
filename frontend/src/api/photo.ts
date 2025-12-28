@@ -33,6 +33,17 @@ export function getPublicPhotos(params?: PhotoListParams): Promise<PhotoListResp
 }
 
 /**
+ * 获取我的投稿列表
+ */
+export function getMySubmissions(params?: PhotoListParams): Promise<PhotoListResponse> {
+  return request({
+    url: '/api/v1/photos/my-submissions',
+    method: 'get',
+    params,
+  })
+}
+
+/**
  * 获取照片详情
  */
 export function getPhotoById(id: string): Promise<Photo> {
@@ -158,6 +169,17 @@ export function batchApprovePhotos(photoIds: string[]): Promise<{ message: strin
 export function batchRejectPhotos(photoIds: string[]): Promise<{ message: string; updated_count: number }> {
   return request({
     url: '/api/v1/photos/batch-reject',
+    method: 'post',
+    data: photoIds,
+  })
+}
+
+/**
+ * 批量删除照片
+ */
+export function batchDeletePhotos(photoIds: string[]): Promise<{ message: string; deleted_count: number }> {
+  return request({
+    url: '/api/v1/photos/batch-delete',
     method: 'post',
     data: photoIds,
   })

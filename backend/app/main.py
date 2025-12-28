@@ -36,6 +36,7 @@ app.include_router(api_router, prefix="/api/v1")
 
 # 挂载静态文件目录
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
+app.mount("/api/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="api_uploads")
 
 
 @app.get("/")

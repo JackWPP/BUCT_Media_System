@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { uploadPhoto } from '../api/photo'
-import { useMessage } from 'naive-ui'
+
 
 export interface FileItem {
     file: File

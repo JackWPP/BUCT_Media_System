@@ -287,29 +287,14 @@ watch(showModal, (val) => {
   emit('update:show', val)
 })
 
+import { getPhotoUrl } from '../../utils/format'
+
 function getImageUrl(photo: Photo) {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-  
-  // 获取文件后缀
-  const filename = photo.filename || ''
-  const extIndex = filename.lastIndexOf('.')
-  const ext = extIndex !== -1 ? filename.substring(extIndex) : ''
-  
-  // 构造标准路径: /uploads/originals/{uuid}{ext}
-  // 注意：后端静态挂载点是 /uploads
-  // 这种方式规避了数据库中存储绝对路径(如F:/...)导致的问题
-  return `${baseUrl}/uploads/originals/${photo.id}${ext}`
+  return getPhotoUrl(photo.id, 'original')
 }
 
 function getThumbnailUrl(photo: Photo) {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-  
-  const filename = photo.filename || ''
-  const extIndex = filename.lastIndexOf('.')
-  const ext = extIndex !== -1 ? filename.substring(extIndex) : ''
-
-  // 缩略图路径规范
-  return `${baseUrl}/uploads/thumbnails/${photo.id}${ext}`
+  return getPhotoUrl(photo.id, 'thumbnail')
 }
 
 function handleImageError(e: Event) {
@@ -525,9 +510,8 @@ async function downloadImage() {
   if (!photo.value) return
   
   try {
-    // 使用下载API端点（支持CORS）
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-    const downloadUrl = `${baseUrl}/api/v1/photos/${photo.value.id}/download`
+    // 使用图片接口下载（与显示相同的端点）
+    const downloadUrl = getPhotoUrl(photo.value.id, 'original')
     
     const response = await fetch(downloadUrl)
     if (!response.ok) {
@@ -555,7 +539,8 @@ async function downloadImage() {
 
 function shareImage() {
   if (!photo.value) return
-  const url = getImageUrl(photo.value)
+  // 使用当前页面URL更适合分享
+  const url = window.location.href
   if (navigator.share) {
     navigator.share({
       title: photo.value.filename,
@@ -570,11 +555,33 @@ function shareImage() {
 }
 
 function copyToClipboard(text: string) {
-  navigator.clipboard.writeText(text).then(() => {
+  // 优先尝试现代 Clipboard API
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      message.success('链接已复制到剪贴板')
+    }).catch(() => {
+      fallbackCopyToClipboard(text)
+    })
+  } else {
+    fallbackCopyToClipboard(text)
+  }
+}
+
+function fallbackCopyToClipboard(text: string) {
+  // 使用 execCommand 回退方案（适用于HTTP站点）
+  const textArea = document.createElement('textarea')
+  textArea.value = text
+  textArea.style.position = 'fixed'
+  textArea.style.left = '-9999px'
+  document.body.appendChild(textArea)
+  textArea.select()
+  try {
+    document.execCommand('copy')
     message.success('链接已复制到剪贴板')
-  }).catch(() => {
-    message.error('复制失败')
-  })
+  } catch (err) {
+    message.error('复制失败，请手动复制链接')
+  }
+  document.body.removeChild(textArea)
 }
 </script>
 

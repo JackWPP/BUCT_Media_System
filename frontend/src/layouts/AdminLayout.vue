@@ -13,7 +13,7 @@
         v-model:value="activeKey"
         :collapsed="collapsed"
         :collapsed-width="64"
-        :options="menuOptions"
+        :options="filteredMenuOptions"
         @update:value="handleMenuSelect"
       />
     </n-layout-sider>
@@ -23,6 +23,7 @@
         <n-space justify="space-between" align="center">
           <n-text strong style="font-size: 18px;">后台管理</n-text>
           <n-space>
+            <n-tag :type="roleTagType" size="small">{{ roleLabel }}</n-tag>
             <n-text>{{ user?.full_name || user?.email }}</n-text>
             <n-button @click="handleLogout" secondary>退出登录</n-button>
           </n-space>
@@ -45,7 +46,9 @@ import {
   PricetagsOutline, 
   CloudUploadOutline,
   CheckmarkCircleOutline,
-  BarChartOutline
+  BarChartOutline,
+  PeopleOutline,
+  SettingsOutline
 } from '@vicons/ionicons5'
 import type { MenuOption } from 'naive-ui'
 import { useAuthStore } from '../stores/auth'
@@ -59,11 +62,33 @@ const activeKey = ref(route.name?.toString() || 'PhotoReview')
 
 const user = computed(() => authStore.user)
 
+// 角色显示
+const roleLabel = computed(() => {
+  const roleMap: Record<string, string> = {
+    admin: '超级管理员',
+    auditor: '审核员',
+    dept_user: '部门用户',
+    user: '普通用户',
+  }
+  return roleMap[user.value?.role || 'user'] || '未知'
+})
+
+const roleTagType = computed(() => {
+  const typeMap: Record<string, 'success' | 'warning' | 'info' | 'default'> = {
+    admin: 'success',
+    auditor: 'warning',
+    dept_user: 'info',
+    user: 'default',
+  }
+  return typeMap[user.value?.role || 'user'] || 'default'
+})
+
 function renderMenuIcon(icon: any) {
   return () => h(NIcon, null, { default: () => h(icon) })
 }
 
-const menuOptions: MenuOption[] = [
+// 基础菜单（审核员可见）
+const baseMenuOptions: MenuOption[] = [
   {
     label: '仪表盘',
     key: 'Dashboard',
@@ -84,12 +109,51 @@ const menuOptions: MenuOption[] = [
     key: 'PhotoImport',
     icon: renderMenuIcon(CloudUploadOutline),
   },
+]
+
+// 仅管理员可见的菜单
+const adminOnlyMenuOptions: MenuOption[] = [
+  {
+    type: 'divider',
+    key: 'd1',
+  },
+  {
+    label: '用户管理',
+    key: 'UserManagement',
+    icon: renderMenuIcon(PeopleOutline),
+  },
+  {
+    label: '系统设置',
+    key: 'SystemSettings',
+    icon: renderMenuIcon(SettingsOutline),
+  },
+]
+
+// 底部通用菜单
+const bottomMenuOptions: MenuOption[] = [
+  {
+    type: 'divider',
+    key: 'd2',
+  },
   {
     label: '返回前台',
     key: 'Gallery',
     icon: renderMenuIcon(ImagesOutline),
   },
 ]
+
+// 根据权限过滤菜单
+const filteredMenuOptions = computed(() => {
+  const options = [...baseMenuOptions]
+  
+  // 仅管理员可以看到用户管理和系统设置
+  if (authStore.isAdmin) {
+    options.push(...adminOnlyMenuOptions)
+  }
+  
+  options.push(...bottomMenuOptions)
+  return options
+})
 
 function handleMenuSelect(key: string) {
   activeKey.value = key
@@ -119,3 +183,4 @@ function handleLogout() {
   overflow-y: auto;
 }
 </style>
+

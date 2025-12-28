@@ -20,33 +20,42 @@
             <n-radio-button value="approved">已通过</n-radio-button>
             <n-radio-button value="rejected">已拒绝</n-radio-button>
           </n-radio-group>
+        </n-space>
+        
+        <n-space>
           <n-input
             v-model:value="searchQuery"
             placeholder="搜索文件名..."
             clearable
-            style="width: 300px;"
+            style="width: 200px;"
             @update:value="handleSearch"
           >
             <template #prefix>
               <n-icon :component="SearchOutline" />
             </template>
           </n-input>
-        </n-space>
-        <n-space>
           <n-button
             :disabled="selectedPhotos.length === 0"
             type="success"
             @click="handleBatchApprove"
           >
-            批量通过 ({{ selectedPhotos.length }})
+            通过({{ selectedPhotos.length }})
           </n-button>
           <n-button
             :disabled="selectedPhotos.length === 0"
-            type="error"
+            type="warning"
             @click="handleBatchReject"
           >
-            批量拒绝 ({{ selectedPhotos.length }})
+            拒绝({{ selectedPhotos.length }})
           </n-button>
+          <n-popconfirm @positive-click="handleBatchDelete">
+            <template #trigger>
+              <n-button :disabled="selectedPhotos.length === 0" type="error">
+                删除({{ selectedPhotos.length }})
+              </n-button>
+            </template>
+            确定要永久删除这 {{ selectedPhotos.length }} 张照片吗？
+          </n-popconfirm>
         </n-space>
       </n-space>
 
@@ -149,7 +158,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { SearchOutline } from '@vicons/ionicons5'
-import { getPhotos, approvePhoto, rejectPhoto, batchApprovePhotos, batchRejectPhotos } from '@/api/photo'
+import { getPhotos, approvePhoto, rejectPhoto, batchApprovePhotos, batchRejectPhotos, batchDeletePhotos } from '@/api/photo'
 import PhotoDetail from '@/components/photo/PhotoDetail.vue'
 import type { Photo } from '@/types/photo'
 
@@ -292,27 +301,29 @@ async function handleBatchReject() {
   }
 }
 
+async function handleBatchDelete() {
+  if (selectedPhotos.value.length === 0) return
+  
+  try {
+    const result = await batchDeletePhotos(selectedPhotos.value)
+    message.success(result.message)
+    selectedPhotos.value = []
+    loadPhotos()
+    loadStatistics()
+  } catch (error: any) {
+    message.error(error?.response?.data?.detail || '批量操作失败')
+  }
+}
+
 function viewPhotoDetail(photo: Photo) {
   selectedPhotoId.value = photo.id
   showDetail.value = true
 }
 
+import { getPhotoUrl } from '../../utils/format'
+
 function getImageUrl(photo: Photo) {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-  
-  // 优先使用缩略图 (thumb_path)
-  let path = (photo.thumb_path || photo.original_path || '').replace(/\\/g, '/')
-  
-  // 尝试从路径中提取 'uploads/' 开始的部分 (处理绝对路径)
-  const uploadsIndex = path.indexOf('uploads/')
-  if (uploadsIndex !== -1) {
-    path = path.substring(uploadsIndex)
-  }
-  
-  if (!path) return ''
-  if (path.startsWith('/')) path = path.substring(1)
-  
-  return `${baseUrl}/${path}`
+   return getPhotoUrl(photo.id, 'thumbnail')
 }
 
 function getStatusType(status: string): 'success' | 'warning' | 'error' | 'info' {

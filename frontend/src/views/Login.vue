@@ -27,10 +27,10 @@
             :rules="loginRules"
             size="large"
           >
-            <n-form-item label="邮箱" path="email">
+            <n-form-item label="学号/邮箱" path="identifier">
               <n-input
-                v-model:value="loginForm.email"
-                placeholder="请输入邮箱"
+                v-model:value="loginForm.identifier"
+                placeholder="请输入学号或邮箱"
                 @keydown.enter="handleLogin"
               />
             </n-form-item>
@@ -65,10 +65,17 @@
             :rules="registerRules"
             size="large"
           >
+            <n-form-item label="学号/工号" path="student_id">
+              <n-input
+                v-model:value="registerForm.student_id"
+                placeholder="请输入学号/工号（必填）"
+              />
+            </n-form-item>
+            
             <n-form-item label="邮箱" path="email">
               <n-input
                 v-model:value="registerForm.email"
-                placeholder="请输入邮箱"
+                placeholder="请输入邮箱（可选）"
               />
             </n-form-item>
             
@@ -143,11 +150,12 @@ const errorMessage = ref('')
 const activeTab = ref('login')
 
 const loginForm = ref({
-  email: '',
+  identifier: '',
   password: '',
 })
 
 const registerForm = ref({
+  student_id: '',
   email: '',
   full_name: '',
   password: '',
@@ -155,9 +163,8 @@ const registerForm = ref({
 })
 
 const loginRules: FormRules = {
-  email: [
-    { required: true, message: '请输入邮箱', trigger: ['input', 'blur'] },
-    { type: 'email', message: '请输入有效的邮箱地址', trigger: ['blur'] },
+  identifier: [
+    { required: true, message: '请输入学号或邮箱', trigger: ['input', 'blur'] },
   ],
   password: [
     { required: true, message: '请输入密码', trigger: ['input', 'blur'] },
@@ -166,9 +173,8 @@ const loginRules: FormRules = {
 }
 
 const registerRules: FormRules = {
-  email: [
-    { required: true, message: '请输入邮箱', trigger: ['input', 'blur'] },
-    { type: 'email', message: '请输入有效的邮箱地址', trigger: ['blur'] },
+  student_id: [
+    { required: true, message: '请输入学号/工号', trigger: ['input', 'blur'] },
   ],
   password: [
     { required: true, message: '请输入密码', trigger: ['input', 'blur'] },
@@ -197,7 +203,7 @@ async function handleLogin() {
     await loginFormRef.value.validate()
     loading.value = true
 
-    await authStore.login(loginForm.value.email, loginForm.value.password)
+    await authStore.login(loginForm.value.identifier, loginForm.value.password)
     
     message.success('登录成功')
     
@@ -211,7 +217,7 @@ async function handleLogin() {
       return
     }
     console.error('登录失败:', error)
-    const errMsg = error?.response?.data?.detail || '登录失败，请检查邮箱和密码'
+    const errMsg = error?.response?.data?.detail || '登录失败，请检查学号/邮箱和密码'
     errorMessage.value = errMsg
     message.error(errMsg)
   } finally {
@@ -229,7 +235,8 @@ async function handleRegister() {
     registering.value = true
 
     await request.post('/api/v1/auth/register', {
-      email: registerForm.value.email,
+      student_id: registerForm.value.student_id,
+      email: registerForm.value.email || undefined,
       full_name: registerForm.value.full_name || undefined,
       password: registerForm.value.password,
     })
@@ -238,8 +245,8 @@ async function handleRegister() {
     
     // 切换到登录tab
     activeTab.value = 'login'
-    loginForm.value.email = registerForm.value.email
-    registerForm.value = { email: '', full_name: '', password: '', confirmPassword: '' }
+    loginForm.value.identifier = registerForm.value.student_id
+    registerForm.value = { student_id: '', email: '', full_name: '', password: '', confirmPassword: '' }
   } catch (error: any) {
     console.error('注册失败:', error)
     const errMsg = error?.response?.data?.detail || '注册失败'
