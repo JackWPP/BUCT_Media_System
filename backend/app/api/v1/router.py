@@ -10,7 +10,7 @@ from app.api.v1.endpoints import admin_users, admin_config, admin_permissions
 api_router = APIRouter()
 
 # Include all endpoint routers
-api_router.include_router(auth.router, tags=["Authentication"])
+api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(photos.router, prefix="/photos", tags=["Photos"])
 api_router.include_router(tags.router, prefix="/tags", tags=["Tags"])
 api_router.include_router(import_photos.router, prefix="/photos", tags=["Import"])

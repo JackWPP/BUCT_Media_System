@@ -9,7 +9,7 @@ import type { LoginRequest, LoginResponse, User } from '../types/user'
  */
 export function login(data: LoginRequest): Promise<LoginResponse> {
   return request({
-    url: '/api/v1/login',
+    url: '/api/v1/auth/login',
     method: 'post',
     data,
   })
@@ -20,7 +20,7 @@ export function login(data: LoginRequest): Promise<LoginResponse> {
  */
 export function getCurrentUser(): Promise<User> {
   return request({
-    url: '/api/v1/me',
+    url: '/api/v1/auth/me',
     method: 'get',
   })
 }

@@ -1,13 +1,6 @@
 <template>
-  <n-modal
-    v-model:show="showModal"
-    :mask-closable="true"
-    preset="card"
-    class="photo-detail-modal"
-    style="width: 90%; max-width: 1200px;"
-    title="照片详情"
-    @after-leave="handleModalClose"
-  >
+  <n-modal v-model:show="showModal" :mask-closable="true" preset="card" class="photo-detail-modal"
+    style="width: 90%; max-width: 1200px;" title="照片详情" @after-leave="handleModalClose">
     <n-spin :show="loading">
       <div v-if="photo" class="photo-detail">
         <n-grid :cols="2" :x-gap="24" :y-gap="24" responsive="screen">
@@ -20,14 +13,9 @@
               <div class="nav-btn next" v-if="hasNext" @click="$emit('next')">
                 <n-icon size="30" color="white" :component="ChevronForwardOutline" />
               </div>
-              
-              <img
-                :key="photo.id"
-                :src="getImageUrl(photo)"
-                :alt="photo.filename"
-                class="preview-image"
-                @error="handleImageError"
-              />
+
+              <img :key="photo.id" :src="getImageUrl(photo)" :alt="photo.filename" class="preview-image"
+                @error="handleImageError" />
               <div class="image-actions">
                 <n-button-group>
                   <n-button @click="downloadImage" tertiary>
@@ -77,26 +65,13 @@
               <!-- 可编辑信息 -->
               <n-form ref="formRef" :model="formData">
                 <n-form-item label="季节">
-                  <n-select
-                    v-model:value="formData.season"
-                    :options="seasonOptions"
-                    clearable
-                  />
+                  <n-select v-model:value="formData.season" :options="seasonOptions" clearable />
                 </n-form-item>
                 <n-form-item label="类别">
-                  <n-select
-                    v-model:value="formData.category"
-                    :options="categoryOptions"
-                    clearable
-                  />
+                  <n-select v-model:value="formData.category" :options="categoryOptions" clearable />
                 </n-form-item>
                 <n-form-item label="描述">
-                  <n-input
-                    v-model:value="formData.description"
-                    type="textarea"
-                    placeholder="输入照片描述..."
-                    :rows="3"
-                  />
+                  <n-input v-model:value="formData.description" type="textarea" placeholder="输入照片描述..." :rows="3" />
                 </n-form-item>
               </n-form>
 
@@ -104,12 +79,7 @@
               <div>
                 <n-text strong>标签</n-text>
                 <n-space style="margin-top: 8px;">
-                  <n-tag
-                    v-for="tag in photo.tags"
-                    :key="tag"
-                    closable
-                    @close="handleRemoveTag(tag)"
-                  >
+                  <n-tag v-for="tag in photo.tags" :key="tag" closable @close="handleRemoveTag(tag)">
                     {{ tag }}
                   </n-tag>
                   <n-button size="small" @click="showAddTag = true">
@@ -122,11 +92,7 @@
               <n-collapse v-if="photo.exif_data && Object.keys(photo.exif_data).length > 0">
                 <n-collapse-item title="EXIF 数据" name="exif">
                   <n-descriptions :column="1" size="small">
-                    <n-descriptions-item
-                      v-for="(value, key) in photo.exif_data"
-                      :key="key"
-                      :label="key"
-                    >
+                    <n-descriptions-item v-for="(value, key) in photo.exif_data" :key="key" :label="key">
                       {{ value }}
                     </n-descriptions-item>
                   </n-descriptions>
@@ -140,9 +106,7 @@
 
     <template #footer>
       <n-space justify="space-between">
-        <n-popconfirm
-          @positive-click="handleDelete"
-        >
+        <n-popconfirm @positive-click="handleDelete">
           <template #trigger>
             <n-button type="error" :loading="deleting">
               删除照片
@@ -154,12 +118,7 @@
           <n-button @click="showModal = false">
             取消
           </n-button>
-          <n-button
-            type="primary"
-            :loading="saving"
-            :disabled="!hasChanges"
-            @click="handleSave"
-          >
+          <n-button type="primary" :loading="saving" :disabled="!hasChanges" @click="handleSave">
             保存修改
           </n-button>
         </n-space>
@@ -169,11 +128,7 @@
 
   <!-- 添加标签对话框 -->
   <n-modal v-model:show="showAddTag" preset="dialog" title="添加标签">
-    <n-input
-      v-model:value="newTag"
-      placeholder="输入标签名称"
-      @keydown.enter="handleAddTag"
-    />
+    <n-input v-model:value="newTag" placeholder="输入标签名称" @keydown.enter="handleAddTag" />
     <template #action>
       <n-button @click="showAddTag = false">取消</n-button>
       <n-button type="primary" @click="handleAddTag">确定</n-button>
@@ -218,7 +173,7 @@ const emit = defineEmits<{
 // Keyboard navigation
 function handleKeydown(e: KeyboardEvent) {
   if (!props.show) return
-  
+
   if (e.key === 'ArrowLeft' && props.hasPrev) {
     emit('prev')
   } else if (e.key === 'ArrowRight' && props.hasNext) {
@@ -304,12 +259,12 @@ function handleImageError(e: Event) {
   const thumbUrl = getThumbnailUrl(photo.value)
   // 如果当前显示的不是缩略图，且缩略图存在，尝试降级
   if (thumbUrl && !img.src.includes('data:image')) {
-     if (img.getAttribute('data-tried-thumb') === 'true') {
-        img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
-     } else {
-        img.setAttribute('data-tried-thumb', 'true')
-        img.src = thumbUrl
-     }
+    if (img.getAttribute('data-tried-thumb') === 'true') {
+      img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
+    } else {
+      img.setAttribute('data-tried-thumb', 'true')
+      img.src = thumbUrl
+    }
   } else {
     img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
   }
@@ -354,7 +309,7 @@ function getStatusText(status: string): string {
 
 async function loadPhotoDetail() {
   if (!props.photoId) return
-  
+
   loading.value = true
   try {
     // 根据模式选择 API：管理后台使用已认证 API，前台使用公开 API
@@ -372,7 +327,7 @@ async function loadPhotoDetail() {
     incrementView(props.photoId).catch(err => {
       console.error('Failed to increment view count', err)
     })
-    
+
     // 加载所有标签（用于删除时获取 ID）
     await loadAllTags()
   } catch (error: any) {
@@ -387,11 +342,11 @@ async function loadAllTags() {
     // 使用公开API获取标签列表
     const response = await getPublicTags({ limit: 1000 }) as unknown as { items: Tag[], total: number }
     const tagMap = new Map<string, number>()
-    
+
     response.items.forEach((tag: Tag) => {
       tagMap.set(tag.name, tag.id)
     })
-    
+
     allTagsMap.value = tagMap
   } catch (error) {
     console.error('加载标签失败:', error)
@@ -454,14 +409,14 @@ async function handleDelete() {
 
 async function handleRemoveTag(tagName: string) {
   if (!photo.value) return
-  
+
   // 找到对应的标签 ID
   const tagId = allTagsMap.value.get(tagName)
   if (!tagId) {
     message.error('标签不存在')
     return
   }
-  
+
   try {
     await removePhotoTag(photo.value.id, tagId)
     message.success('标签已删除')
@@ -477,14 +432,14 @@ async function handleAddTag() {
     message.warning('请输入标签名称')
     return
   }
-  
+
   if (!photo.value) return
-  
+
   try {
     // 合并现有标签和新标签
     const newTagName = newTag.value.trim().toLowerCase()
     const allTags = [...(photo.value.tags || []), newTagName]
-    
+
     // 调用 API 添加标签（需要传递所有标签）
     await addPhotoTags(photo.value.id, allTags)
     message.success('标签已添加')
@@ -508,17 +463,17 @@ function handleModalClose() {
 
 async function downloadImage() {
   if (!photo.value) return
-  
+
   try {
     // 使用图片接口下载（与显示相同的端点）
     const downloadUrl = getPhotoUrl(photo.value.id, 'original')
-    
+
     const response = await fetch(downloadUrl)
     if (!response.ok) {
       throw new Error('Download failed')
     }
     const blob = await response.blob()
-    
+
     // 创建下载链接
     const blobUrl = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -529,7 +484,7 @@ async function downloadImage() {
     link.click()
     document.body.removeChild(link)
     window.URL.revokeObjectURL(blobUrl)
-    
+
     message.success('下载开始')
   } catch (error) {
     console.error('下载失败:', error)
@@ -539,49 +494,85 @@ async function downloadImage() {
 
 function shareImage() {
   if (!photo.value) return
-  // 使用当前页面URL更适合分享
-  const url = window.location.href
+
+  // 构建分享URL - 使用照片ID生成可分享的链接
+  const baseUrl = window.location.origin
+  const shareUrl = `${baseUrl}/?photo=${photo.value.id}`
+
+  // 尝试使用原生分享 API (移动端)
   if (navigator.share) {
     navigator.share({
-      title: photo.value.filename,
-      text: photo.value.description || '',
-      url: url
-    }).catch(() => {
-      copyToClipboard(url)
+      title: photo.value.filename || 'BUCT Media 照片',
+      text: photo.value.description || '来自 BUCT Media HUB 的照片',
+      url: shareUrl
+    }).catch((err) => {
+      // 用户取消分享不算错误
+      if (err.name !== 'AbortError') {
+        copyToClipboard(shareUrl)
+      }
     })
   } else {
-    copyToClipboard(url)
+    // 桌面端直接复制链接
+    copyToClipboard(shareUrl)
   }
 }
 
 function copyToClipboard(text: string) {
-  // 优先尝试现代 Clipboard API
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(() => {
-      message.success('链接已复制到剪贴板')
-    }).catch(() => {
-      fallbackCopyToClipboard(text)
-    })
-  } else {
-    fallbackCopyToClipboard(text)
+  // 尝试多种复制方法
+
+  // 方法1: 现代 Clipboard API (需要 HTTPS 或 localhost)
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        message.success('链接已复制到剪贴板')
+      })
+      .catch(() => {
+        fallbackCopyToClipboard(text)
+      })
+    return
   }
+
+  // 方法2: 回退到 execCommand
+  fallbackCopyToClipboard(text)
 }
 
 function fallbackCopyToClipboard(text: string) {
-  // 使用 execCommand 回退方案（适用于HTTP站点）
+  // 使用 textarea + execCommand 回退方案
   const textArea = document.createElement('textarea')
   textArea.value = text
+
+  // 确保 textarea 在视口内但不可见
   textArea.style.position = 'fixed'
-  textArea.style.left = '-9999px'
+  textArea.style.top = '0'
+  textArea.style.left = '0'
+  textArea.style.width = '2em'
+  textArea.style.height = '2em'
+  textArea.style.padding = '0'
+  textArea.style.border = 'none'
+  textArea.style.outline = 'none'
+  textArea.style.boxShadow = 'none'
+  textArea.style.background = 'transparent'
+  textArea.style.opacity = '0'
+
   document.body.appendChild(textArea)
+  textArea.focus()
   textArea.select()
+
+  let success = false
   try {
-    document.execCommand('copy')
-    message.success('链接已复制到剪贴板')
+    success = document.execCommand('copy')
   } catch (err) {
-    message.error('复制失败，请手动复制链接')
+    console.error('execCommand copy failed:', err)
   }
+
   document.body.removeChild(textArea)
+
+  if (success) {
+    message.success('链接已复制到剪贴板')
+  } else {
+    // 最后的回退：显示链接让用户手动复制
+    message.info(`请手动复制链接: ${text}`, { duration: 5000 })
+  }
 }
 </script>
 
@@ -642,7 +633,7 @@ function fallbackCopyToClipboard(text: string) {
 
 .image-actions {
   padding: 12px;
-  background: linear-gradient(to top, rgba(255,255,255,0.95), rgba(255,255,255,0.85));
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.85));
   display: flex;
   justify-content: center;
   border-top: 1px solid #eee;
@@ -656,7 +647,7 @@ function fallbackCopyToClipboard(text: string) {
   .photo-detail :deep(.n-grid) {
     grid-template-columns: 1fr !important;
   }
-  
+
   .image-preview {
     position: relative;
     top: 0;

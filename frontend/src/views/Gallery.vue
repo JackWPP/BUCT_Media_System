@@ -1,9 +1,10 @@
 <template>
   <div class="gallery-container">
     <n-layout has-sider>
-      <!-- 侧边栏 -->
-      <n-layout-sider bordered :collapsed="appStore.sidebarCollapsed" collapse-mode="width" :collapsed-width="64"
-        :width="240" show-trigger @collapse="appStore.toggleSidebar" @expand="appStore.toggleSidebar">
+      <!-- 侧边栏 (桌面端) -->
+      <n-layout-sider class="desktop-sider" bordered :collapsed="appStore.sidebarCollapsed" collapse-mode="width"
+        :collapsed-width="64" :width="240" show-trigger @collapse="appStore.toggleSidebar"
+        @expand="appStore.toggleSidebar">
         <n-menu :collapsed="appStore.sidebarCollapsed" :collapsed-width="64" :collapsed-icon-size="22"
           :options="menuOptions" :value="activeMenu" @update:value="handleMenuSelect" />
       </n-layout-sider>
@@ -13,8 +14,14 @@
         <!-- 头部 -->
         <n-layout-header bordered class="gallery-header">
           <div class="header-left">
+            <!-- 移动端汉堡菜单 -->
+            <n-button class="mobile-menu-btn" quaternary circle @click="showMobileDrawer = true">
+              <template #icon>
+                <n-icon :component="MenuOutline" />
+              </template>
+            </n-button>
             <h2 class="header-title">BUCT Media HUB</h2>
-            <n-input v-model:value="searchKeyword" placeholder="搜索照片..." clearable class="search-input"
+            <n-input v-model:value="searchKeyword" placeholder="搜索..." clearable class="search-input"
               @update:value="handleSearch">
               <template #prefix>
                 <n-icon :component="SearchOutline" />
@@ -58,27 +65,40 @@
         </n-layout-header>
 
         <!-- 内容 -->
-        <n-layout-content content-style="padding: 24px;">
+        <n-layout-content content-style="padding: 16px;" class="gallery-content">
           <!-- 筛选器 -->
           <div class="filters-container">
-            <n-space>
-              <n-select v-model:value="photoStore.filters.season" placeholder="选择季节" clearable style="width: 150px;"
-                :options="seasonOptions" @update:value="handleFilterChange" />
-              <n-select v-model:value="photoStore.filters.category" placeholder="选择类别" clearable style="width: 150px;"
-                :options="categoryOptions" @update:value="handleFilterChange" />
-              <n-select v-model:value="photoStore.filters.tag" placeholder="按标签筛选" clearable filterable
-                style="width: 180px;" :options="tagOptions" :loading="loadingTags" @update:value="handleFilterChange" />
-              <n-select v-model:value="photoStore.filters.sortBy" placeholder="排序方式" style="width: 140px;"
-                :options="sortOptions" @update:value="handleFilterChange" />
-              <n-button @click="handleClearFilters" secondary>
+            <!-- 移动端筛选器折叠按钮 -->
+            <div class="mobile-filter-toggle">
+              <n-button @click="showFilters = !showFilters" secondary block>
                 <template #icon>
-                  <n-icon :component="RefreshOutline" />
+                  <n-icon :component="FunnelOutline" />
                 </template>
-                清除筛选
+                {{ showFilters ? '收起筛选' : '展开筛选' }}
               </n-button>
-            </n-space>
-            <n-text depth="3" style="font-size: 14px;">
-              共 {{ photoStore.total }} 张照片
+            </div>
+            <!-- 筛选器内容 -->
+            <div class="filters-content" :class="{ 'filters-visible': showFilters }">
+              <n-space wrap>
+                <n-select v-model:value="photoStore.filters.season" placeholder="季节" clearable style="width: 120px;"
+                  :options="seasonOptions" @update:value="handleFilterChange" />
+                <n-select v-model:value="photoStore.filters.category" placeholder="类别" clearable style="width: 120px;"
+                  :options="categoryOptions" @update:value="handleFilterChange" />
+                <n-select v-model:value="photoStore.filters.tag" placeholder="标签" clearable filterable
+                  style="width: 140px;" :options="tagOptions" :loading="loadingTags"
+                  @update:value="handleFilterChange" />
+                <n-select v-model:value="photoStore.filters.sortBy" placeholder="排序" style="width: 120px;"
+                  :options="sortOptions" @update:value="handleFilterChange" />
+                <n-button @click="handleClearFilters" secondary size="small">
+                  <template #icon>
+                    <n-icon :component="RefreshOutline" />
+                  </template>
+                  清除
+                </n-button>
+              </n-space>
+            </div>
+            <n-text depth="3" class="photo-count">
+              共 {{ photoStore.total }} 张
             </n-text>
           </div>
 
@@ -140,6 +160,14 @@
     <PhotoDetail v-model:show="showPhotoDetail" :photo-id="selectedPhotoId" :has-prev="hasPrevPhoto"
       :has-next="hasNextPhoto" @prev="handlePrevPhoto" @next="handleNextPhoto" @deleted="handlePhotoDeleted"
       @updated="handlePhotoUpdated" />
+
+    <!-- 移动端导航抽屉 -->
+    <n-drawer v-model:show="showMobileDrawer" placement="left" :width="280">
+      <n-drawer-content title="导航菜单" closable>
+        <n-menu :options="menuOptions" :value="activeMenu"
+          @update:value="(val: string) => { handleMenuSelect(val); showMobileDrawer = false }" />
+      </n-drawer-content>
+    </n-drawer>
   </div>
 </template>
 
@@ -147,7 +175,7 @@
 import { ref, onMounted, h, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { NIcon, useMessage, useDialog } from 'naive-ui'
-import { SearchOutline, CloudUploadOutline, PersonOutline, ImagesOutline, LogOutOutline, EyeOutline, RefreshOutline, SettingsOutline } from '@vicons/ionicons5'
+import { SearchOutline, CloudUploadOutline, PersonOutline, ImagesOutline, LogOutOutline, EyeOutline, RefreshOutline, SettingsOutline, MenuOutline, FunnelOutline } from '@vicons/ionicons5'
 import { useAuthStore } from '../stores/auth'
 import { usePhotoStore } from '../stores/photo'
 import { useAppStore } from '../stores/app'
@@ -171,6 +199,10 @@ const activeMenu = ref('all')
 const showPhotoDetail = ref(false)
 const selectedPhotoId = ref<string | null>(null)
 const gridCols = ref(4)
+
+// 移动端状态
+const showMobileDrawer = ref(false)
+const showFilters = ref(false)
 
 // 标签相关
 const loadingTags = ref(false)
@@ -535,20 +567,126 @@ onMounted(() => {
   justify-content: center;
 }
 
+.photo-count {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* 移动端筛选器折叠按钮 - 默认隐藏 */
+.mobile-filter-toggle {
+  display: none;
+}
+
+/* 筛选器内容默认显示 */
+.filters-content {
+  display: block;
+}
+
+/* 移动端汉堡菜单按钮 - 默认隐藏 */
+.mobile-menu-btn {
+  display: none;
+}
+
+/* ========== 移动端响应式适配 ========== */
 @media (max-width: 768px) {
-  .header-left {
-    flex-direction: column;
-    align-items: flex-start;
+
+  /* 隐藏桌面端侧边栏 */
+  .desktop-sider {
+    display: none !important;
+  }
+
+  /* 显示移动端菜单按钮 */
+  .mobile-menu-btn {
+    display: inline-flex;
+  }
+
+  /* 头部布局优化 */
+  .gallery-header {
+    height: auto;
+    padding: 12px;
+    flex-wrap: wrap;
     gap: 8px;
+  }
+
+  .header-left {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .header-title {
+    font-size: 18px;
+    flex: 1;
+    min-width: 0;
   }
 
   .search-input {
     width: 100%;
+    order: 3;
+  }
+
+  .header-right {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* 筛选器 - 显示折叠按钮 */
+  .mobile-filter-toggle {
+    display: block;
+    width: 100%;
+    margin-bottom: 12px;
+  }
+
+  /* 筛选器 - 默认折叠 */
+  .filters-content {
+    display: none;
+    width: 100%;
+  }
+
+  .filters-content.filters-visible {
+    display: block;
+    margin-bottom: 12px;
   }
 
   .filters-container {
     flex-direction: column;
     align-items: stretch;
+    gap: 8px;
+  }
+
+  .photo-count {
+    text-align: center;
+    width: 100%;
+  }
+
+  /* 内容区内边距减小 */
+  .gallery-content {
+    padding: 12px !important;
+  }
+
+  /* 分页优化 */
+  .pagination-container {
+    margin-top: 16px;
+  }
+
+  /* 照片卡片信息区域优化 */
+  .photo-info {
+    padding: 8px;
+  }
+}
+
+/* 超小屏幕 (<=480px) */
+@media (max-width: 480px) {
+  .header-title {
+    font-size: 16px;
+  }
+
+  .photo-info {
+    padding: 6px;
+  }
+
+  .photo-info .n-tag {
+    font-size: 11px;
   }
 }
 </style>
