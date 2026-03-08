@@ -1,11 +1,14 @@
 """
 Taxonomy management endpoints.
 """
+from pydantic import BaseModel, ConfigDict
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_auditor_user, get_db
-from app.models.taxonomy import TaxonomyFacet, TaxonomyNode
+from app.models.photo import Photo
+from app.models.taxonomy import PhotoClassification, TaxonomyFacet, TaxonomyNode
 from app.models.user import User
 from app.schemas.taxonomy import (
     TaxonomyFacetCreate,
@@ -25,6 +28,27 @@ from app.services.taxonomy import (
 )
 
 router = APIRouter()
+
+
+class TaxonomyFacetInsight(BaseModel):
+    facet_key: str
+    facet_name: str
+    node_name: str
+    count: int
+
+
+class UnclassifiedPhotoItem(BaseModel):
+    id: str
+    filename: str
+    status: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TaxonomyInsightsResponse(BaseModel):
+    unclassified_total: int
+    unclassified_items: list[UnclassifiedPhotoItem]
+    facet_counts: list[TaxonomyFacetInsight]
 
 
 def _serialize_facet(facet: TaxonomyFacet) -> TaxonomyFacetResponse:
@@ -52,6 +76,61 @@ async def list_taxonomy_facets(
     await ensure_default_taxonomy(db)
     facets = await get_facets(db, active_only=False)
     return [_serialize_facet(facet) for facet in facets]
+
+
+@router.get("/insights", response_model=TaxonomyInsightsResponse)
+async def get_taxonomy_insights(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_auditor_user),
+):
+    await ensure_default_taxonomy(db)
+
+    facet_count_rows = await db.execute(
+        select(
+            TaxonomyFacet.key,
+            TaxonomyFacet.name,
+            TaxonomyNode.name,
+            func.count(Photo.id),
+        )
+        .join(TaxonomyNode, TaxonomyNode.facet_id == TaxonomyFacet.id)
+        .join(TaxonomyNode.photo_classifications)
+        .join(Photo)
+        .group_by(TaxonomyFacet.key, TaxonomyFacet.name, TaxonomyNode.name)
+        .order_by(TaxonomyFacet.sort_order.asc(), func.count(Photo.id).desc(), TaxonomyNode.sort_order.asc())
+    )
+
+    unclassified_query = (
+        select(Photo)
+        .outerjoin(PhotoClassification, PhotoClassification.photo_id == Photo.id)
+        .group_by(Photo.id)
+        .having(func.count(PhotoClassification.id) == 0)
+        .order_by(Photo.created_at.desc())
+    )
+    unclassified_items_result = await db.execute(unclassified_query.limit(10))
+    unclassified_total_result = await db.execute(
+        select(func.count())
+        .select_from(
+            select(Photo.id)
+            .outerjoin(PhotoClassification, PhotoClassification.photo_id == Photo.id)
+            .group_by(Photo.id)
+            .having(func.count(PhotoClassification.id) == 0)
+            .subquery()
+        )
+    )
+
+    return TaxonomyInsightsResponse(
+        unclassified_total=unclassified_total_result.scalar_one(),
+        unclassified_items=[UnclassifiedPhotoItem.model_validate(item) for item in unclassified_items_result.scalars().all()],
+        facet_counts=[
+            TaxonomyFacetInsight(
+                facet_key=facet_key,
+                facet_name=facet_name,
+                node_name=node_name,
+                count=count,
+            )
+            for facet_key, facet_name, node_name, count in facet_count_rows.all()
+        ],
+    )
 
 
 @router.post("/facets", response_model=TaxonomyFacetResponse, status_code=status.HTTP_201_CREATED)

@@ -9,6 +9,7 @@ from app.models.system_config import SystemConfig, ConfigKeys, PortraitVisibilit
 from app.models.permission import ResourcePermission, ResourceType, PermissionType
 from app.models.taxonomy import TaxonomyFacet, TaxonomyNode, TaxonomyAlias, PhotoClassification
 from app.models.ai_analysis import AIAnalysisTask
+from app.models.ai_provider import AIProviderConfig, AIProviderType
 
 __all__ = [
     "User",
@@ -28,6 +29,8 @@ __all__ = [
     "TaxonomyAlias",
     "PhotoClassification",
     "AIAnalysisTask",
+    "AIProviderConfig",
+    "AIProviderType",
 ]
 
 

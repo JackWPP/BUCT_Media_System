@@ -1,9 +1,11 @@
 """
 应用配置管理模块
 """
-from pydantic_settings import BaseSettings
-from functools import lru_cache
 from typing import Literal
+from functools import lru_cache
+
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -37,7 +39,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # AI 服务配置
-    AI_PROVIDER: Literal["ollama", "dashscope"] = "ollama"
+    AI_PROVIDER: Literal["ollama", "dashscope", "openai_compatible"] = "ollama"
     OLLAMA_API_URL: str = "http://localhost:11434"
     AI_MODEL_NAME: str = "llava"
     AI_MODEL_ID: str = "llava"
@@ -47,6 +49,10 @@ class Settings(BaseSettings):
     AI_DAILY_BUDGET: int = 500
     DASHSCOPE_API_KEY: str | None = None
     DASHSCOPE_BASE_URL: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    OPENAI_COMPATIBLE_API_KEY: str | None = None
+    OPENAI_COMPATIBLE_BASE_URL: str | None = None
+    OPENAI_COMPATIBLE_MODEL_ID: str | None = None
+    OPENAI_COMPATIBLE_HEADERS: dict[str, str] = Field(default_factory=dict)
     
     # CORS 配置
     ALLOWED_ORIGINS: list[str] = [

@@ -1,20 +1,21 @@
 """
 AI analysis services with provider abstraction and fallback.
 """
+from __future__ import annotations
+
 import base64
 import io
 import json
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from PIL import Image
 
-from app.core.config import get_settings
+from app.services.ai_providers import ResolvedAIProvider
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 DEFAULT_RESULT = {
@@ -37,12 +38,29 @@ DEFAULT_RESULT = {
 class BaseAIProvider(ABC):
     """Common AI provider contract."""
 
-    provider_name: str
+    def __init__(self, config: ResolvedAIProvider) -> None:
+        self.config = config
 
     @property
-    @abstractmethod
+    def provider_name(self) -> str:
+        return self.config.provider_type
+
+    @property
     def model_id(self) -> str:
-        raise NotImplementedError
+        return self.config.model_id
+
+    @property
+    def timeout_seconds(self) -> int:
+        return self.config.timeout_seconds
+
+    @property
+    def headers(self) -> dict[str, str]:
+        headers = {"Content-Type": "application/json"}
+        if self.config.api_key:
+            headers["Authorization"] = f"Bearer {self.config.api_key}"
+        if self.config.extra_headers:
+            headers.update({str(k): str(v) for k, v in self.config.extra_headers.items()})
+        return headers
 
     @abstractmethod
     async def analyze(self, image_base64: str, prompt: str) -> str:
@@ -50,41 +68,22 @@ class BaseAIProvider(ABC):
 
 
 class OllamaProvider(BaseAIProvider):
-    provider_name = "ollama"
-    model_override: str | None = None
-
-    @property
-    def model_id(self) -> str:
-        return self.model_override or settings.AI_MODEL_ID or settings.AI_MODEL_NAME
-
     async def analyze(self, image_base64: str, prompt: str) -> str:
-        url = f"{settings.OLLAMA_API_URL}/api/generate"
         payload = {
             "model": self.model_id,
             "prompt": prompt,
             "images": [image_base64],
             "stream": False,
         }
-        async with httpx.AsyncClient(timeout=settings.AI_TIMEOUT) as client:
-            response = await client.post(url, json=payload)
+        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+            response = await client.post(f"{self.config.base_url.rstrip('/')}/api/generate", json=payload)
             response.raise_for_status()
             data = response.json()
             return data.get("response", "")
 
 
-class DashScopeVLMProvider(BaseAIProvider):
-    provider_name = "dashscope"
-    model_override: str | None = None
-
-    @property
-    def model_id(self) -> str:
-        return self.model_override or settings.AI_MODEL_ID or "qwen-vl-max"
-
+class OpenAICompatibleProvider(BaseAIProvider):
     async def analyze(self, image_base64: str, prompt: str) -> str:
-        if not settings.DASHSCOPE_API_KEY:
-            raise RuntimeError("DASHSCOPE_API_KEY is not configured.")
-
-        url = f"{settings.DASHSCOPE_BASE_URL.rstrip('/')}/chat/completions"
         payload = {
             "model": self.model_id,
             "messages": [
@@ -98,47 +97,43 @@ class DashScopeVLMProvider(BaseAIProvider):
             ],
             "temperature": 0.2,
         }
-        headers = {
-            "Authorization": f"Bearer {settings.DASHSCOPE_API_KEY}",
-            "Content-Type": "application/json",
-        }
-
-        async with httpx.AsyncClient(timeout=settings.AI_TIMEOUT) as client:
-            response = await client.post(url, json=payload, headers=headers)
+        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+            response = await client.post(
+                f"{self.config.base_url.rstrip('/')}/chat/completions",
+                json=payload,
+                headers=self.headers,
+            )
             response.raise_for_status()
             data = response.json()
             choices = data.get("choices") or []
             if not choices:
                 return ""
             message = choices[0].get("message") or {}
-            return message.get("content", "")
+            content = message.get("content", "")
+            if isinstance(content, list):
+                texts = [str(item.get("text", "")) for item in content if isinstance(item, dict)]
+                return "\n".join(filter(None, texts))
+            return str(content)
+
+
+class DashScopeVLMProvider(OpenAICompatibleProvider):
+    """DashScope compatible-mode provider."""
 
 
 class AITaggingService:
     """AI analysis service with provider selection and fallback."""
 
-    def __init__(
-        self,
-        provider_name: str | None = None,
-        model_id: str | None = None,
-        enabled: bool | None = None,
-    ) -> None:
-        self.enabled = settings.AI_ENABLED if enabled is None else enabled
-        self.ollama_url = settings.OLLAMA_API_URL
-        self.model_name = model_id or settings.AI_MODEL_ID or settings.AI_MODEL_NAME
-        selected_provider = provider_name or settings.AI_PROVIDER
-        self.primary_provider = self._create_provider(selected_provider)
-        self.fallback_provider = None
-        if selected_provider != "ollama":
-            self.fallback_provider = self._create_provider("ollama")
+    def __init__(self, providers: list[ResolvedAIProvider], enabled: bool) -> None:
+        self.providers = providers
+        self.enabled = enabled
 
-    def _create_provider(self, provider_name: str) -> BaseAIProvider:
-        if provider_name == "dashscope":
-            provider = DashScopeVLMProvider()
-        else:
-            provider = OllamaProvider()
-        provider.model_override = self.model_name
-        return provider
+    @staticmethod
+    def _create_provider(config: ResolvedAIProvider) -> BaseAIProvider:
+        if config.provider_type == "ollama":
+            return OllamaProvider(config)
+        if config.provider_type == "dashscope":
+            return DashScopeVLMProvider(config)
+        return OpenAICompatibleProvider(config)
 
     def _compress_and_encode_image(self, image_path: str, max_size: int = 1024) -> str:
         with Image.open(image_path) as img:
@@ -158,22 +153,23 @@ class AITaggingService:
             img.save(buffer, format="JPEG", quality=85)
             return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
-    def _build_prompt(self) -> str:
+    @staticmethod
+    def _build_prompt() -> str:
         return (
-            "你是校园媒体图库审核助手。请分析这张图片并只返回 JSON。"
-            "请输出以下字段："
-            "summary(一句中文概述), "
-            "classifications(对象，键固定为 season/campus/building/gallery_series/gallery_year/photo_type), "
-            "free_tags(数组，最多 10 个中文标签), "
-            "quality_flags(数组，可含 模糊/过曝/欠曝/构图杂乱/疑似重复), "
-            "risk_flags(数组，可含 含人物/证件信息/屏幕内容/敏感文本), "
-            "confidence(0 到 1 的数字)。"
-            "如果某个分类无法判断则填 null。"
-            "season 优先用 春季/夏季/秋季/冬季，"
-            "photo_type 优先用 风光/人像/活动/纪实。"
+            "你是校园媒体图库审核助手。请只返回 JSON，不要输出其他文本。"
+            "字段必须包含：summary、classifications、free_tags、quality_flags、risk_flags、confidence。"
+            "classifications 的键固定为 season、campus、building、gallery_series、gallery_year、photo_type。"
+            "无法判断时填 null。"
+            "season 优先使用 春季、夏季、秋季、冬季。"
+            "photo_type 优先使用 风光、人像、活动、纪实。"
+            "free_tags 最多 10 个中文标签。"
+            "quality_flags 可包含 模糊、过曝、欠曝、构图杂乱、疑似重复。"
+            "risk_flags 可包含 含人物、证件信息、屏幕内容、敏感文本。"
+            "confidence 返回 0 到 1 之间的小数。"
         )
 
-    def _normalize_result(self, payload: dict[str, Any]) -> dict[str, Any]:
+    @staticmethod
+    def _normalize_result(payload: dict[str, Any]) -> dict[str, Any]:
         result = json.loads(json.dumps(DEFAULT_RESULT))
         if isinstance(payload.get("summary"), str):
             result["summary"] = payload["summary"].strip()
@@ -220,20 +216,19 @@ class AITaggingService:
             logger.warning("Failed to parse AI response: %s", exc)
             return json.loads(json.dumps(DEFAULT_RESULT))
 
-    async def analyze_image(self, image_path: str) -> Optional[dict[str, Any]]:
-        if not self.enabled:
-            logger.info("AI service disabled. Skipping image analysis.")
+    async def analyze_image(self, image_path: str) -> dict[str, Any] | None:
+        if not self.enabled or not self.providers:
+            logger.info("AI service disabled or no provider available. Skipping image analysis.")
             return None
 
         image_base64 = self._compress_and_encode_image(image_path)
         prompt = self._build_prompt()
-        providers = [self.primary_provider]
-        if self.fallback_provider:
-            providers.append(self.fallback_provider)
+        last_error: Exception | None = None
 
-        last_error: Optional[Exception] = None
-        for provider in providers:
-            for _attempt in range(settings.AI_MAX_RETRIES + 1):
+        for provider_config in self.providers:
+            provider = self._create_provider(provider_config)
+            attempts = max(provider_config.max_retries, 0) + 1
+            for _ in range(attempts):
                 try:
                     response_text = await provider.analyze(image_base64, prompt)
                     result = self._parse_response(response_text)
@@ -243,26 +238,18 @@ class AITaggingService:
                 except Exception as exc:  # noqa: BLE001
                     last_error = exc
                     logger.warning("AI provider %s failed: %s", provider.provider_name, exc)
+                    break
 
         if last_error:
             logger.error("All AI providers failed: %s", last_error)
         return None
 
 
-ai_service = AITaggingService()
-
-
-async def analyze_photo_with_ai(image_path: str) -> Optional[dict[str, Any]]:
-    """Convenience wrapper for legacy callers."""
-    return await ai_service.analyze_image(image_path)
-
-
 async def analyze_photo_with_runtime_settings(
     image_path: str,
-    provider_name: str,
-    model_id: str,
+    providers: list[ResolvedAIProvider],
     enabled: bool,
-) -> Optional[dict[str, Any]]:
-    """Run AI analysis with DB-backed runtime overrides."""
-    service = AITaggingService(provider_name=provider_name, model_id=model_id, enabled=enabled)
+) -> dict[str, Any] | None:
+    """Run AI analysis with resolved runtime provider settings."""
+    service = AITaggingService(providers=providers, enabled=enabled)
     return await service.analyze_image(image_path)

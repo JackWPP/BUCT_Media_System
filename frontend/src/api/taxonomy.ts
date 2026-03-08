@@ -35,6 +35,25 @@ export interface TaxonomyFacet {
   nodes: TaxonomyNode[]
 }
 
+export interface TaxonomyFacetInsight {
+  facet_key: string
+  facet_name: string
+  node_name: string
+  count: number
+}
+
+export interface UnclassifiedPhotoItem {
+  id: string
+  filename: string
+  status: string
+}
+
+export interface TaxonomyInsightsResponse {
+  unclassified_total: number
+  unclassified_items: UnclassifiedPhotoItem[]
+  facet_counts: TaxonomyFacetInsight[]
+}
+
 export interface TaxonomyFacetCreate {
   key: string
   name: string
@@ -65,6 +84,10 @@ export function getTaxonomyFacets() {
 
 export function createTaxonomyFacet(data: TaxonomyFacetCreate) {
   return request.post<TaxonomyFacet>('/api/v1/taxonomy/facets', data)
+}
+
+export function getTaxonomyInsights() {
+  return request.get<TaxonomyInsightsResponse>('/api/v1/taxonomy/insights')
 }
 
 export function updateTaxonomyFacet(facetId: number, data: Partial<TaxonomyFacetCreate>) {

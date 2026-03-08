@@ -1,28 +1,43 @@
 <template>
   <div class="gallery-container">
     <n-layout has-sider>
-      <!-- 侧边栏 (桌面端) -->
-      <n-layout-sider class="desktop-sider" bordered :collapsed="appStore.sidebarCollapsed" collapse-mode="width"
-        :collapsed-width="64" :width="240" show-trigger @collapse="appStore.toggleSidebar"
-        @expand="appStore.toggleSidebar">
-        <n-menu :collapsed="appStore.sidebarCollapsed" :collapsed-width="64" :collapsed-icon-size="22"
-          :options="menuOptions" :value="activeMenu" @update:value="handleMenuSelect" />
+      <n-layout-sider
+        class="desktop-sider"
+        bordered
+        :collapsed="appStore.sidebarCollapsed"
+        collapse-mode="width"
+        :collapsed-width="64"
+        :width="240"
+        show-trigger
+        @collapse="appStore.toggleSidebar"
+        @expand="appStore.toggleSidebar"
+      >
+        <n-menu
+          :collapsed="appStore.sidebarCollapsed"
+          :collapsed-width="64"
+          :collapsed-icon-size="22"
+          :options="menuOptions"
+          :value="activeMenu"
+          @update:value="handleMenuSelect"
+        />
       </n-layout-sider>
 
-      <!-- 主内容区 -->
       <n-layout>
-        <!-- 头部 -->
         <n-layout-header bordered class="gallery-header">
           <div class="header-left">
-            <!-- 移动端汉堡菜单 -->
             <n-button class="mobile-menu-btn" quaternary circle @click="showMobileDrawer = true">
               <template #icon>
                 <n-icon :component="MenuOutline" />
               </template>
             </n-button>
             <h2 class="header-title">BUCT Media HUB</h2>
-            <n-input v-model:value="searchKeyword" placeholder="搜索..." clearable class="search-input"
-              @update:value="handleSearch">
+            <n-input
+              v-model:value="searchKeyword"
+              placeholder="搜索照片、描述或自由标签"
+              clearable
+              class="search-input"
+              @update:value="handleSearch"
+            >
               <template #prefix>
                 <n-icon :component="SearchOutline" />
               </template>
@@ -36,14 +51,12 @@
                 </template>
               </n-button>
             </n-badge>
-            <!-- 只有登录用户才能上传 -->
             <n-button v-if="authStore.isAuthenticated" type="primary" @click="router.push('/upload')">
               <template #icon>
                 <n-icon :component="CloudUploadOutline" />
               </template>
               上传照片
             </n-button>
-            <!-- 未登录显示登录按钮，已登录显示用户菜单 -->
             <template v-if="authStore.isAuthenticated">
               <n-dropdown :options="userMenuOptions" @select="handleUserMenuSelect">
                 <n-button circle>
@@ -64,11 +77,8 @@
           </div>
         </n-layout-header>
 
-        <!-- 内容 -->
         <n-layout-content content-style="padding: 16px;" class="gallery-content">
-          <!-- 筛选器 -->
           <div class="filters-container">
-            <!-- 移动端筛选器折叠按钮 -->
             <div class="mobile-filter-toggle">
               <n-button @click="showFilters = !showFilters" secondary block>
                 <template #icon>
@@ -77,65 +87,147 @@
                 {{ showFilters ? '收起筛选' : '展开筛选' }}
               </n-button>
             </div>
-            <!-- 筛选器内容 -->
+
             <div class="filters-content" :class="{ 'filters-visible': showFilters }">
               <n-space wrap>
-                <n-select v-model:value="photoStore.filters.season" placeholder="季节" clearable style="width: 120px;"
-                  :options="seasonOptions" @update:value="handleFilterChange" />
-                <n-select v-model:value="photoStore.filters.category" placeholder="类别" clearable style="width: 120px;"
-                  :options="categoryOptions" @update:value="handleFilterChange" />
-                <n-select v-model:value="photoStore.filters.tag" placeholder="标签" clearable filterable
-                  style="width: 140px;" :options="tagOptions" :loading="loadingTags"
-                  @update:value="handleFilterChange" />
-                <n-select v-model:value="photoStore.filters.sortBy" placeholder="排序" style="width: 120px;"
-                  :options="sortOptions" @update:value="handleFilterChange" />
+                <n-select
+                  v-model:value="photoStore.filters.season"
+                  placeholder="季节"
+                  clearable
+                  style="width: 120px;"
+                  :options="facetOptions('season')"
+                  @update:value="handleFilterChange"
+                />
+                <n-select
+                  v-model:value="photoStore.filters.campus"
+                  placeholder="校区"
+                  clearable
+                  style="width: 140px;"
+                  :options="facetOptions('campus')"
+                  @update:value="handleFilterChange"
+                />
+                <n-select
+                  v-model:value="photoStore.filters.building"
+                  placeholder="楼宇"
+                  clearable
+                  style="width: 160px;"
+                  :options="facetOptions('building')"
+                  @update:value="handleFilterChange"
+                />
+                <n-select
+                  v-model:value="photoStore.filters.gallery_series"
+                  placeholder="专题 / 赛事"
+                  clearable
+                  style="width: 180px;"
+                  :options="facetOptions('gallery_series')"
+                  @update:value="handleFilterChange"
+                />
+                <n-select
+                  v-model:value="photoStore.filters.gallery_year"
+                  placeholder="年份"
+                  clearable
+                  style="width: 120px;"
+                  :options="facetOptions('gallery_year')"
+                  @update:value="handleFilterChange"
+                />
+                <n-select
+                  v-model:value="photoStore.filters.photo_type"
+                  placeholder="照片类型"
+                  clearable
+                  style="width: 140px;"
+                  :options="facetOptions('photo_type')"
+                  @update:value="handleFilterChange"
+                />
+                <n-select
+                  v-model:value="photoStore.filters.tag"
+                  placeholder="自由标签"
+                  clearable
+                  filterable
+                  style="width: 160px;"
+                  :options="tagOptions"
+                  :loading="loadingTags"
+                  @update:value="handleFilterChange"
+                />
+                <n-select
+                  v-model:value="photoStore.filters.sortBy"
+                  placeholder="排序"
+                  style="width: 140px;"
+                  :options="sortOptions"
+                  @update:value="handleFilterChange"
+                />
                 <n-button @click="handleClearFilters" secondary size="small">
                   <template #icon>
                     <n-icon :component="RefreshOutline" />
                   </template>
-                  清除
+                  清空
                 </n-button>
               </n-space>
+
+              <n-space v-if="activeFilters.length" wrap style="margin-top: 12px;">
+                <n-tag
+                  v-for="filter in activeFilters"
+                  :key="filter.key"
+                  closable
+                  @close="removeFilter(filter.key)"
+                >
+                  {{ filter.label }}: {{ filter.value }}
+                </n-tag>
+              </n-space>
             </div>
-            <n-text depth="3" class="photo-count">
-              共 {{ photoStore.total }} 张
-            </n-text>
+
+            <n-text depth="3" class="photo-count">共 {{ photoStore.total }} 张</n-text>
           </div>
 
-          <!-- 照片网格 -->
           <div class="photos-section">
             <n-spin :show="photoStore.loading">
-              <!-- 加载中显示骨架屏 -->
               <n-grid v-if="photoStore.loading" :cols="gridCols" :x-gap="16" :y-gap="16" responsive="screen">
                 <n-grid-item v-for="i in 12" :key="i">
                   <PhotoCardSkeleton />
                 </n-grid-item>
               </n-grid>
-              <!-- 空状态 -->
-              <EmptyState v-else-if="photoStore.photos.length === 0" description="暂无照片" :icon="ImagesOutline" action
-                action-text="上传照片" @action="router.push('/upload')" />
-              <!-- 照片列表 -->
+
+              <EmptyState
+                v-else-if="photoStore.photos.length === 0"
+                description="暂无符合条件的照片"
+                :icon="ImagesOutline"
+                action
+                action-text="清空筛选"
+                @action="handleClearFilters"
+              />
+
               <MasonryLayout v-else :items="photoStore.photos" :gap="16">
                 <template #default="{ item: photo }">
                   <div class="photo-card" @click="handlePhotoClick(photo)">
-                    <div class="photo-image"
-                      :style="{ aspectRatio: photo.width && photo.height ? `${photo.width} / ${photo.height}` : '4 / 3' }">
-                      <img :src="getImageUrl(photo)" :alt="photo.filename" loading="lazy" class="masonry-img"
-                        @error="(e) => handleImageError(e, photo)" />
+                    <div
+                      class="photo-image"
+                      :style="{ aspectRatio: photo.width && photo.height ? `${photo.width} / ${photo.height}` : '4 / 3' }"
+                    >
+                      <img
+                        :src="getImageUrl(photo)"
+                        :alt="photo.filename"
+                        loading="lazy"
+                        class="masonry-img"
+                        @error="(e) => handleImageError(e, photo)"
+                      />
                       <div class="photo-overlay">
                         <n-icon size="32" color="white" :component="EyeOutline" />
                       </div>
                     </div>
                     <div class="photo-info">
-                      <n-space size="small" style="margin-top: 8px;" wrap>
-                        <n-tag v-if="photo.season" size="small" type="success">
-                          {{ SEASON_MAP[photo.season] || photo.season }}
+                      <n-space size="small" wrap>
+                        <n-tag v-if="photo.classifications?.season" size="small" type="success">
+                          {{ photo.classifications.season.node_name }}
                         </n-tag>
-                        <n-tag v-if="photo.category" size="small" type="info">
-                          {{ CATEGORY_MAP[photo.category] || photo.category }}
+                        <n-tag v-if="photo.classifications?.photo_type" size="small" type="info">
+                          {{ photo.classifications.photo_type.node_name }}
                         </n-tag>
-                        <n-tag v-for="tag in photo.tags?.slice(0, 3)" :key="tag" size="small" class="clickable-tag"
-                          @click.stop="handleTagClick(tag)">
+                        <n-tag
+                          v-for="tag in (photo.free_tags || photo.tags || []).slice(0, 3)"
+                          :key="tag"
+                          size="small"
+                          class="clickable-tag"
+                          @click.stop="handleTagClick(tag)"
+                        >
                           {{ tag }}
                         </n-tag>
                       </n-space>
@@ -146,48 +238,76 @@
             </n-spin>
           </div>
 
-          <!-- 分页 -->
           <div v-if="photoStore.total > photoStore.pageSize" class="pagination-container">
-            <n-pagination v-model:page="photoStore.currentPage" :item-count="photoStore.total"
-              :page-size="photoStore.pageSize" show-size-picker :page-sizes="[20, 50, 100]"
-              @update:page="handlePageChange" @update:page-size="handlePageSizeChange" />
+            <n-pagination
+              v-model:page="photoStore.currentPage"
+              :item-count="photoStore.total"
+              :page-size="photoStore.pageSize"
+              show-size-picker
+              :page-sizes="[20, 50, 100]"
+              @update:page="handlePageChange"
+              @update:page-size="handlePageSizeChange"
+            />
           </div>
         </n-layout-content>
       </n-layout>
     </n-layout>
 
-    <!-- 照片详情模态框 -->
-    <PhotoDetail v-model:show="showPhotoDetail" :photo-id="selectedPhotoId" :has-prev="hasPrevPhoto"
-      :has-next="hasNextPhoto" @prev="handlePrevPhoto" @next="handleNextPhoto" @deleted="handlePhotoDeleted"
-      @updated="handlePhotoUpdated" />
+    <PhotoDetail
+      v-model:show="showPhotoDetail"
+      :photo-id="selectedPhotoId"
+      :has-prev="hasPrevPhoto"
+      :has-next="hasNextPhoto"
+      @prev="handlePrevPhoto"
+      @next="handleNextPhoto"
+      @deleted="handlePhotoDeleted"
+      @updated="handlePhotoUpdated"
+    />
 
-    <!-- 移动端导航抽屉 -->
     <n-drawer v-model:show="showMobileDrawer" placement="left" :width="280">
       <n-drawer-content title="导航菜单" closable>
-        <n-menu :options="menuOptions" :value="activeMenu"
-          @update:value="(val: string) => { handleMenuSelect(val); showMobileDrawer = false }" />
+        <n-menu
+          :options="menuOptions"
+          :value="activeMenu"
+          @update:value="(val: string) => { handleMenuSelect(val); showMobileDrawer = false }"
+        />
       </n-drawer-content>
     </n-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, h, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { NIcon, useMessage, useDialog } from 'naive-ui'
-import { SearchOutline, CloudUploadOutline, PersonOutline, ImagesOutline, LogOutOutline, EyeOutline, RefreshOutline, SettingsOutline, MenuOutline, FunnelOutline } from '@vicons/ionicons5'
+import { computed, h, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { NIcon, useDialog, useMessage } from 'naive-ui'
+import {
+  CloudUploadOutline,
+  EyeOutline,
+  FunnelOutline,
+  ImagesOutline,
+  LogOutOutline,
+  MenuOutline,
+  PersonOutline,
+  RefreshOutline,
+  SearchOutline,
+  SettingsOutline,
+} from '@vicons/ionicons5'
+import { useDebounceFn } from '@vueuse/core'
+import type { SelectOption } from 'naive-ui'
+import { getPopularTags, type Tag } from '../api/tag'
+import { getPublicTaxonomy, type TaxonomyFacet } from '../api/taxonomy'
+import EmptyState from '../components/common/EmptyState.vue'
+import MasonryLayout from '../components/common/MasonryLayout.vue'
+import PhotoCardSkeleton from '../components/common/PhotoCardSkeleton.vue'
+import PhotoDetail from '../components/photo/PhotoDetail.vue'
+import { useAppStore } from '../stores/app'
 import { useAuthStore } from '../stores/auth'
 import { usePhotoStore } from '../stores/photo'
-import { useAppStore } from '../stores/app'
-import { useDebounceFn } from '@vueuse/core'
-import type { Photo } from '../types/photo'
-import { getPopularTags, type Tag } from '../api/tag'
-import PhotoDetail from '../components/photo/PhotoDetail.vue'
-import EmptyState from '../components/common/EmptyState.vue'
-import PhotoCardSkeleton from '../components/common/PhotoCardSkeleton.vue'
-import MasonryLayout from '../components/common/MasonryLayout.vue'
+import type { Photo, PhotoFilters } from '../types/photo'
+import { getPhotoUrl } from '../utils/format'
 
 const router = useRouter()
+const route = useRoute()
 const message = useMessage()
 const dialog = useDialog()
 const authStore = useAuthStore()
@@ -199,21 +319,13 @@ const activeMenu = ref('all')
 const showPhotoDetail = ref(false)
 const selectedPhotoId = ref<string | null>(null)
 const gridCols = ref(4)
-
-// 移动端状态
 const showMobileDrawer = ref(false)
 const showFilters = ref(false)
-
-// 标签相关
 const loadingTags = ref(false)
 const popularTags = ref<Tag[]>([])
+const taxonomyFacets = ref<TaxonomyFacet[]>([])
+const syncingRoute = ref(false)
 
-// 标签选项
-const tagOptions = computed(() =>
-  popularTags.value.map(tag => ({ label: tag.name, value: tag.name }))
-)
-
-// 菜单选项
 const menuOptions = [
   {
     label: '全部照片',
@@ -222,7 +334,6 @@ const menuOptions = [
   },
 ]
 
-// 用户菜单选项
 const userMenuOptions = computed(() => {
   const options: any[] = [
     {
@@ -231,21 +342,16 @@ const userMenuOptions = computed(() => {
       disabled: true,
     },
     {
-      type: 'divider',
-      key: 'd1',
+      label: '我的投稿',
+      key: 'submissions',
     },
   ]
 
-  // 审核员和管理员都可进入后台
   if (authStore.isAuditor) {
     options.push({
       label: '管理后台',
       key: 'admin',
       icon: () => h(NIcon, null, { default: () => h(SettingsOutline) }),
-    })
-    options.push({
-      type: 'divider',
-      key: 'd2',
     })
   }
 
@@ -258,27 +364,66 @@ const userMenuOptions = computed(() => {
   return options
 })
 
-// 季节选项
-import { SEASON_OPTIONS, CATEGORY_OPTIONS, SEASON_MAP, CATEGORY_MAP } from '../constants/options'
-
-const seasonOptions = SEASON_OPTIONS
-
-// 类别选项
-const categoryOptions = CATEGORY_OPTIONS
-
-// 排序选项
 const sortOptions = [
   { label: '最新上传', value: 'created_at' },
   { label: '最热门', value: 'views' },
   { label: '最近发布', value: 'published_at' },
 ]
 
-// 获取图片URL - 增强兼容性处理
-// 获取图片URL - 增强兼容性处理
-import { getPhotoUrl } from '../utils/format'
+const tagOptions = computed<SelectOption[]>(() =>
+  popularTags.value.map((tag) => ({ label: tag.name, value: tag.name })),
+)
+
+const facetMap = computed(() =>
+  Object.fromEntries(taxonomyFacets.value.map((facet) => [facet.key, facet])),
+)
+
+const activeFilters = computed(() => {
+  const filters = photoStore.filters
+  const chips: Array<{ key: keyof PhotoFilters | 'search'; label: string; value: string }> = []
+  const labelMap: Record<string, string> = {
+    season: '季节',
+    campus: '校区',
+    building: '楼宇',
+    gallery_series: '专题',
+    gallery_year: '年份',
+    photo_type: '照片类型',
+    tag: '自由标签',
+    search: '搜索',
+  }
+
+  ;(['season', 'campus', 'building', 'gallery_series', 'gallery_year', 'photo_type', 'tag'] as const).forEach((key) => {
+    const value = filters[key]
+    if (value) {
+      chips.push({ key, label: labelMap[key], value })
+    }
+  })
+  if (filters.search) {
+    chips.push({ key: 'search', label: labelMap.search, value: filters.search })
+  }
+  return chips
+})
+
+const currentPhotoIndex = computed(() => {
+  if (!selectedPhotoId.value) return -1
+  return photoStore.photos.findIndex((photo) => photo.id === selectedPhotoId.value)
+})
+
+const hasPrevPhoto = computed(() => currentPhotoIndex.value > 0)
+const hasNextPhoto = computed(() => currentPhotoIndex.value >= 0 && currentPhotoIndex.value < photoStore.photos.length - 1)
+
+function facetOptions(key: string): SelectOption[] {
+  const facet = facetMap.value[key]
+  if (!facet) return []
+  const flatten = (nodes: TaxonomyFacet['nodes']): SelectOption[] =>
+    nodes.flatMap((node) => [
+      { label: node.name, value: node.name },
+      ...flatten(node.children || []),
+    ])
+  return flatten(facet.nodes || [])
+}
 
 function getImageUrl(photo: Photo) {
-  // 瀑布流使用缩略图，节省带宽
   return getPhotoUrl(photo.id, 'thumbnail')
 }
 
@@ -286,73 +431,114 @@ function getThumbnailUrl(photo: Photo) {
   return getPhotoUrl(photo.id, 'thumbnail')
 }
 
-// 图片加载错误处理
-function handleImageError(e: Event, photo: Photo) {
-  const img = e.target as HTMLImageElement
-
-  const thumbUrl = getThumbnailUrl(photo)
-  // 如果当前显示的不是缩略图，且缩略图存在，尝试降级
-  // 注意：需要构建完整的URL进行比较，或者简单判断 src 是否包含 thumbUrl 的关键部分
-  // 这里简化判断: 如果 src 已经是 data URL，或者已经是缩略图路径，则停止
-
-  if (thumbUrl && !img.src.includes('data:image')) {
-    // 检查是否已经是缩略图 (防止无限循环，尽管 getThumbnailUrl 返回的不同)
-    // 简单起见，如果 load error 了，且之前尝试的是 getImageUrl 的结果(原图)，那么尝试缩略图
-    // 但为了避免判断 src 的复杂性，我们只尝试一次降级
-    // 更好的方式是设置一个属性标记
-
-    if (img.getAttribute('data-tried-thumb') === 'true') {
-      img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
-    } else {
-      img.setAttribute('data-tried-thumb', 'true')
-      img.src = thumbUrl
-    }
-  } else {
-    img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
+function handleImageError(event: Event, photo: Photo) {
+  const img = event.target as HTMLImageElement
+  if (img.getAttribute('data-tried-thumb') === 'true') {
+    img.src =
+      'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
+    return
   }
+  img.setAttribute('data-tried-thumb', 'true')
+  img.src = getThumbnailUrl(photo)
 }
 
-// 防抖搜索
-const handleSearch = useDebounceFn((value: string) => {
+function buildQuery() {
+  const query: Record<string, string> = {}
+  const filters = photoStore.filters
+  ;(['season', 'campus', 'building', 'gallery_series', 'gallery_year', 'photo_type', 'tag'] as const).forEach((key) => {
+    const value = filters[key]
+    if (value) query[key] = value
+  })
+  if (filters.search) query.search = filters.search
+  if (filters.sortBy) query.sort_by = filters.sortBy
+  if (filters.sortOrder) query.sort_order = filters.sortOrder
+  if (photoStore.currentPage > 1) query.page = String(photoStore.currentPage)
+  if (photoStore.pageSize !== 20) query.page_size = String(photoStore.pageSize)
+  if (selectedPhotoId.value) query.photo = selectedPhotoId.value
+  return query
+}
+
+function applyRouteQuery() {
+  syncingRoute.value = true
+  const query = route.query
+  searchKeyword.value = typeof query.search === 'string' ? query.search : ''
+  photoStore.filters.season = typeof query.season === 'string' ? query.season : null
+  photoStore.filters.campus = typeof query.campus === 'string' ? query.campus : null
+  photoStore.filters.building = typeof query.building === 'string' ? query.building : null
+  photoStore.filters.gallery_series = typeof query.gallery_series === 'string' ? query.gallery_series : null
+  photoStore.filters.gallery_year = typeof query.gallery_year === 'string' ? query.gallery_year : null
+  photoStore.filters.photo_type = typeof query.photo_type === 'string' ? query.photo_type : null
+  photoStore.filters.tag = typeof query.tag === 'string' ? query.tag : null
+  photoStore.filters.search = searchKeyword.value
+  photoStore.filters.sortBy = typeof query.sort_by === 'string' ? query.sort_by : 'created_at'
+  photoStore.filters.sortOrder = typeof query.sort_order === 'string' ? query.sort_order : 'desc'
+  photoStore.currentPage = query.page ? Number(query.page) || 1 : 1
+  photoStore.pageSize = query.page_size ? Number(query.page_size) || 20 : 20
+  selectedPhotoId.value = typeof query.photo === 'string' ? query.photo : null
+  showPhotoDetail.value = !!selectedPhotoId.value
+  syncingRoute.value = false
+}
+
+async function syncQueryAndFetch() {
+  const nextQuery = buildQuery()
+  syncingRoute.value = true
+  await router.replace({ path: '/', query: nextQuery })
+  syncingRoute.value = false
+  await photoStore.fetchPublicPhotos()
+}
+
+const handleSearch = useDebounceFn(async (value: string) => {
   photoStore.setFilters({ search: value })
-  photoStore.fetchPhotos()
+  await syncQueryAndFetch()
 }, 500)
 
-// 筛选变更
-function handleFilterChange() {
-  photoStore.fetchPublicPhotos()
+async function handleFilterChange() {
+  await syncQueryAndFetch()
 }
 
-// 清除筛选
-function handleClearFilters() {
+async function handleClearFilters() {
   searchKeyword.value = ''
   photoStore.clearFilters()
-  photoStore.fetchPublicPhotos()
+  selectedPhotoId.value = null
+  showPhotoDetail.value = false
+  await syncQueryAndFetch()
 }
 
-// 分页变更
-function handlePageChange(page: number) {
+async function removeFilter(key: keyof PhotoFilters | 'search') {
+  if (key === 'search') {
+    searchKeyword.value = ''
+    photoStore.setFilters({ search: '' })
+  } else {
+    photoStore.setFilters({ [key]: null } as Partial<PhotoFilters>)
+  }
+  await syncQueryAndFetch()
+}
+
+async function handlePageChange(page: number) {
   photoStore.setPage(page)
-  photoStore.fetchPublicPhotos()
+  await syncQueryAndFetch()
 }
 
-// 分页大小变更
-function handlePageSizeChange(pageSize: number) {
+async function handlePageSizeChange(pageSize: number) {
   photoStore.pageSize = pageSize
   photoStore.setPage(1)
-  photoStore.fetchPublicPhotos()
+  await syncQueryAndFetch()
 }
 
-// 菜单选择
 function handleMenuSelect(key: string) {
   activeMenu.value = key
 }
 
-// 用户菜单选择
 function handleUserMenuSelect(key: string) {
   if (key === 'admin') {
     router.push('/admin')
-  } else if (key === 'logout') {
+    return
+  }
+  if (key === 'submissions') {
+    router.push('/my-submissions')
+    return
+  }
+  if (key === 'logout') {
     dialog.warning({
       title: '确认退出',
       content: '确定要退出登录吗？',
@@ -367,58 +553,50 @@ function handleUserMenuSelect(key: string) {
   }
 }
 
-// 照片点击
-function handlePhotoClick(photo: Photo) {
+async function handlePhotoClick(photo: Photo) {
   selectedPhotoId.value = photo.id
   showPhotoDetail.value = true
+  syncingRoute.value = true
+  await router.replace({ path: '/', query: buildQuery() })
+  syncingRoute.value = false
 }
 
-// 导航逻辑
-const currentPhotoIndex = computed(() => {
-  if (!selectedPhotoId.value) return -1
-  return photoStore.photos.findIndex(p => p.id === selectedPhotoId.value)
-})
-
-const hasPrevPhoto = computed(() => currentPhotoIndex.value > 0)
-const hasNextPhoto = computed(() => currentPhotoIndex.value !== -1 && currentPhotoIndex.value < photoStore.photos.length - 1)
-
-function handlePrevPhoto() {
-  if (hasPrevPhoto.value) {
-    const prevPhoto = photoStore.photos[currentPhotoIndex.value - 1]
-    selectedPhotoId.value = prevPhoto.id
-  }
+async function handlePrevPhoto() {
+  if (!hasPrevPhoto.value) return
+  selectedPhotoId.value = photoStore.photos[currentPhotoIndex.value - 1].id
+  syncingRoute.value = true
+  await router.replace({ path: '/', query: buildQuery() })
+  syncingRoute.value = false
 }
 
-function handleNextPhoto() {
-  if (hasNextPhoto.value) {
-    const nextPhoto = photoStore.photos[currentPhotoIndex.value + 1]
-    selectedPhotoId.value = nextPhoto.id
-  }
+async function handleNextPhoto() {
+  if (!hasNextPhoto.value) return
+  selectedPhotoId.value = photoStore.photos[currentPhotoIndex.value + 1].id
+  syncingRoute.value = true
+  await router.replace({ path: '/', query: buildQuery() })
+  syncingRoute.value = false
 }
 
-// 照片删除后
-function handlePhotoDeleted() {
+async function handlePhotoDeleted() {
   message.success('照片已删除')
   showPhotoDetail.value = false
-  photoStore.fetchPublicPhotos()
+  selectedPhotoId.value = null
+  await syncQueryAndFetch()
 }
 
-// 照片更新后
-function handlePhotoUpdated() {
-  photoStore.fetchPublicPhotos()
+async function handlePhotoUpdated() {
+  await photoStore.fetchPublicPhotos()
 }
 
-// 点击标签进行筛选
-function handleTagClick(tagName: string) {
+async function handleTagClick(tagName: string) {
   photoStore.setFilters({ tag: tagName })
-  photoStore.fetchPublicPhotos()
+  await syncQueryAndFetch()
 }
 
-// 加载热门标签
 async function loadPopularTags() {
   loadingTags.value = true
   try {
-    popularTags.value = await getPopularTags(50) as unknown as Tag[]
+    popularTags.value = (await getPopularTags(50)) as unknown as Tag[]
   } catch (error) {
     console.error('加载标签失败:', error)
   } finally {
@@ -426,13 +604,44 @@ async function loadPopularTags() {
   }
 }
 
-// 加载照片
-onMounted(() => {
-  photoStore.fetchPublicPhotos().catch((error) => {
-    message.error('加载照片失败')
+async function loadTaxonomy() {
+  try {
+    taxonomyFacets.value = await getPublicTaxonomy()
+  } catch (error) {
+    console.error('加载 taxonomy 失败:', error)
+  }
+}
+
+watch(
+  () => route.query,
+  async () => {
+    if (syncingRoute.value) return
+    applyRouteQuery()
+    await photoStore.fetchPublicPhotos()
+  },
+)
+
+watch(showPhotoDetail, async (value) => {
+  if (!value && selectedPhotoId.value) {
+    selectedPhotoId.value = null
+    syncingRoute.value = true
+    await router.replace({ path: '/', query: buildQuery() })
+    syncingRoute.value = false
+  }
+})
+
+onMounted(async () => {
+  applyRouteQuery()
+  try {
+    await Promise.all([
+      photoStore.fetchPublicPhotos(),
+      loadPopularTags(),
+      loadTaxonomy(),
+    ])
+  } catch (error) {
+    message.error('加载图库失败')
     console.error(error)
-  })
-  loadPopularTags()
+  }
 })
 </script>
 
@@ -462,7 +671,7 @@ onMounted(() => {
 }
 
 .search-input {
-  width: 300px;
+  width: 320px;
   max-width: 100%;
 }
 
@@ -476,7 +685,7 @@ onMounted(() => {
   margin-bottom: 24px;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: wrap;
   gap: 16px;
 }
@@ -514,23 +723,14 @@ onMounted(() => {
   transition: transform 0.3s ease;
 }
 
-/* Remove old absolute positioning if any */
-.photo-image img {
-  /* Inherit transition from masonry-img or keep here if not using class everywhere */
-  transition: transform 0.3s ease;
-}
-
 .photo-card:hover .photo-image img {
   transform: scale(1.05);
 }
 
 .photo-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -546,19 +746,8 @@ onMounted(() => {
   padding: 12px;
 }
 
-.photo-name {
-  font-weight: 500;
-  font-size: 14px;
-}
-
 .clickable-tag {
   cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.clickable-tag:hover {
-  transform: scale(1.05);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .pagination-container {
@@ -572,35 +761,28 @@ onMounted(() => {
   white-space: nowrap;
 }
 
-/* 移动端筛选器折叠按钮 - 默认隐藏 */
 .mobile-filter-toggle {
   display: none;
 }
 
-/* 筛选器内容默认显示 */
 .filters-content {
   display: block;
+  flex: 1;
 }
 
-/* 移动端汉堡菜单按钮 - 默认隐藏 */
 .mobile-menu-btn {
   display: none;
 }
 
-/* ========== 移动端响应式适配 ========== */
 @media (max-width: 768px) {
-
-  /* 隐藏桌面端侧边栏 */
   .desktop-sider {
     display: none !important;
   }
 
-  /* 显示移动端菜单按钮 */
   .mobile-menu-btn {
     display: inline-flex;
   }
 
-  /* 头部布局优化 */
   .gallery-header {
     height: auto;
     padding: 12px;
@@ -630,14 +812,12 @@ onMounted(() => {
     gap: 8px;
   }
 
-  /* 筛选器 - 显示折叠按钮 */
   .mobile-filter-toggle {
     display: block;
     width: 100%;
     margin-bottom: 12px;
   }
 
-  /* 筛选器 - 默认折叠 */
   .filters-content {
     display: none;
     width: 100%;
@@ -659,34 +839,16 @@ onMounted(() => {
     width: 100%;
   }
 
-  /* 内容区内边距减小 */
   .gallery-content {
     padding: 12px !important;
   }
 
-  /* 分页优化 */
   .pagination-container {
     margin-top: 16px;
   }
 
-  /* 照片卡片信息区域优化 */
   .photo-info {
     padding: 8px;
-  }
-}
-
-/* 超小屏幕 (<=480px) */
-@media (max-width: 480px) {
-  .header-title {
-    font-size: 16px;
-  }
-
-  .photo-info {
-    padding: 6px;
-  }
-
-  .photo-info .n-tag {
-    font-size: 11px;
   }
 }
 </style>

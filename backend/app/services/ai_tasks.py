@@ -78,8 +78,7 @@ async def run_ai_analysis_task(task_id: str) -> Optional[AIAnalysisTask]:
             with storage.local_copy(photo.original_path) as local_path:
                 result = await analyze_photo_with_runtime_settings(
                     local_path,
-                    provider_name=runtime_settings.ai_provider,
-                    model_id=runtime_settings.ai_model_id,
+                    providers=runtime_settings.providers,
                     enabled=runtime_settings.ai_enabled,
                 )
 
