@@ -18,7 +18,7 @@ from app.schemas.permission import (
     PermissionList,
 )
 
-router = APIRouter(prefix="/permissions", tags=["permission-management"])
+router = APIRouter(prefix="/permissions")
 
 
 @router.post("/grant", response_model=PermissionResponse)

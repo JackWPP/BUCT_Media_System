@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.services.ai_tagging import AITaggingService
 
 
-async def test_ai_service():
+async def _test_ai_service():
     """测试 AI 服务"""
     print("=" * 50)
     print("AI 打标服务测试")
@@ -95,7 +95,7 @@ async def test_ai_service():
         traceback.print_exc()
 
 
-async def test_response_parsing():
+async def _test_response_parsing():
     """测试响应解析"""
     print("\n" + "=" * 50)
     print("测试响应解析")
@@ -139,14 +139,22 @@ async def test_response_parsing():
             print(f"❌ 解析失败: {str(e)}")
 
 
+def test_ai_service():
+    asyncio.run(_test_ai_service())
+
+
+def test_response_parsing():
+    asyncio.run(_test_response_parsing())
+
+
 if __name__ == "__main__":
     print("\n🚀 开始测试 AI 打标服务\n")
     
     # 运行响应解析测试
-    asyncio.run(test_response_parsing())
+    asyncio.run(_test_response_parsing())
     
     # 运行完整 AI 服务测试
-    asyncio.run(test_ai_service())
+    asyncio.run(_test_ai_service())
     
     print("\n" + "=" * 50)
     print("测试完成")

@@ -18,7 +18,7 @@ from app.schemas.user import (
     UserRoleUpdate,
 )
 
-router = APIRouter(prefix="/users", tags=["用户管理"])
+router = APIRouter(prefix="/users")
 
 
 @router.get("", response_model=UserList)

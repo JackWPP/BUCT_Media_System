@@ -23,6 +23,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * 是否为审核员（包含管理员）
+   * 用于内容审核相关能力，不代表拥有系统管理权限。
    */
   const isAuditor = computed(() =>
     user.value?.role === 'admin' || user.value?.role === 'auditor'

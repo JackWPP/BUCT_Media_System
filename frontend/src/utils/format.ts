@@ -64,5 +64,7 @@ export function getPhotoUrl(photoId: string, type: 'original' | 'thumbnail' = 'o
   // In production, use empty base (relative path) since Nginx handles /api proxy
   // In development, use full localhost URL
   const base = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')
-  return `${base}/api/v1/photos/${photoId}/image/${type}`
+  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+  const query = token ? `?access_token=${encodeURIComponent(token)}` : ''
+  return `${base}/api/v1/photos/${photoId}/image/${type}${query}`
 }

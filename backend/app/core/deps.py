@@ -4,7 +4,7 @@ Dependency injection functions
 提供 FastAPI 依赖注入函数，用于数据库会话、用户认证和权限校验。
 """
 from typing import AsyncGenerator, Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,8 +15,9 @@ from app.models.user import User
 from app.models.system_config import SystemConfig, ConfigKeys, PortraitVisibility
 
 # OAuth2 scheme for token authentication
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
-oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
+# OpenAPI/OAuth2 password flow must point to the form-based token endpoint.
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token", auto_error=False)
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -36,6 +37,34 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
+async def _get_user_from_token(
+    token: Optional[str],
+    db: AsyncSession
+) -> Optional[User]:
+    """
+    Resolve user from JWT token.
+
+    Returns None for missing/invalid tokens or missing users.
+    """
+    if not token:
+        return None
+
+    payload = decode_access_token(token)
+    if payload is None:
+        return None
+
+    student_id: Optional[str] = payload.get("sub")
+    if student_id is None:
+        return None
+
+    # 优先按 student_id 查找，回退到 email（兼容旧 token）
+    user = await user_crud.get_user_by_student_id(db, student_id=student_id)
+    if user is None:
+        user = await user_crud.get_user_by_email(db, email=student_id)
+
+    return user
+
+
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db)
@@ -51,22 +80,11 @@ async def get_current_user(
         detail="无法验证凭据",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
-    payload = decode_access_token(token)
-    if payload is None:
-        raise credentials_exception
-    
-    student_id: Optional[str] = payload.get("sub")
-    if student_id is None:
-        raise credentials_exception
-    
-    # 优先按 student_id 查找，回退到 email（兼容旧 token）
-    user = await user_crud.get_user_by_student_id(db, student_id=student_id)
-    if user is None:
-        user = await user_crud.get_user_by_email(db, email=student_id)
+
+    user = await _get_user_from_token(token, db)
     if user is None:
         raise credentials_exception
-    
+
     return user
 
 
@@ -127,21 +145,22 @@ async def get_optional_current_user(
     
     用于公开接口，允许游客访问但可能根据登录状态返回不同内容。
     """
-    if not token:
-        return None
-    
-    payload = decode_access_token(token)
-    if payload is None:
-        return None
-    
-    student_id: Optional[str] = payload.get("sub")
-    if student_id is None:
-        return None
-    
-    # 优先按 student_id 查找，回退到 email
-    user = await user_crud.get_user_by_student_id(db, student_id=student_id)
-    if user is None:
-        user = await user_crud.get_user_by_email(db, email=student_id)
+    user = await _get_user_from_token(token, db)
+    return user
+
+
+async def get_optional_current_user_for_media(
+    token: Optional[str] = Depends(oauth2_scheme_optional),
+    access_token: Optional[str] = Query(None, description="JWT token for image requests"),
+    db: AsyncSession = Depends(get_db)
+) -> Optional[User]:
+    """
+    Resolve the current user for media requests.
+
+    Browsers won't attach Authorization headers to cross-origin <img> requests,
+    so media endpoints also accept the JWT via query string.
+    """
+    user = await _get_user_from_token(token or access_token, db)
     return user
 
 

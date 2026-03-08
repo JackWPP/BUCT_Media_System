@@ -12,7 +12,7 @@ from app.schemas.token import LoginRequest, LoginResponse, Token
 from app.schemas.user import User, UserCreate
 from app.crud import user as user_crud
 
-router = APIRouter(tags=["authentication"])
+router = APIRouter()
 
 
 @router.post("/login", response_model=LoginResponse)

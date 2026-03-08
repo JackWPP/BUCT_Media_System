@@ -35,10 +35,10 @@ async def increment_view(
 @router.get("/dashboard")
 async def get_dashboard_stats(
     db: AsyncSession = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_admin_user),
+    current_user: User = Depends(deps.get_current_auditor_user),
 ):
     """
-    Get dashboard statistics (admin only)
+    Get dashboard statistics (reviewer only)
     """
     # 1. Total Photos
     result = await db.execute(

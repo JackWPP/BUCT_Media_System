@@ -104,11 +104,6 @@ const baseMenuOptions: MenuOption[] = [
     key: 'TagManagement',
     icon: renderMenuIcon(PricetagsOutline),
   },
-  {
-    label: '批量导入',
-    key: 'PhotoImport',
-    icon: renderMenuIcon(CloudUploadOutline),
-  },
 ]
 
 // 仅管理员可见的菜单
@@ -116,6 +111,11 @@ const adminOnlyMenuOptions: MenuOption[] = [
   {
     type: 'divider',
     key: 'd1',
+  },
+  {
+    label: '批量导入',
+    key: 'PhotoImport',
+    icon: renderMenuIcon(CloudUploadOutline),
   },
   {
     label: '用户管理',

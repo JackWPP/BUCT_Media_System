@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import get_db, get_current_user
+from app.core.deps import get_db, get_current_user, get_current_auditor_user
 from app.models.user import User
 from app.schemas.tag import TagCreate, TagUpdate, TagResponse, TagListResponse
 from app.crud import tag as tag_crud
@@ -100,20 +100,13 @@ async def get_popular_tags(
 async def create_tag(
     tag: TagCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_auditor_user)
 ):
     """
     Create a new tag
     
-    Only admins can create tags manually
+    Only reviewers can create tags manually
     """
-    # Check admin permission
-    if current_user.role != 'admin':
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators can create tags"
-        )
-    
     # Check if tag already exists
     existing_tag = await tag_crud.get_tag_by_name(db, tag.name)
     if existing_tag:
@@ -152,20 +145,13 @@ async def update_tag(
     tag_id: int,
     tag_update: TagUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_auditor_user)
 ):
     """
     Update a tag
     
-    Only admins can update tags
+    Only reviewers can update tags
     """
-    # Check admin permission
-    if current_user.role != 'admin':
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators can update tags"
-        )
-    
     tag = await tag_crud.get_tag(db, tag_id)
     
     if not tag:
@@ -192,21 +178,14 @@ async def update_tag(
 async def delete_tag(
     tag_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_auditor_user)
 ):
     """
     Delete a tag
     
-    Only admins can delete tags
+    Only reviewers can delete tags
     Note: This will also remove all photo-tag associations
     """
-    # Check admin permission
-    if current_user.role != 'admin':
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators can delete tags"
-        )
-    
     tag = await tag_crud.get_tag(db, tag_id)
     
     if not tag:

@@ -1,0 +1,2625 @@
+openapi: 3.1.0
+info:
+  title: BUCT Media HUB
+  description: '北京化工大学媒体资源管理系统后端接口。
+
+
+    认证方式：大多数受保护接口使用 `Authorization: Bearer <token>`。
+
+    前端常用登录接口为 `POST /api/v1/auth/login`，OpenAPI 工具链兼容登录接口为 `POST /api/v1/auth/token`。'
+  version: 1.0.0
+paths:
+  /api/v1/auth/login:
+    post:
+      tags:
+      - Authentication
+      summary: Login
+      description: '用户登录
+
+
+        支持学号或邮箱登录，返回 JWT token 和用户信息。'
+      operationId: login_api_v1_auth_login_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/auth/me:
+    get:
+      tags:
+      - Authentication
+      summary: Get Current User Info
+      description: 获取当前登录用户信息
+      operationId: get_current_user_info_api_v1_auth_me_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/auth/token:
+    post:
+      tags:
+      - Authentication
+      summary: Login For Access Token
+      description: 'OAuth2 兼容的 token 登录端点
+
+
+        username 字段可以是学号或邮箱。'
+      operationId: login_for_access_token_api_v1_auth_token_post
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Body_login_for_access_token_api_v1_auth_token_post'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Token'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/auth/register:
+    post:
+      tags:
+      - Authentication
+      summary: Register
+      description: '用户注册
+
+
+        必须提供学号，邮箱可选。'
+      operationId: register_api_v1_auth_register_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/photos/public:
+    get:
+      tags:
+      - Photos
+      summary: List Public Photos
+      description: 'List approved photos for public access
+
+
+        根据系统配置的人像可见性设置，对 Portrait 类别照片进行过滤：
+
+        - public: 所有人可见
+
+        - login_required: 仅登录用户可见
+
+        - authorized_only: 仅授权用户可见（暂同 login_required）
+
+
+        如果用户未登录且请求 Portrait 类别，该类别将被自动排除。
+
+
+        排序参数：
+
+        - sort_by: created_at (默认), views, published_at
+
+        - sort_order: desc (默认), asc'
+      operationId: list_public_photos_api_v1_photos_public_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: skip
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 0
+          title: Skip
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 20
+          title: Limit
+      - name: season
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Season
+      - name: category
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Category
+      - name: search
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Search
+      - name: tag
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Tag
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          type: string
+          default: created_at
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          type: string
+          default: desc
+          title: Sort Order
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/photos/{photo_id}/image/original:
+    get:
+      tags:
+      - Photos
+      summary: Get Photo Image
+      description: '获取原始照片文件
+
+
+        通过照片ID查找并返回原始图片文件。
+
+        使用 UPLOAD_DIR 配置构建路径，忽略数据库中的绝对路径。'
+      operationId: get_photo_image_api_v1_photos__photo_id__image_original_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: photo_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Photo Id
+      - name: access_token
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: JWT token for image requests
+          title: Access Token
+        description: JWT token for image requests
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/photos/{photo_id}/image/thumbnail:
+    get:
+      tags:
+      - Photos
+      summary: Get Photo Thumbnail
+      description: '获取照片缩略图
+
+
+        缩略图文件名格式为 {photo_id}_thumb.jpg'
+      operationId: get_photo_thumbnail_api_v1_photos__photo_id__image_thumbnail_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: photo_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Photo Id
+      - name: access_token
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: JWT token for image requests
+          title: Access Token
+        description: JWT token for image requests
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/photos/public/{photo_id}:
+    get:
+      tags:
+      - Photos
+      summary: Get Public Photo
+      description: 'Get a specific approved photo by ID
+
+
+        根据系统配置的人像可见性设置，对 Portrait 类别照片进行权限检查。'
+      operationId: get_public_photo_api_v1_photos_public__photo_id__get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: photo_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Photo Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/photos/upload:
+    post:
+      tags:
+      - Photos
+      summary: Upload Photo
+      description: 'Upload a new photo
+
+
+        - **file**: Photo file (JPEG, PNG, etc.)
+
+        - **description**: Optional description
+
+        - **season**: Optional season classification
+
+        - **category**: Optional category classification'
+      operationId: upload_photo_api_v1_photos_upload_post
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_upload_photo_api_v1_photos_upload_post'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoUploadResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/photos:
+    get:
+      tags:
+      - Photos
+      summary: List Photos
+      description: 'List photos with filtering and pagination
+
+
+        - **skip**: Number of records to skip (for pagination)
+
+        - **limit**: Maximum number of records to return (max 100)
+
+        - **status**: Filter by status
+
+        - **season**: Filter by season
+
+        - **category**: Filter by category
+
+        - **search**: Search in filename, description, and tags
+
+        - **tag**: Filter by specific tag name'
+      operationId: list_photos_api_v1_photos_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: skip
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 0
+          title: Skip
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 20
+          title: Limit
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: season
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Season
+      - name: category
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Category
+      - name: search
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Search
+      - name: tag
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Tag
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/photos/my-submissions:
+    get:
+      tags:
+      - Photos
+      summary: List My Submissions
+      description: List current user's submissions (all statuses)
+      operationId: list_my_submissions_api_v1_photos_my_submissions_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: skip
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 0
+          title: Skip
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 20
+          title: Limit
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: season
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Season
+      - name: category
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Category
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/photos/{photo_id}:
+    get:
+      tags:
+      - Photos
+      summary: Get Photo
+      description: Get a specific photo by ID
+      operationId: get_photo_api_v1_photos__photo_id__get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: photo_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Photo Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    patch:
+      tags:
+      - Photos
+      summary: Update Photo
+      description: 'Update a photo''s metadata
+
+
+        Users can only update their own photos unless they are admin'
+      operationId: update_photo_api_v1_photos__photo_id__patch
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: photo_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Photo Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PhotoUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - Photos
+      summary: Delete Photo
+      description: 'Delete a photo
+
+
+        Users can only delete their own photos unless they are admin'
+      operationId: delete_photo_api_v1_photos__photo_id__delete
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: photo_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Photo Id
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/photos/{photo_id}/approve:
+    post:
+      tags:
+      - Photos
+      summary: Approve Photo
+      description: 'Approve a photo (publish it)
+
+
+        Only reviewers can approve photos'
+      operationId: approve_photo_api_v1_photos__photo_id__approve_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: photo_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Photo Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/photos/{photo_id}/reject:
+    post:
+      tags:
+      - Photos
+      summary: Reject Photo
+      description: 'Reject a photo (unpublish it)
+
+
+        Only reviewers can reject photos'
+      operationId: reject_photo_api_v1_photos__photo_id__reject_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: photo_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Photo Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/photos/batch-approve:
+    post:
+      tags:
+      - Photos
+      summary: Batch Approve Photos
+      description: 'Batch approve multiple photos
+
+
+        Only reviewers can approve photos'
+      operationId: batch_approve_photos_api_v1_photos_batch_approve_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              items:
+                type: string
+              type: array
+              title: Photo Ids
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/photos/batch-reject:
+    post:
+      tags:
+      - Photos
+      summary: Batch Reject Photos
+      description: 'Batch reject multiple photos
+
+
+        Only reviewers can reject photos'
+      operationId: batch_reject_photos_api_v1_photos_batch_reject_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              items:
+                type: string
+              type: array
+              title: Photo Ids
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/photos/batch-delete:
+    post:
+      tags:
+      - Photos
+      summary: Batch Delete Photos
+      description: 'Batch delete multiple photos
+
+
+        Only admins can delete photos in batch'
+      operationId: batch_delete_photos_api_v1_photos_batch_delete_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              items:
+                type: string
+              type: array
+              title: Photo Ids
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/photos/{photo_id}/tags:
+    post:
+      tags:
+      - Photos
+      summary: Add Photo Tags
+      description: 'Add tags to a photo by tag names
+
+
+        Tags will be created automatically if they don''t exist
+
+        Users can only update tags for their own photos unless they are admin'
+      operationId: add_photo_tags_api_v1_photos__photo_id__tags_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: photo_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Photo Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+              title: Tag Names
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/photos/{photo_id}/tags/{tag_id}:
+    delete:
+      tags:
+      - Photos
+      summary: Remove Photo Tag
+      description: 'Remove a tag from a photo
+
+
+        Users can only update tags for their own photos unless they are admin'
+      operationId: remove_photo_tag_api_v1_photos__photo_id__tags__tag_id__delete
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: photo_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Photo Id
+      - name: tag_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Tag Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/photos/{photo_id}/download:
+    get:
+      tags:
+      - Photos
+      summary: Download Photo
+      description: Download photo by ID. Handles both relative and absolute paths.
+      operationId: download_photo_api_v1_photos__photo_id__download_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: photo_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Photo Id
+      - name: access_token
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: JWT token for image requests
+          title: Access Token
+        description: JWT token for image requests
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/tags/public:
+    get:
+      tags:
+      - Tags
+      summary: List Public Tags
+      description: List tags with filtering and pagination (no authentication required)
+      operationId: list_public_tags_api_v1_tags_public_get
+      parameters:
+      - name: skip
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 0
+          title: Skip
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 100
+          title: Limit
+      - name: search
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Search
+      - name: category
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Category
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/tags:
+    get:
+      tags:
+      - Tags
+      summary: List Tags
+      description: 'List tags with filtering and pagination
+
+
+        - **skip**: Number of records to skip
+
+        - **limit**: Maximum number of records to return (max 200)
+
+        - **search**: Search in tag name
+
+        - **category**: Filter by category'
+      operationId: list_tags_api_v1_tags_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: skip
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 0
+          title: Skip
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 100
+          title: Limit
+      - name: search
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Search
+      - name: category
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Category
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - Tags
+      summary: Create Tag
+      description: 'Create a new tag
+
+
+        Only reviewers can create tags manually'
+      operationId: create_tag_api_v1_tags_post
+      security:
+      - OAuth2PasswordBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagCreate'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/tags/popular:
+    get:
+      tags:
+      - Tags
+      summary: Get Popular Tags
+      description: 'Get popular tags sorted by usage count (no authentication required)
+
+
+        - **limit**: Maximum number of tags to return (max 50)'
+      operationId: get_popular_tags_api_v1_tags_popular_get
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 20
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TagResponse'
+                title: Response Get Popular Tags Api V1 Tags Popular Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/tags/{tag_id}:
+    get:
+      tags:
+      - Tags
+      summary: Get Tag
+      description: Get a specific tag by ID
+      operationId: get_tag_api_v1_tags__tag_id__get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: tag_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Tag Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    patch:
+      tags:
+      - Tags
+      summary: Update Tag
+      description: 'Update a tag
+
+
+        Only reviewers can update tags'
+      operationId: update_tag_api_v1_tags__tag_id__patch
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: tag_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Tag Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - Tags
+      summary: Delete Tag
+      description: 'Delete a tag
+
+
+        Only reviewers can delete tags
+
+        Note: This will also remove all photo-tag associations'
+      operationId: delete_tag_api_v1_tags__tag_id__delete
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: tag_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Tag Id
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/photos/import:
+    post:
+      tags:
+      - Import
+      summary: Import Photos
+      description: '批量导入照片数据
+
+
+        - **json_path**: JSON 文件或目录路径
+
+        - **image_folder**: 可选的图片文件夹路径
+
+
+        仅管理员可用'
+      operationId: import_photos_api_v1_photos_import_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/photos/import/validate:
+    get:
+      tags:
+      - Import
+      summary: Validate Import Path
+      description: '验证导入路径
+
+
+        检查路径是否存在以及包含多少 JSON 文件'
+      operationId: validate_import_path_api_v1_photos_import_validate_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: json_path
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Json Path
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/stats/view/{photo_id}:
+    post:
+      tags:
+      - Statistics
+      summary: Increment View
+      description: Increment view count for a photo
+      operationId: increment_view_api_v1_stats_view__photo_id__post
+      parameters:
+      - name: photo_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Photo Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/stats/dashboard:
+    get:
+      tags:
+      - Statistics
+      summary: Get Dashboard Stats
+      description: Get dashboard statistics (reviewer only)
+      operationId: get_dashboard_stats_api_v1_stats_dashboard_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/admin/users:
+    get:
+      tags:
+      - 用户管理
+      summary: Get Users
+      description: '获取用户列表
+
+
+        - 仅限管理员访问
+
+        - 支持分页和搜索'
+      operationId: get_users_api_v1_admin_users_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: skip
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          description: 跳过记录数
+          default: 0
+          title: Skip
+        description: 跳过记录数
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          description: 返回记录数
+          default: 20
+          title: Limit
+        description: 返回记录数
+      - name: search
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: 搜索关键词（邮箱或姓名）
+          title: Search
+        description: 搜索关键词（邮箱或姓名）
+      - name: role
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: 按角色过滤
+          title: Role
+        description: 按角色过滤
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserList'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - 用户管理
+      summary: Create User
+      description: '创建新用户
+
+
+        - 仅限管理员访问
+
+        - 支持指定用户角色（包括创建管理员）'
+      operationId: create_user_api_v1_admin_users_post
+      security:
+      - OAuth2PasswordBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreateByAdmin'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/admin/users/{user_id}:
+    get:
+      tags:
+      - 用户管理
+      summary: Get User
+      description: '获取单个用户详情
+
+
+        - 仅限管理员访问'
+      operationId: get_user_api_v1_admin_users__user_id__get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: User Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    put:
+      tags:
+      - 用户管理
+      summary: Update User
+      description: '更新用户信息
+
+
+        - 仅限管理员访问
+
+        - 可修改邮箱、姓名、密码、激活状态和角色'
+      operationId: update_user_api_v1_admin_users__user_id__put
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: User Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateByAdmin'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - 用户管理
+      summary: Delete User
+      description: '删除用户
+
+
+        - 仅限管理员访问
+
+        - 管理员不能删除自己'
+      operationId: delete_user_api_v1_admin_users__user_id__delete
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: User Id
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/admin/users/{user_id}/role:
+    put:
+      tags:
+      - 用户管理
+      summary: Update User Role
+      description: '修改用户角色
+
+
+        - 仅限管理员访问
+
+        - 管理员可以将任何用户提升为管理员或降级'
+      operationId: update_user_role_api_v1_admin_users__user_id__role_put
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: User Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRoleUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/admin/settings:
+    get:
+      tags:
+      - 系统设置
+      summary: Get Settings
+      description: '获取系统设置
+
+
+        - 仅限管理员访问'
+      operationId: get_settings_api_v1_admin_settings_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemSettings'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/admin/settings/portrait-visibility:
+    get:
+      tags:
+      - 系统设置
+      summary: Get Portrait Visibility Public
+      description: '获取人像照片可见性设置（公开接口）
+
+
+        - 用于前端判断是否显示人像分类'
+      operationId: get_portrait_visibility_public_api_v1_admin_settings_portrait_visibility_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+    put:
+      tags:
+      - 系统设置
+      summary: Update Portrait Visibility
+      description: '更新人像照片可见性设置
+
+
+        - 仅限管理员访问
+
+        - 可选值: public（公开）, login_required（需要登录）, authorized_only（仅授权用户）'
+      operationId: update_portrait_visibility_api_v1_admin_settings_portrait_visibility_put
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PortraitVisibilityUpdate'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemSettings'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/admin/permissions/grant:
+    post:
+      tags:
+      - 授权管理
+      summary: Grant Permission
+      description: '授予用户权限
+
+
+        管理员可以按学号给用户授权访问特定资源（如 Portrait 类别）。'
+      operationId: grant_permission_api_v1_admin_permissions_grant_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionGrantRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/admin/permissions/user/{student_id}:
+    get:
+      tags:
+      - 授权管理
+      summary: Get User Permissions
+      description: '获取用户的权限列表
+
+
+        按学号查询用户的所有授权记录。'
+      operationId: get_user_permissions_api_v1_admin_permissions_user__student_id__get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: student_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Student Id
+      - name: active_only
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Active Only
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionList'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/admin/permissions/{permission_id}:
+    delete:
+      tags:
+      - 授权管理
+      summary: Revoke Permission
+      description: 撤销权限
+      operationId: revoke_permission_api_v1_admin_permissions__permission_id__delete
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: permission_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Permission Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/admin/permissions/check/{student_id}:
+    get:
+      tags:
+      - 授权管理
+      summary: Check User Permission
+      description: 检查用户是否有特定权限
+      operationId: check_user_permission_api_v1_admin_permissions_check__student_id__get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: student_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Student Id
+      - name: resource_type
+        in: query
+        required: false
+        schema:
+          type: string
+          default: category
+          title: Resource Type
+      - name: resource_key
+        in: query
+        required: false
+        schema:
+          type: string
+          default: Portrait
+          title: Resource Key
+      - name: permission_type
+        in: query
+        required: false
+        schema:
+          type: string
+          default: view
+          title: Permission Type
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /:
+    get:
+      summary: Root
+      description: 根路径，返回API信息
+      operationId: root__get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /health:
+    get:
+      summary: Health Check
+      description: 健康检查端点
+      operationId: health_check_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+components:
+  schemas:
+    Body_login_for_access_token_api_v1_auth_token_post:
+      properties:
+        grant_type:
+          anyOf:
+          - type: string
+            pattern: password
+          - type: 'null'
+          title: Grant Type
+        username:
+          type: string
+          title: Username
+        password:
+          type: string
+          title: Password
+        scope:
+          type: string
+          title: Scope
+          default: ''
+        client_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Id
+        client_secret:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Secret
+      type: object
+      required:
+      - username
+      - password
+      title: Body_login_for_access_token_api_v1_auth_token_post
+    Body_upload_photo_api_v1_photos_upload_post:
+      properties:
+        file:
+          type: string
+          format: binary
+          title: File
+          description: Photo file to upload
+        description:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Description
+        season:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Season
+          description: Spring/Summer/Autumn/Winter
+        category:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Category
+          description: Landscape/Portrait/Activity/Documentary
+        enable_ai:
+          type: boolean
+          title: Enable Ai
+          description: Enable AI auto-tagging
+          default: true
+      type: object
+      required:
+      - file
+      title: Body_upload_photo_api_v1_photos_upload_post
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    ImportRequest:
+      properties:
+        json_path:
+          type: string
+          title: Json Path
+        image_folder:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Image Folder
+      type: object
+      required:
+      - json_path
+      title: ImportRequest
+      description: 导入请求
+    ImportResponse:
+      properties:
+        total_count:
+          type: integer
+          title: Total Count
+        imported_count:
+          type: integer
+          title: Imported Count
+        skipped_count:
+          type: integer
+          title: Skipped Count
+        error_count:
+          type: integer
+          title: Error Count
+        errors:
+          items:
+            type: string
+          type: array
+          title: Errors
+        message:
+          type: string
+          title: Message
+      type: object
+      required:
+      - total_count
+      - imported_count
+      - skipped_count
+      - error_count
+      - errors
+      - message
+      title: ImportResponse
+      description: 导入响应
+    LoginRequest:
+      properties:
+        identifier:
+          type: string
+          title: Identifier
+        password:
+          type: string
+          title: Password
+      type: object
+      required:
+      - identifier
+      - password
+      title: LoginRequest
+      description: 'Login request schema
+
+
+        identifier: 学号或邮箱，作为登录凭证'
+    LoginResponse:
+      properties:
+        access_token:
+          type: string
+          title: Access Token
+        token_type:
+          type: string
+          title: Token Type
+          default: bearer
+        user:
+          $ref: '#/components/schemas/User'
+      type: object
+      required:
+      - access_token
+      - user
+      title: LoginResponse
+      description: Login response with user info
+    PermissionGrantRequest:
+      properties:
+        student_id:
+          type: string
+          title: Student Id
+        resource_type:
+          $ref: '#/components/schemas/ResourceTypeEnum'
+          default: category
+        resource_key:
+          type: string
+          title: Resource Key
+          default: Portrait
+        permission_type:
+          $ref: '#/components/schemas/PermissionTypeEnum'
+          default: view
+        days:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Days
+          default: 30
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Note
+      type: object
+      required:
+      - student_id
+      title: PermissionGrantRequest
+      description: '授权请求 - 简化版
+
+
+        管理员可以按学号授权访问特定类别。'
+    PermissionList:
+      properties:
+        permissions:
+          items:
+            $ref: '#/components/schemas/PermissionResponse'
+          type: array
+          title: Permissions
+        total:
+          type: integer
+          title: Total
+      type: object
+      required:
+      - permissions
+      - total
+      title: PermissionList
+      description: 权限列表响应
+    PermissionResponse:
+      properties:
+        id:
+          type: string
+          title: Id
+        user_id:
+          type: string
+          title: User Id
+        user_student_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: User Student Id
+        user_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: User Name
+        resource_type:
+          type: string
+          title: Resource Type
+        resource_key:
+          type: string
+          title: Resource Key
+        permission_type:
+          type: string
+          title: Permission Type
+        start_time:
+          type: string
+          format: date-time
+          title: Start Time
+        end_time:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: End Time
+        is_active:
+          type: boolean
+          title: Is Active
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Note
+      type: object
+      required:
+      - id
+      - user_id
+      - resource_type
+      - resource_key
+      - permission_type
+      - start_time
+      - end_time
+      - is_active
+      - created_at
+      - note
+      title: PermissionResponse
+      description: 权限响应
+    PermissionTypeEnum:
+      type: string
+      enum:
+      - view
+      - download
+      - upload
+      title: PermissionTypeEnum
+      description: 权限类型
+    PhotoListResponse:
+      properties:
+        total:
+          type: integer
+          title: Total
+        page:
+          type: integer
+          title: Page
+        page_size:
+          type: integer
+          title: Page Size
+        items:
+          items:
+            $ref: '#/components/schemas/PhotoResponse'
+          type: array
+          title: Items
+      type: object
+      required:
+      - total
+      - page
+      - page_size
+      - items
+      title: PhotoListResponse
+      description: Photo list response with pagination
+    PhotoResponse:
+      properties:
+        filename:
+          type: string
+          title: Filename
+          description: Original filename
+        description:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Description
+          description: Photo description
+        season:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Season
+          description: 'Season: Spring/Summer/Autumn/Winter'
+        category:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Category
+          description: 'Category: Landscape/Portrait/Activity/Documentary'
+        id:
+          type: string
+          title: Id
+        uploader_id:
+          type: string
+          title: Uploader Id
+        original_path:
+          type: string
+          title: Original Path
+        processed_path:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Processed Path
+        thumb_path:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Thumb Path
+        width:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Width
+        height:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Height
+        file_size:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: File Size
+        mime_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Mime Type
+        exif_data:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Exif Data
+        captured_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Captured At
+        status:
+          type: string
+          title: Status
+        processing_status:
+          type: string
+          title: Processing Status
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        uploader_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Uploader Name
+        tags:
+          items:
+            type: string
+          type: array
+          title: Tags
+          description: Associated tags
+      type: object
+      required:
+      - filename
+      - id
+      - uploader_id
+      - original_path
+      - status
+      - processing_status
+      - created_at
+      - updated_at
+      title: PhotoResponse
+      description: Photo response schema
+    PhotoUpdate:
+      properties:
+        description:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Description
+        season:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Season
+        category:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Category
+        status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      additionalProperties: false
+      type: object
+      title: PhotoUpdate
+      description: Schema for updating a photo
+    PhotoUploadResponse:
+      properties:
+        id:
+          type: string
+          title: Id
+        filename:
+          type: string
+          title: Filename
+        original_path:
+          type: string
+          title: Original Path
+        thumb_path:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Thumb Path
+        width:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Width
+        height:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Height
+        status:
+          type: string
+          title: Status
+        message:
+          type: string
+          title: Message
+          default: Photo uploaded successfully
+      type: object
+      required:
+      - id
+      - filename
+      - original_path
+      - status
+      title: PhotoUploadResponse
+      description: Response after uploading a photo
+    PortraitVisibilityUpdate:
+      properties:
+        visibility:
+          type: string
+          title: Visibility
+      type: object
+      required:
+      - visibility
+      title: PortraitVisibilityUpdate
+      description: 人像照片可见性更新 schema
+      example:
+        visibility: login_required
+    ResourceTypeEnum:
+      type: string
+      enum:
+      - category
+      - photo
+      - tag
+      title: ResourceTypeEnum
+      description: 资源类型
+    RoleEnum:
+      type: string
+      enum:
+      - admin
+      - auditor
+      - dept_user
+      - user
+      title: RoleEnum
+      description: '用户角色枚举
+
+
+        - admin: 超级管理员，拥有所有权限
+
+        - auditor: 审核员，可审核照片和编辑标签
+
+        - dept_user: 部门用户，预留扩展
+
+        - user: 普通用户'
+    SystemSettings:
+      properties:
+        portrait_visibility:
+          type: string
+          title: Portrait Visibility
+      type: object
+      required:
+      - portrait_visibility
+      title: SystemSettings
+      description: 系统设置响应 schema
+      example:
+        portrait_visibility: login_required
+    TagCreate:
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Name
+          description: Tag name
+        category:
+          anyOf:
+          - type: string
+            maxLength: 50
+          - type: 'null'
+          title: Category
+          description: 'Tag category: object/scene/color/mood'
+        color:
+          anyOf:
+          - type: string
+            pattern: ^#[0-9A-Fa-f]{6}$
+          - type: 'null'
+          title: Color
+          description: HEX color code
+      type: object
+      required:
+      - name
+      title: TagCreate
+      description: Schema for creating a tag
+    TagListResponse:
+      properties:
+        total:
+          type: integer
+          title: Total
+        items:
+          items:
+            $ref: '#/components/schemas/TagResponse'
+          type: array
+          title: Items
+      type: object
+      required:
+      - total
+      - items
+      title: TagListResponse
+      description: Tag list response
+    TagResponse:
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Name
+          description: Tag name
+        category:
+          anyOf:
+          - type: string
+            maxLength: 50
+          - type: 'null'
+          title: Category
+          description: 'Tag category: object/scene/color/mood'
+        color:
+          anyOf:
+          - type: string
+            pattern: ^#[0-9A-Fa-f]{6}$
+          - type: 'null'
+          title: Color
+          description: HEX color code
+        id:
+          type: integer
+          title: Id
+        usage_count:
+          type: integer
+          title: Usage Count
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - name
+      - id
+      - usage_count
+      - created_at
+      title: TagResponse
+      description: Tag response schema
+    TagUpdate:
+      properties:
+        name:
+          anyOf:
+          - type: string
+            maxLength: 100
+            minLength: 1
+          - type: 'null'
+          title: Name
+        category:
+          anyOf:
+          - type: string
+            maxLength: 50
+          - type: 'null'
+          title: Category
+        color:
+          anyOf:
+          - type: string
+            pattern: ^#[0-9A-Fa-f]{6}$
+          - type: 'null'
+          title: Color
+      additionalProperties: false
+      type: object
+      title: TagUpdate
+      description: Schema for updating a tag
+    Token:
+      properties:
+        access_token:
+          type: string
+          title: Access Token
+        token_type:
+          type: string
+          title: Token Type
+          default: bearer
+      type: object
+      required:
+      - access_token
+      title: Token
+      description: Token response schema
+    User:
+      properties:
+        student_id:
+          type: string
+          title: Student Id
+        email:
+          anyOf:
+          - type: string
+            format: email
+          - type: 'null'
+          title: Email
+        full_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Full Name
+        id:
+          type: string
+          title: Id
+        role:
+          type: string
+          title: Role
+        is_active:
+          type: boolean
+          title: Is Active
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - student_id
+      - id
+      - role
+      - is_active
+      - created_at
+      title: User
+      description: User response schema
+    UserCreate:
+      properties:
+        student_id:
+          type: string
+          title: Student Id
+        email:
+          anyOf:
+          - type: string
+            format: email
+          - type: 'null'
+          title: Email
+        full_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Full Name
+        password:
+          type: string
+          title: Password
+      type: object
+      required:
+      - student_id
+      - password
+      title: UserCreate
+      description: 用户注册 schema (公开注册)
+    UserCreateByAdmin:
+      properties:
+        student_id:
+          type: string
+          title: Student Id
+        email:
+          anyOf:
+          - type: string
+            format: email
+          - type: 'null'
+          title: Email
+        full_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Full Name
+        password:
+          type: string
+          title: Password
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+          default: user
+      type: object
+      required:
+      - student_id
+      - password
+      title: UserCreateByAdmin
+      description: '管理员创建用户 schema
+
+
+        允许管理员在创建用户时指定角色和学号。
+
+        student_id 为必填字段。'
+    UserList:
+      properties:
+        users:
+          items:
+            $ref: '#/components/schemas/User'
+          type: array
+          title: Users
+        total:
+          type: integer
+          title: Total
+      type: object
+      required:
+      - users
+      - total
+      title: UserList
+      description: 用户列表响应 schema
+    UserRoleUpdate:
+      properties:
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+      type: object
+      required:
+      - role
+      title: UserRoleUpdate
+      description: 管理员修改用户角色 schema
+    UserUpdateByAdmin:
+      properties:
+        email:
+          anyOf:
+          - type: string
+            format: email
+          - type: 'null'
+          title: Email
+        full_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Full Name
+        password:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Password
+        is_active:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Is Active
+        role:
+          anyOf:
+          - $ref: '#/components/schemas/RoleEnum'
+          - type: 'null'
+        student_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Student Id
+      type: object
+      title: UserUpdateByAdmin
+      description: '管理员更新用户 schema
+
+
+        允许管理员修改用户的激活状态、角色和学号。'
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+  securitySchemes:
+    OAuth2PasswordBearer:
+      type: oauth2
+      flows:
+        password:
+          scopes: {}
+          tokenUrl: /api/v1/auth/token
+      description: 使用 `POST /api/v1/auth/token` 获取 Bearer Token，或通过 `POST /api/v1/auth/login`
+        获取前端登录响应。
+tags:
+- name: Authentication
+  description: 登录、注册与当前用户信息。`/auth/login` 使用 JSON 请求体，`/auth/token` 用于 OpenAPI/OAuth2
+    password flow。
+- name: Photos
+  description: 照片上传、查询、审核、下载、标签维护与个人投稿管理。
+- name: Tags
+  description: 标签查询与管理。
+- name: Import
+  description: 管理员批量导入照片与导入路径校验。
+- name: Statistics
+  description: 浏览量统计与审核后台仪表盘数据。
+- name: 用户管理
+  description: 管理员用户列表、创建、更新、删除与角色变更。
+- name: 系统设置
+  description: 系统级配置，当前主要包括人像照片可见性策略。
+- name: 授权管理
+  description: 管理员按学号授予、查询、校验和撤销资源访问权限。
+servers:
+- url: http://localhost:8000
+  description: 本地开发环境
+- url: /
+  description: 相对路径，适合反向代理或 ApiFox 自定义环境
+externalDocs:
+  description: 项目部署与使用说明
+  url: /README.md

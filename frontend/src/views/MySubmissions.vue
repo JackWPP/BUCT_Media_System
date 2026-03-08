@@ -55,6 +55,7 @@ import { CloudUploadOutline, Search as SearchIcon } from '@vicons/ionicons5'
 import type { DataTableColumns } from 'naive-ui'
 import type { Photo } from '../types/photo'
 import * as photoApi from '../api/photo'
+import { getPhotoUrl } from '../utils/format'
 
 const router = useRouter()
 const message = useMessage()
@@ -94,7 +95,7 @@ const columns: DataTableColumns<Photo> = [
     render(row) {
       if (!row.thumb_path) return '无'
       return h(NImage, {
-        src: getImageUrl(row.thumb_path),
+        src: getImageUrl(row),
         width: 80,
         height: 60,
         objectFit: 'cover',
@@ -148,10 +149,8 @@ const columns: DataTableColumns<Photo> = [
 ]
 
 // 方法
-function getImageUrl(path: string) {
-  if (!path) return ''
-  // 简单处理路径，实际应根据后端配置
-  return `/api/v1/static/${path.split('/').pop()}`
+function getImageUrl(photo: Photo) {
+  return getPhotoUrl(photo.id, 'thumbnail')
 }
 
 async function fetchPhotos() {

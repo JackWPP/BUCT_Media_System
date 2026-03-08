@@ -236,8 +236,8 @@ const userMenuOptions = computed(() => {
     },
   ]
 
-  // 如果是管理员，添加管理后台入口
-  if (authStore.user?.role === 'admin') {
+  // 审核员和管理员都可进入后台
+  if (authStore.isAuditor) {
     options.push({
       label: '管理后台',
       key: 'admin',

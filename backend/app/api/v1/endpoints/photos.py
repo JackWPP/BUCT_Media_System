@@ -11,8 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
 from app.core.deps import (
-    get_db, get_current_user, get_optional_current_user,
-    get_portrait_visibility
+    get_db,
+    get_current_user,
+    get_current_auditor_user,
+    get_optional_current_user,
+    get_optional_current_user_for_media,
+    get_portrait_visibility,
 )
 from app.models.user import User
 from app.models.photo import Photo
@@ -24,7 +28,7 @@ from app.schemas.photo import (
 from app.crud import photo as photo_crud
 from app.crud import tag as tag_crud
 from app.crud import permission as permission_crud
-from app.services.storage import save_photo_file, delete_file, ensure_upload_dirs, get_settings
+from app.services.storage import save_photo_file, delete_file
 from app.services.image_processing import process_uploaded_image
 from app.services.ai_tagging import analyze_photo_with_ai
 import os
@@ -33,6 +37,127 @@ logger = logging.getLogger(__name__)
 
 
 router = APIRouter()
+
+
+def is_reviewer(user: Optional[User]) -> bool:
+    """Return whether the user can review global photo content."""
+    return bool(user and user.role in ("admin", "auditor"))
+
+
+async def can_access_portrait_photo(
+    db: AsyncSession,
+    current_user: Optional[User],
+    portrait_visibility: str
+) -> bool:
+    """Check whether the current user may access portrait content."""
+    if portrait_visibility == PortraitVisibility.PUBLIC:
+        return True
+
+    if not current_user:
+        return False
+
+    if portrait_visibility == PortraitVisibility.LOGIN_REQUIRED:
+        return True
+
+    return await permission_crud.check_permission(
+        db, current_user.id, "category", "Portrait", "view"
+    )
+
+
+async def can_access_photo_publicly(
+    db: AsyncSession,
+    photo: Photo,
+    current_user: Optional[User],
+    portrait_visibility: str
+) -> bool:
+    """Check whether a photo is visible through the public access path."""
+    if photo.status != "approved":
+        return False
+
+    if photo.category != "Portrait":
+        return True
+
+    return await can_access_portrait_photo(db, current_user, portrait_visibility)
+
+
+async def serialize_photo(db: AsyncSession, photo: Photo) -> PhotoResponse:
+    """Convert ORM photo model to API response."""
+    tags = await photo_crud.get_photo_tags(db, photo.id)
+    tag_names = [tag.name for tag in tags]
+
+    photo_dict = {**photo.__dict__}
+    photo_dict.pop("_sa_instance_state", None)
+    photo_dict["tags"] = tag_names
+    photo_dict["uploader_name"] = None
+
+    return PhotoResponse(**photo_dict)
+
+
+async def serialize_photos(db: AsyncSession, photos: List[Photo]) -> List[PhotoResponse]:
+    """Convert a list of ORM photo models to API responses."""
+    return [await serialize_photo(db, photo) for photo in photos]
+
+
+def find_original_photo_path(photo: Photo) -> Optional[str]:
+    """Find the stored original file path for a photo."""
+    from app.core.config import get_settings
+
+    settings = get_settings()
+
+    ext = ""
+    if photo.filename:
+        _, ext = os.path.splitext(photo.filename)
+    if not ext and photo.original_path:
+        _, ext = os.path.splitext(photo.original_path)
+
+    candidates = []
+    if ext:
+        candidates.append(f"{photo.id}{ext}")
+        if ext.lower() != ".jpg":
+            candidates.append(f"{photo.id}.jpg")
+
+    if photo.original_path:
+        clean_path = photo.original_path.replace("\\", "/")
+        basename = os.path.basename(clean_path)
+        if basename not in candidates:
+            candidates.append(basename)
+
+    if photo.filename and photo.filename not in candidates:
+        candidates.append(photo.filename)
+
+    for filename in candidates:
+        file_path = os.path.join(settings.UPLOAD_DIR, "originals", filename)
+        if os.path.exists(file_path):
+            return file_path
+
+    if photo.original_path and os.path.exists(photo.original_path):
+        return photo.original_path
+
+    logger.error(
+        "Image not found for photo %s. Tried: %s in %s/originals",
+        photo.id,
+        candidates,
+        settings.UPLOAD_DIR,
+    )
+    return None
+
+
+def find_thumbnail_path(photo: Photo) -> Optional[str]:
+    """Find the stored thumbnail path for a photo."""
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    filename = f"{photo.id}_thumb.jpg"
+    file_path = os.path.join(settings.UPLOAD_DIR, "thumbnails", filename)
+
+    if os.path.exists(file_path):
+        return file_path
+
+    if photo.thumb_path and os.path.exists(photo.thumb_path):
+        return photo.thumb_path
+
+    logger.error("Thumbnail not found for photo %s", photo.id)
+    return None
 
 
 @router.get("/public", response_model=PhotoListResponse)
@@ -74,8 +199,6 @@ async def list_public_photos(
     
     # 检查是否需要过滤人像照片
     should_filter_portrait = False
-    has_portrait_permission = False
-    
     if portrait_visibility == PortraitVisibility.LOGIN_REQUIRED:
         # 需要登录才能查看人像
         if not current_user:
@@ -86,26 +209,10 @@ async def list_public_photos(
             should_filter_portrait = True
         else:
             # 检查用户是否有 Portrait 类别的查看权限
-            has_portrait_permission = await permission_crud.check_permission(
-                db, current_user.id, "category", "Portrait", "view"
-            )
-            if not has_portrait_permission:
+            if not await can_access_portrait_photo(db, current_user, portrait_visibility):
                 should_filter_portrait = True
     # portrait_visibility == 'public' 时不过滤
-    
-    # 如果用户明确请求 Portrait 类别但无权访问
-    if category == 'Portrait' and should_filter_portrait:
-        if portrait_visibility == PortraitVisibility.AUTHORIZED_ONLY:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="人像照片需要授权后才能查看，请联系管理员获取权限"
-            )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="人像照片需要登录后才能查看"
-            )
-    
+
     # 构建排除类别列表
     exclude_categories = []
     if should_filter_portrait:
@@ -125,21 +232,7 @@ async def list_public_photos(
         sort_order=sort_order
     )
     
-    # Convert to response format
-    photo_responses = []
-    for photo in photos:
-        # Get tags for this photo
-        tags = await photo_crud.get_photo_tags(db, photo.id)
-        tag_names = [tag.name for tag in tags]
-        
-        # Convert to dict and add tag names
-        photo_dict = {**photo.__dict__}
-        photo_dict.pop('_sa_instance_state', None)
-        photo_dict['tags'] = tag_names
-        photo_dict['uploader_name'] = None
-        
-        photo_response = PhotoResponse(**photo_dict)
-        photo_responses.append(photo_response)
+    photo_responses = await serialize_photos(db, photos)
     
     page = skip // limit + 1 if limit > 0 else 1
     
@@ -154,7 +247,9 @@ async def list_public_photos(
 @router.get("/{photo_id}/image/original")
 async def get_photo_image(
     photo_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user_for_media),
+    portrait_visibility: str = Depends(get_portrait_visibility),
 ):
     """
     获取原始照片文件
@@ -162,88 +257,53 @@ async def get_photo_image(
     通过照片ID查找并返回原始图片文件。
     使用 UPLOAD_DIR 配置构建路径，忽略数据库中的绝对路径。
     """
-    from app.core.config import get_settings
-    settings = get_settings()
-    
     photo = await photo_crud.get_photo(db, photo_id)
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
-    
-    # 策略 1: 尝试使用 UUID 文件名 (标准 storage.py 行为: uuid.ext)
-    # 需要获取后缀
-    ext = ""
-    if photo.filename:
-        _, ext = os.path.splitext(photo.filename)
-    if not ext and photo.original_path:
-        _, ext = os.path.splitext(photo.original_path)
-    
-    candidates = []
-    
-    # 1. UUID + 后缀
-    if ext:
-        candidates.append(f"{photo.id}{ext}")
-        # 有些情况下后缀可能不一致，尝试 .jpg
-        if ext.lower() != '.jpg':
-            candidates.append(f"{photo.id}.jpg")
-            
-    # 2. 从 original_path 提取文件名 (处理 Windows 路径分隔符)
-    if photo.original_path:
-        clean_path = photo.original_path.replace('\\', '/')
-        basename = os.path.basename(clean_path)
-        if basename not in candidates:
-            candidates.append(basename)
-            
-    # 3. 数据库中存储的 filename
-    if photo.filename and photo.filename not in candidates:
-        candidates.append(photo.filename)
-        
-    upload_dir = settings.UPLOAD_DIR
-    
-    for filename in candidates:
-        file_path = os.path.join(upload_dir, "originals", filename)
-        if os.path.exists(file_path):
-            return FileResponse(file_path)
-            
-    # 如果都找不到，记录错误并尝试返回 404
-    logger.error(f"Image not found for photo {photo.id}. Tried: {candidates} in {upload_dir}/originals")
-    
-    # 最后尝试一下 absolute path (如果数据库存的是服务器上的绝对路径)
-    if photo.original_path and os.path.exists(photo.original_path):
-        return FileResponse(photo.original_path)
-        
-    raise HTTPException(status_code=404, detail="Image file not found on server")
+
+    can_access = (
+        is_reviewer(current_user)
+        or (current_user and photo.uploader_id == current_user.id)
+        or await can_access_photo_publicly(db, photo, current_user, portrait_visibility)
+    )
+    if not can_access:
+        raise HTTPException(status_code=404, detail="Photo not found")
+
+    file_path = find_original_photo_path(photo)
+    if not file_path:
+        raise HTTPException(status_code=404, detail="Image file not found on server")
+
+    return FileResponse(file_path)
 
 
 @router.get("/{photo_id}/image/thumbnail")
 async def get_photo_thumbnail(
     photo_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user_for_media),
+    portrait_visibility: str = Depends(get_portrait_visibility),
 ):
     """
     获取照片缩略图
     
     缩略图文件名格式为 {photo_id}_thumb.jpg
     """
-    from app.core.config import get_settings
-    settings = get_settings()
-    
     photo = await photo_crud.get_photo(db, photo_id)
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
-    
-    # 缩略图总是 uuid_thumb.jpg 格式
-    filename = f"{photo.id}_thumb.jpg"
-    upload_dir = settings.UPLOAD_DIR
-    file_path = os.path.join(upload_dir, "thumbnails", filename)
-    
-    if not os.path.exists(file_path):
-        # 尝试使用数据库中存储的缩略图路径
-        if photo.thumb_path and os.path.exists(photo.thumb_path):
-            file_path = photo.thumb_path
-        else:
-            logger.error(f"Thumbnail not found: {file_path}")
-            raise HTTPException(status_code=404, detail="Thumbnail not found")
-    
+
+    can_access = (
+        is_reviewer(current_user)
+        or (current_user and photo.uploader_id == current_user.id)
+        or await can_access_photo_publicly(db, photo, current_user, portrait_visibility)
+    )
+    if not can_access:
+        raise HTTPException(status_code=404, detail="Photo not found")
+
+    file_path = find_thumbnail_path(photo)
+    if not file_path:
+        raise HTTPException(status_code=404, detail="Thumbnail not found")
+
     return FileResponse(file_path)
 
 
@@ -267,52 +327,13 @@ async def get_public_photo(
             detail="Photo not found"
         )
     
-    # Only allow access to approved photos
-    if photo.status != 'approved':
+    if not await can_access_photo_publicly(db, photo, current_user, portrait_visibility):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Photo not found"
         )
-    
-    # 检查人像照片访问权限
-    if photo.category == 'Portrait':
-        should_block = False
-        block_reason = ""
-        
-        if portrait_visibility == PortraitVisibility.LOGIN_REQUIRED:
-            if not current_user:
-                should_block = True
-                block_reason = "人像照片需要登录后才能查看"
-        elif portrait_visibility == PortraitVisibility.AUTHORIZED_ONLY:
-            if not current_user:
-                should_block = True
-                block_reason = "人像照片需要授权后才能查看"
-            else:
-                # 检查用户是否有 Portrait 类别的查看权限
-                has_permission = await permission_crud.check_permission(
-                    db, current_user.id, "category", "Portrait", "view"
-                )
-                if not has_permission:
-                    should_block = True
-                    block_reason = "您没有查看人像照片的权限，请联系管理员获取授权"
-        
-        if should_block:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=block_reason
-            )
-    
-    # Get tags for this photo
-    tags = await photo_crud.get_photo_tags(db, photo.id)
-    tag_names = [tag.name for tag in tags]
-    
-    # Convert photo to dict and add tag names
-    photo_dict = {**photo.__dict__}
-    photo_dict.pop('_sa_instance_state', None)
-    photo_dict['tags'] = tag_names
-    photo_dict['uploader_name'] = None
-    
-    return PhotoResponse(**photo_dict)
+
+    return await serialize_photo(db, photo)
 
 
 async def process_photo_ai_tagging(photo_id: str, original_path: str):
@@ -500,7 +521,7 @@ async def list_photos(
     search: Optional[str] = None,
     tag: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_auditor_user)
 ):
     """
     List photos with filtering and pagination
@@ -527,21 +548,7 @@ async def list_photos(
         tag=tag
     )
     
-    # Convert to response format
-    photo_responses = []
-    for photo in photos:
-        # Get tags for this photo
-        tags = await photo_crud.get_photo_tags(db, photo.id)
-        tag_names = [tag.name for tag in tags]
-        
-        # Convert to dict and add tag names
-        photo_dict = {**photo.__dict__}
-        photo_dict.pop('_sa_instance_state', None)
-        photo_dict['tags'] = tag_names
-        photo_dict['uploader_name'] = None
-        
-        photo_response = PhotoResponse(**photo_dict)
-        photo_responses.append(photo_response)
+    photo_responses = await serialize_photos(db, photos)
     
     page = skip // limit + 1 if limit > 0 else 1
     
@@ -580,21 +587,7 @@ async def list_my_submissions(
         uploader_id=current_user.id
     )
     
-    # Convert to response format
-    photo_responses = []
-    for photo in photos:
-        # Get tags for this photo
-        tags = await photo_crud.get_photo_tags(db, photo.id)
-        tag_names = [tag.name for tag in tags]
-        
-        # Convert to dict and add tag names
-        photo_dict = {**photo.__dict__}
-        photo_dict.pop('_sa_instance_state', None)
-        photo_dict['tags'] = tag_names
-        photo_dict['uploader_name'] = None
-        
-        photo_response = PhotoResponse(**photo_dict)
-        photo_responses.append(photo_response)
+    photo_responses = await serialize_photos(db, photos)
     
     page = skip // limit + 1 if limit > 0 else 1
     
@@ -622,18 +615,14 @@ async def get_photo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Photo not found"
         )
-    
-    # Get tags for this photo
-    tags = await photo_crud.get_photo_tags(db, photo.id)
-    tag_names = [tag.name for tag in tags]
-    
-    # Convert photo to dict and add tag names
-    photo_dict = {**photo.__dict__}
-    photo_dict.pop('_sa_instance_state', None)  # Remove SQLAlchemy state
-    photo_dict['tags'] = tag_names
-    photo_dict['uploader_name'] = None
-    
-    return PhotoResponse(**photo_dict)
+
+    if not is_reviewer(current_user) and photo.uploader_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this photo"
+        )
+
+    return await serialize_photo(db, photo)
 
 
 @router.patch("/{photo_id}", response_model=PhotoResponse)
@@ -678,17 +667,7 @@ async def update_photo(
     
     updated_photo = await photo_crud.update_photo(db, photo, photo_update)
     
-    # Get tags
-    tags = await photo_crud.get_photo_tags(db, updated_photo.id)
-    tag_names = [tag.name for tag in tags]
-    
-    # Convert to dict and add tags
-    photo_dict = {**updated_photo.__dict__}
-    photo_dict.pop('_sa_instance_state', None)
-    photo_dict['tags'] = tag_names
-    photo_dict['uploader_name'] = None
-    
-    return PhotoResponse(**photo_dict)
+    return await serialize_photo(db, updated_photo)
 
 
 @router.delete("/{photo_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -737,20 +716,13 @@ async def delete_photo(
 async def approve_photo(
     photo_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_auditor_user)
 ):
     """
     Approve a photo (publish it)
     
-    Only admins can approve photos
+    Only reviewers can approve photos
     """
-    # Check admin permission
-    if current_user.role != 'admin':
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators can approve photos"
-        )
-    
     photo = await photo_crud.get_photo(db, photo_id)
     
     if not photo:
@@ -767,37 +739,20 @@ async def approve_photo(
     await db.commit()
     await db.refresh(photo)
     
-    # Get tags
-    tags = await photo_crud.get_photo_tags(db, photo.id)
-    tag_names = [tag.name for tag in tags]
-    
-    # Convert to dict
-    photo_dict = {**photo.__dict__}
-    photo_dict.pop('_sa_instance_state', None)
-    photo_dict['tags'] = tag_names
-    photo_dict['uploader_name'] = None
-    
-    return PhotoResponse(**photo_dict)
+    return await serialize_photo(db, photo)
 
 
 @router.post("/{photo_id}/reject", response_model=PhotoResponse)
 async def reject_photo(
     photo_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_auditor_user)
 ):
     """
     Reject a photo (unpublish it)
     
-    Only admins can reject photos
+    Only reviewers can reject photos
     """
-    # Check admin permission
-    if current_user.role != 'admin':
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators can reject photos"
-        )
-    
     photo = await photo_crud.get_photo(db, photo_id)
     
     if not photo:
@@ -813,37 +768,20 @@ async def reject_photo(
     await db.commit()
     await db.refresh(photo)
     
-    # Get tags
-    tags = await photo_crud.get_photo_tags(db, photo.id)
-    tag_names = [tag.name for tag in tags]
-    
-    # Convert to dict
-    photo_dict = {**photo.__dict__}
-    photo_dict.pop('_sa_instance_state', None)
-    photo_dict['tags'] = tag_names
-    photo_dict['uploader_name'] = None
-    
-    return PhotoResponse(**photo_dict)
+    return await serialize_photo(db, photo)
 
 
 @router.post("/batch-approve")
 async def batch_approve_photos(
     photo_ids: List[str],
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_auditor_user)
 ):
     """
     Batch approve multiple photos
     
-    Only admins can approve photos
+    Only reviewers can approve photos
     """
-    # Check admin permission
-    if current_user.role != 'admin':
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators can approve photos"
-        )
-    
     from datetime import datetime
     updated_count = 0
     
@@ -867,20 +805,13 @@ async def batch_approve_photos(
 async def batch_reject_photos(
     photo_ids: List[str],
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_auditor_user)
 ):
     """
     Batch reject multiple photos
     
-    Only admins can reject photos
+    Only reviewers can reject photos
     """
-    # Check admin permission
-    if current_user.role != 'admin':
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators can reject photos"
-        )
-    
     updated_count = 0
     
     for photo_id in photo_ids:
@@ -965,7 +896,7 @@ async def add_photo_tags(
         )
     
     # Check permission
-    if photo.uploader_id != current_user.id and current_user.role != 'admin':
+    if photo.uploader_id != current_user.id and not is_reviewer(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to update tags for this photo"
@@ -980,18 +911,8 @@ async def add_photo_tags(
     # Add tags to photo
     await photo_crud.add_tags_to_photo(db, photo_id, tag_ids)
     
-    # Get updated photo with tags
     updated_photo = await photo_crud.get_photo(db, photo_id)
-    tags = await photo_crud.get_photo_tags(db, photo_id)
-    tag_names_list = [tag.name for tag in tags]
-    
-    # Convert to dict
-    photo_dict = {**updated_photo.__dict__}
-    photo_dict.pop('_sa_instance_state', None)
-    photo_dict['tags'] = tag_names_list
-    photo_dict['uploader_name'] = None
-    
-    return PhotoResponse(**photo_dict)
+    return await serialize_photo(db, updated_photo)
 
 
 @router.delete("/{photo_id}/tags/{tag_id}", response_model=PhotoResponse)
@@ -1015,7 +936,7 @@ async def remove_photo_tag(
         )
     
     # Check permission
-    if photo.uploader_id != current_user.id and current_user.role != 'admin':
+    if photo.uploader_id != current_user.id and not is_reviewer(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to update tags for this photo"
@@ -1037,26 +958,16 @@ async def remove_photo_tag(
         tag.usage_count -= 1
         await db.commit()
     
-    # Get updated photo with tags
     updated_photo = await photo_crud.get_photo(db, photo_id)
-    tags = await photo_crud.get_photo_tags(db, photo_id)
-    tag_names_list = [tag.name for tag in tags]
-    
-    # Convert to dict
-    photo_dict = {**updated_photo.__dict__}
-    photo_dict.pop('_sa_instance_state', None)
-    photo_dict['tags'] = tag_names_list
-    photo_dict['uploader_name'] = None
-    
-    
-    
-    return PhotoResponse(**photo_dict)
+    return await serialize_photo(db, updated_photo)
 
 
 @router.get("/{photo_id}/download")
 async def download_photo(
     photo_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user_for_media),
+    portrait_visibility: str = Depends(get_portrait_visibility),
 ):
     """
     Download photo by ID. Handles both relative and absolute paths.
@@ -1064,35 +975,18 @@ async def download_photo(
     photo = await photo_crud.get_photo(db, photo_id)
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
-    
-    file_path = photo.original_path
-    
-    # Check if file exists
-    if not os.path.exists(file_path):
-        # Fallback: check standard uploads directory
-        # Import settings to get UPLOAD_DIR
-        from app.core.config import get_settings
-        settings = get_settings()
-        
-        # Try to find file with UUID name in originals folder
-        # We need the extension from the original filename
-        _, ext = os.path.splitext(photo.filename)
-        fallback_path = os.path.join(settings.UPLOAD_DIR, "originals", f"{photo.id}{ext}")
-        
-        if os.path.exists(fallback_path):
-            file_path = fallback_path
-        else:
-            # Try lowercase extension if not found
-            fallback_path_lower = os.path.join(settings.UPLOAD_DIR, "originals", f"{photo.id}{ext.lower()}")
-            if os.path.exists(fallback_path_lower):
-                 file_path = fallback_path_lower
-            else:
-                 # Last resort: try just UUID (some files might not have extensions in storage or different case)
-                 # This is tricky without knowing exact extension. 
-                 # Let's list files in directory matching UUID? No, that's slow.
-                 # Just report not found if these attempts fail.
-                 logger.error(f"File not found at {photo.original_path} or {fallback_path}")
-                 raise HTTPException(status_code=404, detail="File not found on server")
+
+    can_access = (
+        is_reviewer(current_user)
+        or (current_user and photo.uploader_id == current_user.id)
+        or await can_access_photo_publicly(db, photo, current_user, portrait_visibility)
+    )
+    if not can_access:
+        raise HTTPException(status_code=404, detail="Photo not found")
+
+    file_path = find_original_photo_path(photo)
+    if not file_path:
+        raise HTTPException(status_code=404, detail="File not found on server")
 
     return FileResponse(
         path=file_path,

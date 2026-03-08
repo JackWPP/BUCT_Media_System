@@ -13,7 +13,7 @@ from app.core.deps import get_db, get_current_admin_user
 from app.models.user import User
 from app.models.system_config import SystemConfig, ConfigKeys, PortraitVisibility
 
-router = APIRouter(prefix="/settings", tags=["系统设置"])
+router = APIRouter(prefix="/settings")
 
 
 # ================= Schemas =================

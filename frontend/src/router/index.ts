@@ -65,7 +65,7 @@ const routes: RouteRecordRaw[] = [
         path: 'import',
         name: 'PhotoImport',
         component: () => import('../views/admin/PhotoImport.vue'),
-        meta: { requiresAuth: true, requiresAuditor: true },
+        meta: { requiresAuth: true, requiresAdmin: true },
       },
       // 仅限管理员访问的路由
       {
