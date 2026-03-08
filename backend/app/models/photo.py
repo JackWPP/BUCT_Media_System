@@ -39,6 +39,16 @@ class Photo(Base):
     uploader = relationship("User", back_populates="photos")
     tags = relationship("PhotoTag", back_populates="photo", cascade="all, delete-orphan")
     task_photos = relationship("TaskPhoto", back_populates="photo", cascade="all, delete-orphan")
+    classifications = relationship(
+        "PhotoClassification",
+        back_populates="photo",
+        cascade="all, delete-orphan",
+    )
+    ai_analysis_tasks = relationship(
+        "AIAnalysisTask",
+        back_populates="photo",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self):
         return f"<Photo(filename='{self.filename}', status='{self.status}')>"

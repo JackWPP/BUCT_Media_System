@@ -7,12 +7,16 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
+engine_kwargs = {
+    "echo": settings.DEBUG,
+    "future": True,
+}
+
+if settings.DATABASE_URL.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+
 # 创建异步数据库引擎
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DEBUG,
-    future=True,
-)
+engine = create_async_engine(settings.DATABASE_URL, **engine_kwargs)
 
 # 创建异步会话工厂
 AsyncSessionLocal = async_sessionmaker(

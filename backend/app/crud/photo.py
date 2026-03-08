@@ -1,37 +1,32 @@
 """
-CRUD operations for Photo
+CRUD operations for photos.
 """
-from typing import Optional, List
-from uuid import UUID
-from sqlalchemy import select, func, or_
+from typing import List, Optional
+
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.photo import Photo
 from app.models.tag import PhotoTag, Tag
-from app.schemas.photo import PhotoCreate, PhotoUpdate
+from app.models.taxonomy import PhotoClassification, TaxonomyFacet, TaxonomyNode
+from app.schemas.photo import PhotoUpdate
+
+
+def _photo_with_relations():
+    return (
+        selectinload(Photo.classifications).selectinload(PhotoClassification.facet),
+        selectinload(Photo.classifications).selectinload(PhotoClassification.node),
+        selectinload(Photo.tags),
+    )
 
 
 async def create_photo(
     db: AsyncSession,
     photo_data: dict,
-    uploader_id: str
+    uploader_id: str,
 ) -> Photo:
-    """
-    Create a new photo record
-    
-    Args:
-        db: Database session
-        photo_data: Photo data dictionary
-        uploader_id: ID of the user uploading the photo
-    
-    Returns:
-        Created Photo object
-    """
-    photo = Photo(
-        uploader_id=uploader_id,
-        **photo_data
-    )
+    photo = Photo(uploader_id=uploader_id, **photo_data)
     db.add(photo)
     await db.commit()
     await db.refresh(photo)
@@ -39,36 +34,14 @@ async def create_photo(
 
 
 async def get_photo(db: AsyncSession, photo_id: str) -> Optional[Photo]:
-    """
-    Get a photo by ID
-    
-    Args:
-        db: Database session
-        photo_id: Photo ID
-    
-    Returns:
-        Photo object or None
-    """
-    result = await db.execute(
-        select(Photo).where(Photo.id == photo_id)
-    )
+    result = await db.execute(select(Photo).where(Photo.id == photo_id))
     return result.scalar_one_or_none()
 
 
 async def get_photo_with_tags(db: AsyncSession, photo_id: str) -> Optional[Photo]:
-    """
-    Get a photo by ID with its tags loaded
-    
-    Args:
-        db: Database session
-        photo_id: Photo ID
-    
-    Returns:
-        Photo object with tags or None
-    """
     result = await db.execute(
         select(Photo)
-        .options(selectinload(Photo.tags))
+        .options(*_photo_with_relations())
         .where(Photo.id == photo_id)
     )
     return result.scalar_one_or_none()
@@ -86,55 +59,41 @@ async def get_photos(
     tag: Optional[str] = None,
     exclude_categories: Optional[List[str]] = None,
     sort_by: str = "created_at",
-    sort_order: str = "desc"
+    sort_order: str = "desc",
+    campus: Optional[str] = None,
+    building: Optional[str] = None,
+    gallery_series: Optional[str] = None,
+    gallery_year: Optional[str] = None,
+    photo_type: Optional[str] = None,
 ) -> tuple[List[Photo], int]:
-    """
-    Get photos with filtering and pagination
-    
-    Args:
-        db: Database session
-        skip: Number of records to skip
-        limit: Maximum number of records to return
-        uploader_id: Filter by uploader
-        status: Filter by status
-        season: Filter by season
-        category: Filter by category
-        search: Search in filename, description, and tags
-        tag: Filter by specific tag name
-        exclude_categories: 排除的类别列表（用于权限控制，如排除 Portrait）
-        sort_by: 排序字段 (created_at, views, published_at)
-        sort_order: 排序方向 (desc, asc)
-    
-    Returns:
-        Tuple of (list of photos, total count)
-    """
     query = select(Photo)
     count_query = select(func.count(Photo.id.distinct()))
-    
-    # Apply filters
+
     if uploader_id:
         query = query.where(Photo.uploader_id == uploader_id)
         count_query = count_query.where(Photo.uploader_id == uploader_id)
-    
+
     if status:
         query = query.where(Photo.status == status)
         count_query = count_query.where(Photo.status == status)
-    
+
     if season:
         query = query.where(Photo.season == season)
         count_query = count_query.where(Photo.season == season)
-    
+
     if category:
         query = query.where(Photo.category == category)
         count_query = count_query.where(Photo.category == category)
-    
-    # 排除特定类别（用于人像可见性控制）
+
+    if campus:
+        query = query.where(Photo.campus == campus)
+        count_query = count_query.where(Photo.campus == campus)
+
     if exclude_categories:
         for exc_cat in exclude_categories:
             query = query.where(Photo.category != exc_cat)
             count_query = count_query.where(Photo.category != exc_cat)
-    
-    # 标签筛选 - 通过关联表查询
+
     if tag:
         tag_subquery = (
             select(PhotoTag.photo_id)
@@ -143,11 +102,9 @@ async def get_photos(
         )
         query = query.where(Photo.id.in_(tag_subquery))
         count_query = count_query.where(Photo.id.in_(tag_subquery))
-    
-    # 搜索 - 同时搜索文件名、描述和标签
+
     if search:
         search_pattern = f"%{search}%"
-        # 查找匹配标签的照片 ID
         tag_photo_subquery = (
             select(PhotoTag.photo_id)
             .join(Tag)
@@ -156,52 +113,56 @@ async def get_photos(
         search_filter = or_(
             Photo.filename.ilike(search_pattern),
             Photo.description.ilike(search_pattern),
-            Photo.id.in_(tag_photo_subquery)
+            Photo.id.in_(tag_photo_subquery),
         )
         query = query.where(search_filter)
         count_query = count_query.where(search_filter)
-    
-    # Get total count
+
+    facet_filters = {
+        "building": building,
+        "gallery_series": gallery_series,
+        "gallery_year": gallery_year,
+        "photo_type": photo_type,
+    }
+    for facet_key, facet_value in facet_filters.items():
+        if not facet_value:
+            continue
+        normalized_key = facet_value.lower().replace(" ", "-")
+        classification_subquery = (
+            select(PhotoClassification.photo_id)
+            .join(TaxonomyFacet, TaxonomyFacet.id == PhotoClassification.facet_id)
+            .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
+            .where(
+                TaxonomyFacet.key == facet_key,
+                or_(
+                    TaxonomyNode.name == facet_value,
+                    TaxonomyNode.key == normalized_key,
+                ),
+            )
+        )
+        query = query.where(Photo.id.in_(classification_subquery))
+        count_query = count_query.where(Photo.id.in_(classification_subquery))
+
     total_result = await db.execute(count_query)
     total = total_result.scalar_one()
-    
-    # Apply sorting
+
     sort_column = getattr(Photo, sort_by, Photo.created_at)
-    if sort_order == "asc":
-        query = query.order_by(sort_column.asc())
-    else:
-        query = query.order_by(sort_column.desc())
-    
-    # Apply pagination
+    query = query.order_by(sort_column.asc() if sort_order == "asc" else sort_column.desc())
     query = query.offset(skip).limit(limit)
-    
-    # Execute query
-    result = await db.execute(query)
+
+    result = await db.execute(query.options(*_photo_with_relations()))
     photos = result.scalars().all()
-    
     return list(photos), total
 
 
 async def update_photo(
     db: AsyncSession,
     photo: Photo,
-    photo_update: PhotoUpdate
+    photo_update: PhotoUpdate,
 ) -> Photo:
-    """
-    Update a photo
-    
-    Args:
-        db: Database session
-        photo: Photo object to update
-        photo_update: Update data
-    
-    Returns:
-        Updated Photo object
-    """
     update_data = photo_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(photo, field, value)
-    
     await db.commit()
     await db.refresh(photo)
     return photo
@@ -211,37 +172,17 @@ async def update_photo_processing_status(
     db: AsyncSession,
     photo: Photo,
     processing_status: str,
-    processed_path: Optional[str] = None
+    processed_path: Optional[str] = None,
 ) -> Photo:
-    """
-    Update photo processing status
-    
-    Args:
-        db: Database session
-        photo: Photo object
-        processing_status: New processing status
-        processed_path: Path to processed image (optional)
-    
-    Returns:
-        Updated Photo object
-    """
     photo.processing_status = processing_status
     if processed_path:
         photo.processed_path = processed_path
-    
     await db.commit()
     await db.refresh(photo)
     return photo
 
 
 async def delete_photo(db: AsyncSession, photo: Photo) -> None:
-    """
-    Delete a photo
-    
-    Args:
-        db: Database session
-        photo: Photo object to delete
-    """
     await db.delete(photo)
     await db.commit()
 
@@ -249,54 +190,26 @@ async def delete_photo(db: AsyncSession, photo: Photo) -> None:
 async def add_tags_to_photo(
     db: AsyncSession,
     photo_id: str,
-    tag_ids: List[int]
+    tag_ids: List[int],
 ) -> None:
-    """
-    Add tags to a photo
-    
-    Args:
-        db: Database session
-        photo_id: Photo ID
-        tag_ids: List of tag IDs to add
-    """
-    # Remove existing tags
-    from app.models.tag import Tag
-    
-    # Get current tags to decrease usage count
     current_tags = await get_photo_tags(db, photo_id)
     for tag in current_tags:
         if tag.usage_count > 0:
             tag.usage_count -= 1
-    
-    # Remove existing associations
-    await db.execute(
-        PhotoTag.__table__.delete().where(PhotoTag.photo_id == photo_id)
-    )
-    
-    # Add new tags
+
+    await db.execute(PhotoTag.__table__.delete().where(PhotoTag.photo_id == photo_id))
+
     for tag_id in tag_ids:
         photo_tag = PhotoTag(photo_id=photo_id, tag_id=tag_id)
         db.add(photo_tag)
-        
-        # Increase tag usage count
         tag = await db.get(Tag, tag_id)
         if tag:
             tag.usage_count += 1
-    
+
     await db.commit()
 
 
 async def get_photo_tags(db: AsyncSession, photo_id: str) -> List[Tag]:
-    """
-    Get all tags for a photo
-    
-    Args:
-        db: Database session
-        photo_id: Photo ID
-    
-    Returns:
-        List of Tag objects
-    """
     result = await db.execute(
         select(Tag)
         .join(PhotoTag)

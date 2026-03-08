@@ -1,5 +1,5 @@
 /**
- * 照片相关 API
+ * Photo APIs.
  */
 import request from './index'
 import type {
@@ -10,177 +10,133 @@ import type {
   PhotoUploadResponse,
 } from '../types/photo'
 
-/**
- * 获取照片列表
- */
+export interface AIAnalysisTask {
+  id: string
+  photo_id: string
+  requested_by_id: string | null
+  reviewed_by_id: string | null
+  provider: string
+  model_id: string
+  status: string
+  prompt_version: string
+  result_json: Record<string, any> | null
+  error_message: string | null
+  created_at: string
+  updated_at: string
+  completed_at: string | null
+  applied_at: string | null
+}
+
+export interface AIApplyResponse {
+  applied: boolean
+  task: AIAnalysisTask
+  unresolved_classifications: Record<string, string>
+}
+
 export function getPhotos(params?: PhotoListParams): Promise<PhotoListResponse> {
-  return request({
-    url: '/api/v1/photos',
-    method: 'get',
-    params,
-  })
+  return request({ url: '/api/v1/photos', method: 'get', params })
 }
 
-/**
- * 获取公开照片列表（无需登录，只返回已审核的照片）
- */
 export function getPublicPhotos(params?: PhotoListParams): Promise<PhotoListResponse> {
-  return request({
-    url: '/api/v1/photos/public',
-    method: 'get',
-    params,
-  })
+  return request({ url: '/api/v1/photos/public', method: 'get', params })
 }
 
-/**
- * 获取我的投稿列表
- */
 export function getMySubmissions(params?: PhotoListParams): Promise<PhotoListResponse> {
-  return request({
-    url: '/api/v1/photos/my-submissions',
-    method: 'get',
-    params,
-  })
+  return request({ url: '/api/v1/photos/my-submissions', method: 'get', params })
 }
 
-/**
- * 获取照片详情
- */
 export function getPhotoById(id: string): Promise<Photo> {
-  return request({
-    url: `/api/v1/photos/${id}`,
-    method: 'get',
-  })
+  return request({ url: `/api/v1/photos/${id}`, method: 'get' })
 }
 
-/**
- * 获取公开照片详情（无需登录）
- */
 export function getPublicPhotoById(id: string): Promise<Photo> {
-  return request({
-    url: `/api/v1/photos/public/${id}`,
-    method: 'get',
-  })
+  return request({ url: `/api/v1/photos/public/${id}`, method: 'get' })
 }
 
-/**
- * 上传照片
- */
 export function uploadPhoto(
   file: File,
   metadata: {
     description?: string
     season?: string
     category?: string
+    campus?: string
   } = {},
-  onProgress?: (progressEvent: any) => void
+  onProgress?: (progressEvent: any) => void,
 ): Promise<PhotoUploadResponse> {
   const formData = new FormData()
   formData.append('file', file)
-
-  if (metadata?.description) {
-    formData.append('description', metadata.description)
-  }
-  if (metadata?.season) {
-    formData.append('season', metadata.season)
-  }
-  if (metadata?.category) {
-    formData.append('category', metadata.category)
-  }
+  if (metadata.description) formData.append('description', metadata.description)
+  if (metadata.season) formData.append('season', metadata.season)
+  if (metadata.category) formData.append('category', metadata.category)
+  if (metadata.campus) formData.append('campus', metadata.campus)
 
   return request({
     url: '/api/v1/photos/upload',
     method: 'post',
     data: formData,
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
+    headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 60000,
     onUploadProgress: onProgress,
   })
 }
 
-/**
- * 更新照片信息
- */
 export function updatePhoto(id: string, data: PhotoUpdate): Promise<Photo> {
-  return request({
-    url: `/api/v1/photos/${id}`,
-    method: 'patch',
-    data,
-  })
+  return request({ url: `/api/v1/photos/${id}`, method: 'patch', data })
 }
 
-/**
- * 删除照片
- */
 export function deletePhoto(id: string): Promise<void> {
-  return request({
-    url: `/api/v1/photos/${id}`,
-    method: 'delete',
-  })
+  return request({ url: `/api/v1/photos/${id}`, method: 'delete' })
 }
 
-/**
- * 更新照片标签
- */
-export function updatePhotoTags(id: string, tagIds: number[]): Promise<Photo> {
-  return request({
-    url: `/api/v1/photos/${id}/tags`,
-    method: 'post',
-    data: { tag_ids: tagIds },
-  })
+export function updatePhotoTags(id: string, tagNames: string[]): Promise<Photo> {
+  return request({ url: `/api/v1/photos/${id}/tags`, method: 'post', data: tagNames })
 }
 
-/**
- * 审批照片
- */
 export function approvePhoto(id: string): Promise<Photo> {
-  return request({
-    url: `/api/v1/photos/${id}/approve`,
-    method: 'post',
-  })
+  return request({ url: `/api/v1/photos/${id}/approve`, method: 'post' })
 }
 
-/**
- * 拒绝照片
- */
 export function rejectPhoto(id: string): Promise<Photo> {
-  return request({
-    url: `/api/v1/photos/${id}/reject`,
-    method: 'post',
-  })
+  return request({ url: `/api/v1/photos/${id}/reject`, method: 'post' })
 }
 
-/**
- * 批量审批照片
- */
 export function batchApprovePhotos(photoIds: string[]): Promise<{ message: string; updated_count: number }> {
-  return request({
-    url: '/api/v1/photos/batch-approve',
-    method: 'post',
-    data: photoIds,
-  })
+  return request({ url: '/api/v1/photos/batch-approve', method: 'post', data: photoIds })
 }
 
-/**
- * 批量拒绝照片
- */
 export function batchRejectPhotos(photoIds: string[]): Promise<{ message: string; updated_count: number }> {
+  return request({ url: '/api/v1/photos/batch-reject', method: 'post', data: photoIds })
+}
+
+export function batchDeletePhotos(photoIds: string[]): Promise<{ message: string; deleted_count: number }> {
+  return request({ url: '/api/v1/photos/batch-delete', method: 'post', data: photoIds })
+}
+
+export function createPhotoAIAnalysis(photoId: string, force = false): Promise<AIAnalysisTask> {
   return request({
-    url: '/api/v1/photos/batch-reject',
+    url: `/api/v1/photos/${photoId}/ai-analysis`,
     method: 'post',
-    data: photoIds,
+    data: { force },
   })
 }
 
-/**
- * 批量删除照片
- */
-export function batchDeletePhotos(photoIds: string[]): Promise<{ message: string; deleted_count: number }> {
+export function getPhotoAIAnalysis(photoId: string): Promise<AIAnalysisTask | null> {
   return request({
-    url: '/api/v1/photos/batch-delete',
+    url: `/api/v1/photos/${photoId}/ai-analysis`,
+    method: 'get',
+  })
+}
+
+export function applyPhotoAIAnalysis(photoId: string, taskId: string): Promise<AIApplyResponse> {
+  return request({
+    url: `/api/v1/photos/${photoId}/ai-analysis/${taskId}/apply`,
     method: 'post',
-    data: photoIds,
+  })
+}
+
+export function ignorePhotoAIAnalysis(photoId: string, taskId: string): Promise<AIAnalysisTask> {
+  return request({
+    url: `/api/v1/photos/${photoId}/ai-analysis/${taskId}/ignore`,
+    method: 'post',
   })
 }

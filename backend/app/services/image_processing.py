@@ -1,7 +1,6 @@
 """
 Image processing service for thumbnails and EXIF extraction
 """
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -143,7 +142,8 @@ def extract_date_taken(exif_data: Dict[str, Any]) -> Optional[datetime]:
 
 def process_uploaded_image(
     original_path: str,
-    photo_uuid: str
+    photo_uuid: str,
+    output_dir: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Process uploaded image: extract EXIF, create thumbnail, get dimensions
@@ -178,11 +178,9 @@ def process_uploaded_image(
         results['captured_at'] = captured_at
         
         # Create thumbnail
-        upload_dir = Path(settings.UPLOAD_DIR)
-        thumbnails_dir = upload_dir / "thumbnails"
+        thumbnails_dir = Path(output_dir) if output_dir else (Path(settings.UPLOAD_DIR) / "thumbnails")
         thumbnails_dir.mkdir(parents=True, exist_ok=True)
-        
-        file_extension = Path(original_path).suffix
+
         thumb_filename = f"{photo_uuid}_thumb.jpg"
         thumb_path = str(thumbnails_dir / thumb_filename)
         

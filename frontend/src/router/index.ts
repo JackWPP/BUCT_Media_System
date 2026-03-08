@@ -1,13 +1,10 @@
 /**
- * Vue Router 配置
- * 
- * 包含路由定义和权限守卫。
+ * Vue Router configuration.
  */
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
-// 路由配置
 const routes: RouteRecordRaw[] = [
   {
     path: '/login',
@@ -19,13 +16,13 @@ const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'Gallery',
     component: () => import('../views/Gallery.vue'),
-    meta: { requiresAuth: false },  // 普通用户可直接访问
+    meta: { requiresAuth: false },
   },
   {
     path: '/upload',
     name: 'Upload',
     component: () => import('../views/Upload.vue'),
-    meta: { requiresAuth: true },  // 上传需要登录
+    meta: { requiresAuth: true },
   },
   {
     path: '/my-submissions',
@@ -33,16 +30,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/MySubmissions.vue'),
     meta: { requiresAuth: true },
   },
-  // 后台管理路由
   {
     path: '/admin',
     component: () => import('../layouts/AdminLayout.vue'),
     meta: { requiresAuth: true, requiresAuditor: true },
     children: [
-      {
-        path: '',
-        redirect: '/admin/dashboard',
-      },
+      { path: '', redirect: '/admin/dashboard' },
       {
         path: 'dashboard',
         name: 'Dashboard',
@@ -62,12 +55,17 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, requiresAuditor: true },
       },
       {
+        path: 'taxonomy',
+        name: 'TaxonomyManagement',
+        component: () => import('../views/admin/TaxonomyManagement.vue'),
+        meta: { requiresAuth: true, requiresAuditor: true },
+      },
+      {
         path: 'import',
         name: 'PhotoImport',
         component: () => import('../views/admin/PhotoImport.vue'),
         meta: { requiresAuth: true, requiresAdmin: true },
       },
-      // 仅限管理员访问的路由
       {
         path: 'users',
         name: 'UserManagement',
@@ -89,13 +87,11 @@ const routes: RouteRecordRaw[] = [
   },
 ]
 
-// 创建路由实例
 const router = createRouter({
   history: createWebHistory(),
   routes,
 })
 
-// 全局前置守卫
 router.beforeEach((to, _from, next) => {
   const authStore = useAuthStore()
   const requiresAuth = to.meta.requiresAuth !== false
@@ -103,30 +99,22 @@ router.beforeEach((to, _from, next) => {
   const requiresAuditor = to.meta.requiresAuditor === true
 
   if (requiresAuth && !authStore.isAuthenticated) {
-    // 需要认证但未登录，跳转到登录页
-    next({
-      path: '/login',
-      query: { redirect: to.fullPath },
-    })
-  } else if (requiresAdmin && !authStore.isAdmin) {
-    // 需要管理员权限但不是管理员
-    // 如果是审核员，重定向到仪表盘；否则回首页
-    if (authStore.isAuditor) {
-      next('/admin/dashboard')
-    } else {
-      next('/')
-    }
-  } else if (requiresAuditor && !authStore.isAuditor) {
-    // 需要审核员权限但既不是管理员也不是审核员
-    next('/')
-  } else if (to.path === '/login' && authStore.isAuthenticated) {
-    // 已登录用户访问登录页，跳转到首页
-    next('/')
-  } else {
-    // 其他情况，正常访问
-    next()
+    next({ path: '/login', query: { redirect: to.fullPath } })
+    return
   }
+  if (requiresAdmin && !authStore.isAdmin) {
+    next(authStore.isAuditor ? '/admin/dashboard' : '/')
+    return
+  }
+  if (requiresAuditor && !authStore.isAuditor) {
+    next('/')
+    return
+  }
+  if (to.path === '/login' && authStore.isAuthenticated) {
+    next('/')
+    return
+  }
+  next()
 })
 
 export default router
-

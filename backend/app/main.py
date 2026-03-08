@@ -25,6 +25,10 @@ openapi_tags = [
         "description": "标签查询与管理。",
     },
     {
+        "name": "Taxonomy",
+        "description": "受控分类体系（facet / node）查询与审核端维护接口。",
+    },
+    {
         "name": "Import",
         "description": "管理员批量导入照片与导入路径校验。",
     },

@@ -17,7 +17,7 @@
         @update:value="handleMenuSelect"
       />
     </n-layout-sider>
-    
+
     <n-layout>
       <n-layout-header bordered class="admin-header">
         <n-space justify="space-between" align="center">
@@ -25,11 +25,11 @@
           <n-space>
             <n-tag :type="roleTagType" size="small">{{ roleLabel }}</n-tag>
             <n-text>{{ user?.full_name || user?.email }}</n-text>
-            <n-button @click="handleLogout" secondary>退出登录</n-button>
+            <n-button secondary @click="handleLogout">退出登录</n-button>
           </n-space>
         </n-space>
       </n-layout-header>
-      
+
       <n-layout-content class="admin-content" content-style="padding: 24px;">
         <router-view />
       </n-layout-content>
@@ -38,17 +38,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, h } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { computed, h, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { NIcon } from 'naive-ui'
-import { 
-  ImagesOutline, 
-  PricetagsOutline, 
-  CloudUploadOutline,
-  CheckmarkCircleOutline,
+import {
   BarChartOutline,
+  CheckmarkCircleOutline,
+  CloudUploadOutline,
+  GitNetworkOutline,
+  ImagesOutline,
   PeopleOutline,
-  SettingsOutline
+  PricetagsOutline,
+  SettingsOutline,
 } from '@vicons/ionicons5'
 import type { MenuOption } from 'naive-ui'
 import { useAuthStore } from '../stores/auth'
@@ -59,13 +60,11 @@ const authStore = useAuthStore()
 
 const collapsed = ref(false)
 const activeKey = ref(route.name?.toString() || 'PhotoReview')
-
 const user = computed(() => authStore.user)
 
-// 角色显示
 const roleLabel = computed(() => {
   const roleMap: Record<string, string> = {
-    admin: '超级管理员',
+    admin: '管理员',
     auditor: '审核员',
     dept_user: '部门用户',
     user: '普通用户',
@@ -87,70 +86,30 @@ function renderMenuIcon(icon: any) {
   return () => h(NIcon, null, { default: () => h(icon) })
 }
 
-// 基础菜单（审核员可见）
 const baseMenuOptions: MenuOption[] = [
-  {
-    label: '仪表盘',
-    key: 'Dashboard',
-    icon: renderMenuIcon(BarChartOutline),
-  },
-  {
-    label: '照片审核',
-    key: 'PhotoReview',
-    icon: renderMenuIcon(CheckmarkCircleOutline),
-  },
-  {
-    label: '标签管理',
-    key: 'TagManagement',
-    icon: renderMenuIcon(PricetagsOutline),
-  },
+  { label: '仪表盘', key: 'Dashboard', icon: renderMenuIcon(BarChartOutline) },
+  { label: '照片审核', key: 'PhotoReview', icon: renderMenuIcon(CheckmarkCircleOutline) },
+  { label: '自由标签', key: 'TagManagement', icon: renderMenuIcon(PricetagsOutline) },
+  { label: '分类治理', key: 'TaxonomyManagement', icon: renderMenuIcon(GitNetworkOutline) },
 ]
 
-// 仅管理员可见的菜单
 const adminOnlyMenuOptions: MenuOption[] = [
-  {
-    type: 'divider',
-    key: 'd1',
-  },
-  {
-    label: '批量导入',
-    key: 'PhotoImport',
-    icon: renderMenuIcon(CloudUploadOutline),
-  },
-  {
-    label: '用户管理',
-    key: 'UserManagement',
-    icon: renderMenuIcon(PeopleOutline),
-  },
-  {
-    label: '系统设置',
-    key: 'SystemSettings',
-    icon: renderMenuIcon(SettingsOutline),
-  },
+  { type: 'divider', key: 'divider-admin' },
+  { label: '批量导入', key: 'PhotoImport', icon: renderMenuIcon(CloudUploadOutline) },
+  { label: '用户管理', key: 'UserManagement', icon: renderMenuIcon(PeopleOutline) },
+  { label: '系统设置', key: 'SystemSettings', icon: renderMenuIcon(SettingsOutline) },
 ]
 
-// 底部通用菜单
 const bottomMenuOptions: MenuOption[] = [
-  {
-    type: 'divider',
-    key: 'd2',
-  },
-  {
-    label: '返回前台',
-    key: 'Gallery',
-    icon: renderMenuIcon(ImagesOutline),
-  },
+  { type: 'divider', key: 'divider-bottom' },
+  { label: '返回前台', key: 'Gallery', icon: renderMenuIcon(ImagesOutline) },
 ]
 
-// 根据权限过滤菜单
 const filteredMenuOptions = computed(() => {
   const options = [...baseMenuOptions]
-  
-  // 仅管理员可以看到用户管理和系统设置
   if (authStore.isAdmin) {
     options.push(...adminOnlyMenuOptions)
   }
-  
   options.push(...bottomMenuOptions)
   return options
 })
@@ -183,4 +142,3 @@ function handleLogout() {
   overflow-y: auto;
 }
 </style>
-

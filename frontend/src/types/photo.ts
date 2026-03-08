@@ -1,6 +1,15 @@
 /**
- * 照片相关类型定义
+ * Photo-related types.
  */
+
+export interface TaxonomyValue {
+  facet_key: string
+  facet_name: string
+  node_id: number
+  node_key: string
+  node_name: string
+  path: string[]
+}
 
 export interface Photo {
   id: string
@@ -25,6 +34,8 @@ export interface Photo {
   captured_at: string | null
   published_at: string | null
   tags: string[]
+  free_tags: string[]
+  classifications: Record<string, TaxonomyValue>
   uploader_name: string | null
 }
 
@@ -53,6 +64,11 @@ export interface PhotoListParams {
   status?: string
   season?: string
   category?: string
+  campus?: string
+  building?: string
+  gallery_series?: string
+  gallery_year?: string
+  photo_type?: string
   search?: string
   tag?: string
   sort_by?: string
@@ -69,6 +85,11 @@ export interface PhotoListResponse {
 export interface PhotoFilters {
   season?: string | null
   category?: string | null
+  campus?: string | null
+  building?: string | null
+  gallery_series?: string | null
+  gallery_year?: string | null
+  photo_type?: string | null
   status?: string | null
   search?: string
   tag?: string | null

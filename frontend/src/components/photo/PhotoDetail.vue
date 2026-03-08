@@ -1,30 +1,42 @@
 <template>
-  <n-modal v-model:show="showModal" :mask-closable="true" preset="card" class="photo-detail-modal"
-    style="width: 90%; max-width: 1200px;" title="照片详情" @after-leave="handleModalClose">
+  <n-modal
+    v-model:show="showModal"
+    preset="card"
+    class="photo-detail-modal"
+    style="width: 90%; max-width: 1200px;"
+    title="照片详情"
+    @after-leave="handleModalClose"
+  >
     <n-spin :show="loading">
       <div v-if="photo" class="photo-detail">
         <n-grid :cols="2" :x-gap="24" :y-gap="24" responsive="screen">
-          <!-- 左侧:图片展示 -->
           <n-grid-item>
             <div class="image-preview">
-              <div class="nav-btn prev" v-if="hasPrev" @click="$emit('prev')">
+              <div v-if="hasPrev" class="nav-btn prev" @click="$emit('prev')">
                 <n-icon size="30" color="white" :component="ChevronBackOutline" />
               </div>
-              <div class="nav-btn next" v-if="hasNext" @click="$emit('next')">
+              <div v-if="hasNext" class="nav-btn next" @click="$emit('next')">
                 <n-icon size="30" color="white" :component="ChevronForwardOutline" />
               </div>
 
-              <img :key="photo.id" :src="getImageUrl(photo)" :alt="photo.filename" class="preview-image"
-                @error="handleImageError" />
+              <img
+                v-if="photo"
+                :key="photo.id"
+                :src="getImageUrl(photo)"
+                :alt="photo.filename"
+                class="preview-image"
+                @error="handleImageError"
+              />
+
               <div class="image-actions">
                 <n-button-group>
-                  <n-button @click="downloadImage" tertiary>
+                  <n-button tertiary @click="downloadImage">
                     <template #icon>
                       <n-icon :component="DownloadOutline" />
                     </template>
                     下载
                   </n-button>
-                  <n-button @click="shareImage" tertiary>
+                  <n-button tertiary @click="shareImage">
                     <template #icon>
                       <n-icon :component="ShareSocialOutline" />
                     </template>
@@ -35,35 +47,20 @@
             </div>
           </n-grid-item>
 
-          <!-- 右侧：详情信息 -->
           <n-grid-item>
             <n-space vertical size="large">
-              <!-- 基本信息 -->
               <n-descriptions :column="1" bordered size="small">
-                <n-descriptions-item label="文件名">
-                  {{ photo.filename }}
-                </n-descriptions-item>
-                <n-descriptions-item label="尺寸">
-                  {{ photo.width }} × {{ photo.height }}
-                </n-descriptions-item>
-                <n-descriptions-item label="文件大小">
-                  {{ formatFileSize(photo.file_size) }}
-                </n-descriptions-item>
-                <n-descriptions-item label="上传时间">
-                  {{ formatDate(photo.created_at) }}
-                </n-descriptions-item>
-                <n-descriptions-item v-if="photo.captured_at" label="拍摄时间">
-                  {{ formatDate(photo.captured_at) }}
-                </n-descriptions-item>
+                <n-descriptions-item label="文件名">{{ photo.filename }}</n-descriptions-item>
+                <n-descriptions-item label="尺寸">{{ photo.width }} x {{ photo.height }}</n-descriptions-item>
+                <n-descriptions-item label="文件大小">{{ formatFileSize(photo.file_size) }}</n-descriptions-item>
+                <n-descriptions-item label="上传时间">{{ formatDate(photo.created_at) }}</n-descriptions-item>
+                <n-descriptions-item v-if="photo.captured_at" label="拍摄时间">{{ formatDate(photo.captured_at) }}</n-descriptions-item>
                 <n-descriptions-item label="状态">
-                  <n-tag :type="getStatusType(photo.status)">
-                    {{ getStatusText(photo.status) }}
-                  </n-tag>
+                  <n-tag :type="getStatusType(photo.status)">{{ getStatusText(photo.status) }}</n-tag>
                 </n-descriptions-item>
               </n-descriptions>
 
-              <!-- 可编辑信息 -->
-              <n-form ref="formRef" :model="formData">
+              <n-form :model="formData">
                 <n-form-item label="季节">
                   <n-select v-model:value="formData.season" :options="seasonOptions" clearable />
                 </n-form-item>
@@ -71,24 +68,118 @@
                   <n-select v-model:value="formData.category" :options="categoryOptions" clearable />
                 </n-form-item>
                 <n-form-item label="描述">
-                  <n-input v-model:value="formData.description" type="textarea" placeholder="输入照片描述..." :rows="3" />
+                  <n-input v-model:value="formData.description" type="textarea" :rows="3" placeholder="输入照片描述..." />
                 </n-form-item>
               </n-form>
 
-              <!-- 标签 -->
               <div>
-                <n-text strong>标签</n-text>
-                <n-space style="margin-top: 8px;">
+                <n-text strong>自由标签</n-text>
+                <n-space style="margin-top: 8px;" wrap>
                   <n-tag v-for="tag in photo.tags" :key="tag" closable @close="handleRemoveTag(tag)">
                     {{ tag }}
                   </n-tag>
-                  <n-button size="small" @click="showAddTag = true">
-                    + 添加标签
-                  </n-button>
+                  <n-button size="small" @click="showAddTag = true">+ 添加标签</n-button>
                 </n-space>
               </div>
 
-              <!-- EXIF 信息 -->
+              <div v-if="photo.classifications && Object.keys(photo.classifications).length">
+                <n-text strong>受控分类</n-text>
+                <n-space style="margin-top: 8px;" wrap>
+                  <n-tag
+                    v-for="classification in Object.values(photo.classifications)"
+                    :key="classification.node_id"
+                    type="success"
+                    size="small"
+                  >
+                    {{ classification.facet_name }}: {{ classification.node_name }}
+                  </n-tag>
+                </n-space>
+              </div>
+
+              <div v-if="adminMode">
+                <n-space justify="space-between" align="center">
+                  <n-text strong>AI 建议</n-text>
+                  <n-space>
+                    <n-button size="small" :loading="aiLoading" @click="handleRunAI(false)">运行分析</n-button>
+                    <n-button size="small" tertiary :loading="aiLoading" @click="handleRunAI(true)">强制重跑</n-button>
+                  </n-space>
+                </n-space>
+
+                <n-spin :show="aiLoading">
+                  <n-empty
+                    v-if="!aiTask || !aiTask.result_json"
+                    description="暂无 AI 建议"
+                    size="small"
+                    style="margin-top: 12px;"
+                  />
+                  <n-card v-else size="small" embedded style="margin-top: 12px;">
+                    <n-space vertical size="small">
+                      <n-space align="center">
+                        <n-tag size="small" type="info">{{ aiTask.provider }}</n-tag>
+                        <n-tag size="small" :type="aiTask.status === 'applied' ? 'success' : 'warning'">{{ aiTask.status }}</n-tag>
+                        <n-text depth="3">置信度 {{ Math.round((aiTask.result_json.confidence || 0) * 100) }}%</n-text>
+                      </n-space>
+
+                      <n-text v-if="aiTask.result_json.summary">{{ aiTask.result_json.summary }}</n-text>
+
+                      <div v-if="classificationSuggestions.length">
+                        <n-text depth="3">候选分类</n-text>
+                        <n-space style="margin-top: 8px;" wrap>
+                          <n-tag v-for="item in classificationSuggestions" :key="item.key" size="small" type="success">
+                            {{ item.label }}: {{ item.value }}
+                          </n-tag>
+                        </n-space>
+                      </div>
+
+                      <div v-if="aiTask.result_json.free_tags?.length">
+                        <n-text depth="3">候选自由标签</n-text>
+                        <n-space style="margin-top: 8px;" wrap>
+                          <n-tag v-for="tag in aiTask.result_json.free_tags" :key="tag" size="small">{{ tag }}</n-tag>
+                        </n-space>
+                      </div>
+
+                      <div v-if="aiTask.result_json.quality_flags?.length">
+                        <n-text depth="3">质量提示</n-text>
+                        <n-space style="margin-top: 8px;" wrap>
+                          <n-tag v-for="flag in aiTask.result_json.quality_flags" :key="flag" size="small" type="warning">{{ flag }}</n-tag>
+                        </n-space>
+                      </div>
+
+                      <div v-if="aiTask.result_json.risk_flags?.length">
+                        <n-text depth="3">风险提示</n-text>
+                        <n-space style="margin-top: 8px;" wrap>
+                          <n-tag v-for="flag in aiTask.result_json.risk_flags" :key="flag" size="small" type="error">{{ flag }}</n-tag>
+                        </n-space>
+                      </div>
+
+                      <n-alert v-if="Object.keys(unresolvedClassifications).length" type="warning" title="未命中受控词表">
+                        {{ Object.entries(unresolvedClassifications).map(([key, value]) => `${key}: ${value}`).join('；') }}
+                      </n-alert>
+
+                      <n-space>
+                        <n-button
+                          size="small"
+                          type="primary"
+                          :disabled="aiTask.status !== 'completed'"
+                          :loading="applyingAI"
+                          @click="handleApplyAI"
+                        >
+                          应用建议
+                        </n-button>
+                        <n-button
+                          size="small"
+                          :disabled="aiTask.status !== 'completed'"
+                          :loading="applyingAI"
+                          @click="handleIgnoreAI"
+                        >
+                          忽略建议
+                        </n-button>
+                      </n-space>
+                    </n-space>
+                  </n-card>
+                </n-spin>
+              </div>
+
               <n-collapse v-if="photo.exif_data && Object.keys(photo.exif_data).length > 0">
                 <n-collapse-item title="EXIF 数据" name="exif">
                   <n-descriptions :column="1" size="small">
@@ -108,25 +199,19 @@
       <n-space justify="space-between">
         <n-popconfirm @positive-click="handleDelete">
           <template #trigger>
-            <n-button type="error" :loading="deleting">
-              删除照片
-            </n-button>
+            <n-button type="error" :loading="deleting">删除照片</n-button>
           </template>
           确定要删除这张照片吗？此操作不可恢复。
         </n-popconfirm>
+
         <n-space>
-          <n-button @click="showModal = false">
-            取消
-          </n-button>
-          <n-button type="primary" :loading="saving" :disabled="!hasChanges" @click="handleSave">
-            保存修改
-          </n-button>
+          <n-button @click="showModal = false">取消</n-button>
+          <n-button type="primary" :loading="saving" :disabled="!hasChanges" @click="handleSave">保存修改</n-button>
         </n-space>
       </n-space>
     </template>
   </n-modal>
 
-  <!-- 添加标签对话框 -->
   <n-modal v-model:show="showAddTag" preset="dialog" title="添加标签">
     <n-input v-model:value="newTag" placeholder="输入标签名称" @keydown.enter="handleAddTag" />
     <template #action>
@@ -137,14 +222,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useMessage } from 'naive-ui'
-import { DownloadOutline, ShareSocialOutline, ChevronBackOutline, ChevronForwardOutline } from '@vicons/ionicons5'
-import type { Photo, PhotoUpdate } from '../../types/photo'
-import { usePhotoStore } from '../../stores/photo'
-import { getPopularTags, getPublicTags, addPhotoTags, removePhotoTag, type Tag } from '../../api/tag'
-import { incrementView } from '../../api/stats'
+import { ChevronBackOutline, ChevronForwardOutline, DownloadOutline, ShareSocialOutline } from '@vicons/ionicons5'
 import dayjs from 'dayjs'
+import { addPhotoTags, getPublicTags, removePhotoTag, type Tag } from '../../api/tag'
+import {
+  applyPhotoAIAnalysis,
+  createPhotoAIAnalysis,
+  getPhotoAIAnalysis,
+  ignorePhotoAIAnalysis,
+  type AIAnalysisTask,
+} from '../../api/photo'
+import { incrementView } from '../../api/stats'
+import { SEASON_OPTIONS, CATEGORY_OPTIONS } from '../../constants/options'
+import { usePhotoStore } from '../../stores/photo'
+import type { Photo, PhotoUpdate } from '../../types/photo'
+import { getPhotoUrl } from '../../utils/format'
 
 interface Props {
   photoId?: string | null
@@ -164,30 +258,11 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   'update:show': [value: boolean]
-  'deleted': []
-  'updated': []
-  'prev': []
-  'next': []
+  deleted: []
+  updated: []
+  prev: []
+  next: []
 }>()
-
-// Keyboard navigation
-function handleKeydown(e: KeyboardEvent) {
-  if (!props.show) return
-
-  if (e.key === 'ArrowLeft' && props.hasPrev) {
-    emit('prev')
-  } else if (e.key === 'ArrowRight' && props.hasNext) {
-    emit('next')
-  }
-}
-
-onMounted(() => {
-  window.addEventListener('keydown', handleKeydown)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown)
-})
 
 const message = useMessage()
 const photoStore = usePhotoStore()
@@ -196,12 +271,14 @@ const showModal = ref(props.show)
 const loading = ref(false)
 const saving = ref(false)
 const deleting = ref(false)
-const photo = ref<Photo | null>(null)
 const showAddTag = ref(false)
 const newTag = ref('')
-const popularTags = ref<Tag[]>([])
-const loadingTags = ref(false)
+const photo = ref<Photo | null>(null)
 const allTagsMap = ref<Map<string, number>>(new Map())
+const aiTask = ref<AIAnalysisTask | null>(null)
+const aiLoading = ref(false)
+const applyingAI = ref(false)
+const unresolvedClassifications = ref<Record<string, string>>({})
 
 const formData = ref({
   season: null as string | null,
@@ -209,10 +286,7 @@ const formData = ref({
   description: null as string | null,
 })
 
-import { SEASON_OPTIONS, CATEGORY_OPTIONS } from '../../constants/options'
-
 const seasonOptions = SEASON_OPTIONS
-
 const categoryOptions = CATEGORY_OPTIONS
 
 const hasChanges = computed(() => {
@@ -224,50 +298,76 @@ const hasChanges = computed(() => {
   )
 })
 
-watch(() => props.show, (val) => {
-  showModal.value = val
-  if (val && props.photoId) {
-    loadPhotoDetail()
+const classificationSuggestions = computed(() => {
+  const classifications = aiTask.value?.result_json?.classifications || {}
+  const labelMap: Record<string, string> = {
+    season: '季节',
+    campus: '校区',
+    building: '楼宇',
+    gallery_series: '专题/赛事',
+    gallery_year: '年份',
+    photo_type: '照片类型',
   }
+  return Object.entries(classifications)
+    .filter(([, value]) => !!value)
+    .map(([key, value]) => ({ key, label: labelMap[key] || key, value: String(value) }))
 })
 
-// 当 photoId 变化时（导航切换），重新加载照片详情
-watch(() => props.photoId, (newId, oldId) => {
-  if (newId && newId !== oldId && props.show) {
-    loadPhotoDetail()
-  }
-})
-
-watch(showModal, (val) => {
-  emit('update:show', val)
-})
-
-import { getPhotoUrl } from '../../utils/format'
-
-function getImageUrl(photo: Photo) {
-  return getPhotoUrl(photo.id, 'original')
+function handleKeydown(event: KeyboardEvent) {
+  if (!props.show) return
+  if (event.key === 'ArrowLeft' && props.hasPrev) emit('prev')
+  if (event.key === 'ArrowRight' && props.hasNext) emit('next')
 }
 
-function getThumbnailUrl(photo: Photo) {
-  return getPhotoUrl(photo.id, 'thumbnail')
-}
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
 
-function handleImageError(e: Event) {
-  const img = e.target as HTMLImageElement
-  if (!photo.value) return
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+})
 
-  const thumbUrl = getThumbnailUrl(photo.value)
-  // 如果当前显示的不是缩略图，且缩略图存在，尝试降级
-  if (thumbUrl && !img.src.includes('data:image')) {
-    if (img.getAttribute('data-tried-thumb') === 'true') {
-      img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
-    } else {
-      img.setAttribute('data-tried-thumb', 'true')
-      img.src = thumbUrl
+watch(
+  () => props.show,
+  (value) => {
+    showModal.value = value
+    if (value && props.photoId) {
+      loadPhotoDetail()
     }
-  } else {
+  },
+)
+
+watch(
+  () => props.photoId,
+  (newId, oldId) => {
+    if (newId && newId !== oldId && props.show) {
+      loadPhotoDetail()
+    }
+  },
+)
+
+watch(showModal, (value) => {
+  emit('update:show', value)
+})
+
+function getImageUrl(currentPhoto: Photo) {
+  return getPhotoUrl(currentPhoto.id, 'original')
+}
+
+function getThumbnailUrl(currentPhoto: Photo) {
+  return getPhotoUrl(currentPhoto.id, 'thumbnail')
+}
+
+function handleImageError(event: Event) {
+  const img = event.target as HTMLImageElement
+  if (!photo.value) return
+  const thumbUrl = getThumbnailUrl(photo.value)
+  if (img.getAttribute('data-tried-thumb') === 'true') {
     img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
+    return
   }
+  img.setAttribute('data-tried-thumb', 'true')
+  img.src = thumbUrl
 }
 
 function formatFileSize(bytes: number | null): string {
@@ -283,8 +383,7 @@ function formatFileSize(bytes: number | null): string {
 }
 
 function formatDate(dateString: string | null): string {
-  if (!dateString) return '未知'
-  return dayjs(dateString).format('YYYY-MM-DD HH:mm:ss')
+  return dateString ? dayjs(dateString).format('YYYY-MM-DD HH:mm:ss') : '未知'
 }
 
 function getStatusType(status: string): 'success' | 'warning' | 'error' | 'info' {
@@ -292,7 +391,6 @@ function getStatusType(status: string): 'success' | 'warning' | 'error' | 'info'
     approved: 'success',
     pending: 'warning',
     rejected: 'error',
-    active: 'success',
   }
   return statusMap[status] || 'info'
 }
@@ -302,17 +400,14 @@ function getStatusText(status: string): string {
     approved: '已上线',
     pending: '待审核',
     rejected: '已拒绝',
-    active: '正常',
   }
   return statusMap[status] || status
 }
 
 async function loadPhotoDetail() {
   if (!props.photoId) return
-
   loading.value = true
   try {
-    // 根据模式选择 API：管理后台使用已认证 API，前台使用公开 API
     const data = props.adminMode
       ? await photoStore.fetchPhotoDetail(props.photoId)
       : await photoStore.fetchPublicPhotoDetail(props.photoId)
@@ -322,14 +417,11 @@ async function loadPhotoDetail() {
       category: data.category,
       description: data.description,
     }
-
-    // 增加浏览量
-    incrementView(props.photoId).catch(err => {
-      console.error('Failed to increment view count', err)
-    })
-
-    // 加载所有标签（用于删除时获取 ID）
+    incrementView(props.photoId).catch(() => {})
     await loadAllTags()
+    if (props.adminMode) {
+      await loadAITask()
+    }
   } catch (error: any) {
     message.error(error?.response?.data?.detail || '加载照片详情失败')
   } finally {
@@ -338,52 +430,82 @@ async function loadPhotoDetail() {
 }
 
 async function loadAllTags() {
+  const response = (await getPublicTags({ limit: 1000 })) as unknown as { items: Tag[] }
+  const tagMap = new Map<string, number>()
+  response.items.forEach((tag) => {
+    tagMap.set(tag.name, tag.id)
+  })
+  allTagsMap.value = tagMap
+}
+
+async function loadAITask() {
+  if (!props.photoId || !props.adminMode) return
+  aiLoading.value = true
   try {
-    // 使用公开API获取标签列表
-    const response = await getPublicTags({ limit: 1000 }) as unknown as { items: Tag[], total: number }
-    const tagMap = new Map<string, number>()
-
-    response.items.forEach((tag: Tag) => {
-      tagMap.set(tag.name, tag.id)
-    })
-
-    allTagsMap.value = tagMap
+    aiTask.value = await getPhotoAIAnalysis(props.photoId)
   } catch (error) {
-    console.error('加载标签失败:', error)
+    console.error(error)
+  } finally {
+    aiLoading.value = false
   }
 }
 
-async function loadPopularTags() {
-  loadingTags.value = true
+async function handleRunAI(force: boolean) {
+  if (!props.photoId) return
+  aiLoading.value = true
   try {
-    popularTags.value = await getPopularTags(20) as unknown as Tag[]
-  } catch (error) {
-    console.error('加载热门标签失败:', error)
+    aiTask.value = await createPhotoAIAnalysis(props.photoId, force)
+    unresolvedClassifications.value = {}
+    message.success(force ? '已重新提交 AI 分析任务' : '已提交 AI 分析任务')
+  } catch (error: any) {
+    message.error(error?.response?.data?.detail || '提交 AI 分析失败')
   } finally {
-    loadingTags.value = false
+    aiLoading.value = false
+  }
+}
+
+async function handleApplyAI() {
+  if (!props.photoId || !aiTask.value) return
+  applyingAI.value = true
+  try {
+    const response = await applyPhotoAIAnalysis(props.photoId, aiTask.value.id)
+    aiTask.value = response.task
+    unresolvedClassifications.value = response.unresolved_classifications || {}
+    message.success('AI 建议已应用')
+    emit('updated')
+    await loadPhotoDetail()
+  } catch (error: any) {
+    message.error(error?.response?.data?.detail || '应用 AI 建议失败')
+  } finally {
+    applyingAI.value = false
+  }
+}
+
+async function handleIgnoreAI() {
+  if (!props.photoId || !aiTask.value) return
+  applyingAI.value = true
+  try {
+    aiTask.value = await ignorePhotoAIAnalysis(props.photoId, aiTask.value.id)
+    message.success('AI 建议已忽略')
+  } catch (error: any) {
+    message.error(error?.response?.data?.detail || '忽略 AI 建议失败')
+  } finally {
+    applyingAI.value = false
   }
 }
 
 async function handleSave() {
   if (!photo.value || !hasChanges.value) return
-
   saving.value = true
   try {
     const updateData: PhotoUpdate = {}
-    if (formData.value.season !== photo.value.season) {
-      updateData.season = formData.value.season || undefined
-    }
-    if (formData.value.category !== photo.value.category) {
-      updateData.category = formData.value.category || undefined
-    }
-    if (formData.value.description !== photo.value.description) {
-      updateData.description = formData.value.description || undefined
-    }
-
+    if (formData.value.season !== photo.value.season) updateData.season = formData.value.season || undefined
+    if (formData.value.category !== photo.value.category) updateData.category = formData.value.category || undefined
+    if (formData.value.description !== photo.value.description) updateData.description = formData.value.description || undefined
     await photoStore.updatePhoto(photo.value.id, updateData)
     message.success('保存成功')
     emit('updated')
-    await loadPhotoDetail() // 重新加载
+    await loadPhotoDetail()
   } catch (error: any) {
     message.error(error?.response?.data?.detail || '保存失败')
   } finally {
@@ -393,7 +515,6 @@ async function handleSave() {
 
 async function handleDelete() {
   if (!photo.value) return
-
   deleting.value = true
   try {
     await photoStore.deletePhoto(photo.value.id)
@@ -409,211 +530,93 @@ async function handleDelete() {
 
 async function handleRemoveTag(tagName: string) {
   if (!photo.value) return
-
-  // 找到对应的标签 ID
   const tagId = allTagsMap.value.get(tagName)
   if (!tagId) {
     message.error('标签不存在')
     return
   }
-
   try {
-    await removePhotoTag(photo.value.id, tagId)
-    message.success('标签已删除')
-    await loadPhotoDetail() // 重新加载照片详情
+    const updatedPhoto = await removePhotoTag(photo.value.id, tagId)
+    photo.value = updatedPhoto as Photo
     emit('updated')
   } catch (error: any) {
-    message.error(error?.response?.data?.detail || '删除标签失败')
+    message.error(error?.response?.data?.detail || '移除标签失败')
   }
 }
 
 async function handleAddTag() {
-  if (!newTag.value.trim()) {
-    message.warning('请输入标签名称')
-    return
-  }
-
-  if (!photo.value) return
-
+  if (!photo.value || !newTag.value.trim()) return
   try {
-    // 合并现有标签和新标签
-    const newTagName = newTag.value.trim().toLowerCase()
-    const allTags = [...(photo.value.tags || []), newTagName]
-
-    // 调用 API 添加标签（需要传递所有标签）
-    await addPhotoTags(photo.value.id, allTags)
-    message.success('标签已添加')
+    const allTags = [...(photo.value.tags || []), newTag.value.trim()]
+    const updatedPhoto = await addPhotoTags(photo.value.id, allTags)
+    photo.value = updatedPhoto as Photo
     newTag.value = ''
     showAddTag.value = false
-    await loadPhotoDetail() // 重新加载照片详情
     emit('updated')
   } catch (error: any) {
     message.error(error?.response?.data?.detail || '添加标签失败')
   }
 }
 
+function downloadImage() {
+  if (!photo.value) return
+  window.open(getPhotoUrl(photo.value.id, 'original'), '_blank')
+}
+
+async function shareImage() {
+  if (!photo.value) return
+  const shareUrl = `${window.location.origin}/?photo=${photo.value.id}`
+  try {
+    await navigator.clipboard.writeText(shareUrl)
+    message.success('分享链接已复制')
+  } catch {
+    message.error('复制分享链接失败')
+  }
+}
+
 function handleModalClose() {
   photo.value = null
-  formData.value = {
-    season: null,
-    category: null,
-    description: null,
-  }
-}
-
-async function downloadImage() {
-  if (!photo.value) return
-
-  try {
-    // 使用图片接口下载（与显示相同的端点）
-    const downloadUrl = getPhotoUrl(photo.value.id, 'original')
-
-    const response = await fetch(downloadUrl)
-    if (!response.ok) {
-      throw new Error('Download failed')
-    }
-    const blob = await response.blob()
-
-    // 创建下载链接
-    const blobUrl = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = blobUrl
-    link.download = photo.value.filename
-    link.style.display = 'none'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(blobUrl)
-
-    message.success('下载开始')
-  } catch (error) {
-    console.error('下载失败:', error)
-    message.error('下载失败')
-  }
-}
-
-function shareImage() {
-  if (!photo.value) return
-
-  // 构建分享URL - 使用照片ID生成可分享的链接
-  const baseUrl = window.location.origin
-  const shareUrl = `${baseUrl}/?photo=${photo.value.id}`
-
-  // 尝试使用原生分享 API (移动端)
-  if (navigator.share) {
-    navigator.share({
-      title: photo.value.filename || 'BUCT Media 照片',
-      text: photo.value.description || '来自 BUCT Media HUB 的照片',
-      url: shareUrl
-    }).catch((err) => {
-      // 用户取消分享不算错误
-      if (err.name !== 'AbortError') {
-        copyToClipboard(shareUrl)
-      }
-    })
-  } else {
-    // 桌面端直接复制链接
-    copyToClipboard(shareUrl)
-  }
-}
-
-function copyToClipboard(text: string) {
-  // 尝试多种复制方法
-
-  // 方法1: 现代 Clipboard API (需要 HTTPS 或 localhost)
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(text)
-      .then(() => {
-        message.success('链接已复制到剪贴板')
-      })
-      .catch(() => {
-        fallbackCopyToClipboard(text)
-      })
-    return
-  }
-
-  // 方法2: 回退到 execCommand
-  fallbackCopyToClipboard(text)
-}
-
-function fallbackCopyToClipboard(text: string) {
-  // 使用 textarea + execCommand 回退方案
-  const textArea = document.createElement('textarea')
-  textArea.value = text
-
-  // 确保 textarea 在视口内但不可见
-  textArea.style.position = 'fixed'
-  textArea.style.top = '0'
-  textArea.style.left = '0'
-  textArea.style.width = '2em'
-  textArea.style.height = '2em'
-  textArea.style.padding = '0'
-  textArea.style.border = 'none'
-  textArea.style.outline = 'none'
-  textArea.style.boxShadow = 'none'
-  textArea.style.background = 'transparent'
-  textArea.style.opacity = '0'
-
-  document.body.appendChild(textArea)
-  textArea.focus()
-  textArea.select()
-
-  let success = false
-  try {
-    success = document.execCommand('copy')
-  } catch (err) {
-    console.error('execCommand copy failed:', err)
-  }
-
-  document.body.removeChild(textArea)
-
-  if (success) {
-    message.success('链接已复制到剪贴板')
-  } else {
-    // 最后的回退：显示链接让用户手动复制
-    message.info(`请手动复制链接: ${text}`, { duration: 5000 })
-  }
+  aiTask.value = null
+  unresolvedClassifications.value = {}
 }
 </script>
 
 <style scoped>
 .photo-detail {
-  min-height: 400px;
+  min-height: 480px;
 }
 
 .image-preview {
-  position: sticky;
-  top: 20px;
+  position: relative;
+  background: #0f172a;
   border-radius: 12px;
   overflow: hidden;
-  background: #000;
-  position: relative;
+  min-height: 420px;
+}
+
+.preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  max-height: 720px;
+  display: block;
+}
+
+.image-actions {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
 }
 
 .nav-btn {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 48px;
-  height: 48px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  z-index: 2;
   cursor: pointer;
-  transition: all 0.3s ease;
-  z-index: 10;
-  opacity: 0;
-}
-
-.image-preview:hover .nav-btn {
-  opacity: 1;
-}
-
-.nav-btn:hover {
-  background: rgba(0, 0, 0, 0.6);
-  transform: translateY(-50%) scale(1.1);
+  padding: 12px;
+  background: rgba(15, 23, 42, 0.45);
+  border-radius: 999px;
 }
 
 .nav-btn.prev {
@@ -622,35 +625,5 @@ function fallbackCopyToClipboard(text: string) {
 
 .nav-btn.next {
   right: 16px;
-}
-
-.preview-image {
-  width: 100%;
-  height: auto;
-  display: block;
-  border-radius: 8px;
-}
-
-.image-actions {
-  padding: 12px;
-  background: linear-gradient(to top, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.85));
-  display: flex;
-  justify-content: center;
-  border-top: 1px solid #eee;
-}
-
-.photo-detail-modal :deep(.n-card__content) {
-  padding: 24px;
-}
-
-@media (max-width: 768px) {
-  .photo-detail :deep(.n-grid) {
-    grid-template-columns: 1fr !important;
-  }
-
-  .image-preview {
-    position: relative;
-    top: 0;
-  }
 }
 </style>

@@ -1,48 +1,52 @@
 /**
- * 系统设置 API
- * 
- * 仅限管理员使用。
+ * Admin system settings API.
  */
 import request from './index'
 
 const BASE_URL = '/api/v1/admin/settings'
 
-/**
- * 人像照片可见性选项
- */
 export type PortraitVisibility = 'public' | 'login_required' | 'authorized_only'
+export type AIProvider = 'ollama' | 'dashscope'
 
 export interface SystemSettings {
-    portrait_visibility: PortraitVisibility
+  portrait_visibility: PortraitVisibility
+  ai_enabled: boolean
+  ai_provider: AIProvider
+  ai_model_id: string
+  storage_backend: string
+  task_queue_backend: string
 }
 
-/**
- * 获取系统设置
- */
 export async function getSettings(): Promise<SystemSettings> {
-    return request({
-        url: BASE_URL,
-        method: 'get'
-    })
+  return request({
+    url: BASE_URL,
+    method: 'get',
+  })
 }
 
-/**
- * 更新人像照片可见性
- */
 export async function updatePortraitVisibility(visibility: PortraitVisibility): Promise<SystemSettings> {
-    return request({
-        url: `${BASE_URL}/portrait-visibility`,
-        method: 'put',
-        data: { visibility }
-    })
+  return request({
+    url: `${BASE_URL}/portrait-visibility`,
+    method: 'put',
+    data: { visibility },
+  })
 }
 
-/**
- * 获取人像照片可见性（公开接口）
- */
+export async function updateAISettings(data: {
+  enabled: boolean
+  provider: AIProvider
+  model_id: string
+}): Promise<SystemSettings> {
+  return request({
+    url: `${BASE_URL}/ai`,
+    method: 'put',
+    data,
+  })
+}
+
 export async function getPortraitVisibility(): Promise<{ portrait_visibility: PortraitVisibility }> {
-    return request({
-        url: `${BASE_URL}/portrait-visibility`,
-        method: 'get'
-    })
+  return request({
+    url: `${BASE_URL}/portrait-visibility`,
+    method: 'get',
+  })
 }

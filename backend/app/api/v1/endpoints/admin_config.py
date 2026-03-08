@@ -1,152 +1,146 @@
 """
-系统配置 API 端点
-
-仅限超级管理员访问，用于管理系统级别配置。
+Admin system settings endpoints.
 """
-from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
-from app.core.deps import get_db, get_current_admin_user
+from app.core.deps import get_current_admin_user, get_db
+from app.core.config import get_settings
+from app.models.system_config import ConfigKeys, PortraitVisibility
 from app.models.user import User
-from app.models.system_config import SystemConfig, ConfigKeys, PortraitVisibility
+from app.services.runtime_settings import get_runtime_settings, set_runtime_setting
 
 router = APIRouter(prefix="/settings")
+settings = get_settings()
 
-
-# ================= Schemas =================
 
 class PortraitVisibilityUpdate(BaseModel):
-    """
-    人像照片可见性更新 schema
-    """
-    visibility: str  # public, login_required, authorized_only
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "visibility": "login_required"
-            }
-        }
+    visibility: str
+
+    model_config = ConfigDict(json_schema_extra={"example": {"visibility": "login_required"}})
 
 
-class SystemSettings(BaseModel):
-    """
-    系统设置响应 schema
-    """
+class AISettingsUpdate(BaseModel):
+    enabled: bool
+    provider: str
+    model_id: str
+
+    model_config = ConfigDict(protected_namespaces=())
+
+
+class AdminSystemSettings(BaseModel):
     portrait_visibility: str
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "portrait_visibility": "login_required"
-            }
-        }
+    ai_enabled: bool
+    ai_provider: str
+    ai_model_id: str
+    storage_backend: str
+    task_queue_backend: str
 
 
-# ================= Helper Functions =================
-
-async def get_or_create_config(db: AsyncSession, key: str, default_value: str) -> SystemConfig:
-    """
-    获取配置项，如果不存在则创建默认值
-    """
-    result = await db.execute(select(SystemConfig).filter(SystemConfig.key == key))
-    config = result.scalar_one_or_none()
-    
-    if not config:
-        config = SystemConfig(
-            key=key,
-            value=default_value,
-            description=f"System config for {key}"
-        )
-        db.add(config)
-        await db.commit()
-        await db.refresh(config)
-    
-    return config
-
-
-# ================= Endpoints =================
-
-@router.get("", response_model=SystemSettings)
-async def get_settings(
-    db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_admin_user),
-):
-    """
-    获取系统设置
-    
-    - 仅限管理员访问
-    """
-    portrait_config = await get_or_create_config(
-        db, 
-        ConfigKeys.PORTRAIT_VISIBILITY, 
-        PortraitVisibility.LOGIN_REQUIRED
-    )
-    
-    return SystemSettings(
-        portrait_visibility=portrait_config.value
-    )
-
-
-@router.put("/portrait-visibility", response_model=SystemSettings)
-async def update_portrait_visibility(
-    data: PortraitVisibilityUpdate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_admin_user),
-):
-    """
-    更新人像照片可见性设置
-    
-    - 仅限管理员访问
-    - 可选值: public（公开）, login_required（需要登录）, authorized_only（仅授权用户）
-    """
-    # 验证可见性值
+def _validate_portrait_visibility(value: str) -> None:
     valid_values = [
         PortraitVisibility.PUBLIC,
         PortraitVisibility.LOGIN_REQUIRED,
         PortraitVisibility.AUTHORIZED_ONLY,
     ]
-    
-    if data.visibility not in valid_values:
+    if value not in valid_values:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"无效的可见性设置。可选值: {', '.join(valid_values)}"
+            detail=f"Invalid portrait visibility. Expected one of: {', '.join(valid_values)}",
         )
-    
-    # 获取或创建配置
-    config = await get_or_create_config(
+
+
+def _validate_ai_provider(provider: str) -> None:
+    if provider not in {"ollama", "dashscope"}:
+        raise HTTPException(status_code=400, detail="Invalid AI provider.")
+    if provider == "dashscope" and not settings.DASHSCOPE_API_KEY:
+        raise HTTPException(status_code=400, detail="DASHSCOPE_API_KEY is not configured on the server.")
+
+
+@router.get("", response_model=AdminSystemSettings)
+async def get_settings(
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_admin_user),
+):
+    runtime_settings = await get_runtime_settings(db)
+    return AdminSystemSettings(
+        portrait_visibility=runtime_settings.portrait_visibility,
+        ai_enabled=runtime_settings.ai_enabled,
+        ai_provider=runtime_settings.ai_provider,
+        ai_model_id=runtime_settings.ai_model_id,
+        storage_backend=runtime_settings.storage_backend,
+        task_queue_backend=runtime_settings.task_queue_backend,
+    )
+
+
+@router.put("/portrait-visibility", response_model=AdminSystemSettings)
+async def update_portrait_visibility(
+    data: PortraitVisibilityUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    _validate_portrait_visibility(data.visibility)
+    await set_runtime_setting(
         db,
         ConfigKeys.PORTRAIT_VISIBILITY,
-        PortraitVisibility.LOGIN_REQUIRED
+        data.visibility,
+        updated_by=current_user.id,
+        description="Portrait visibility policy",
     )
-    
-    # 更新配置
-    config.value = data.visibility
-    config.updated_by = current_user.id
-    
-    await db.commit()
-    await db.refresh(config)
-    
-    return SystemSettings(portrait_visibility=config.value)
+    runtime_settings = await get_runtime_settings(db)
+    return AdminSystemSettings(
+        portrait_visibility=runtime_settings.portrait_visibility,
+        ai_enabled=runtime_settings.ai_enabled,
+        ai_provider=runtime_settings.ai_provider,
+        ai_model_id=runtime_settings.ai_model_id,
+        storage_backend=runtime_settings.storage_backend,
+        task_queue_backend=runtime_settings.task_queue_backend,
+    )
+
+
+@router.put("/ai", response_model=AdminSystemSettings)
+async def update_ai_settings(
+    data: AISettingsUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    _validate_ai_provider(data.provider)
+    await set_runtime_setting(
+        db,
+        ConfigKeys.AI_ENABLED,
+        "true" if data.enabled else "false",
+        updated_by=current_user.id,
+        description="Whether AI analysis is enabled",
+    )
+    await set_runtime_setting(
+        db,
+        ConfigKeys.AI_PROVIDER,
+        data.provider,
+        updated_by=current_user.id,
+        description="AI provider override",
+    )
+    await set_runtime_setting(
+        db,
+        ConfigKeys.AI_MODEL_ID,
+        data.model_id,
+        updated_by=current_user.id,
+        description="AI model override",
+    )
+    runtime_settings = await get_runtime_settings(db)
+    return AdminSystemSettings(
+        portrait_visibility=runtime_settings.portrait_visibility,
+        ai_enabled=runtime_settings.ai_enabled,
+        ai_provider=runtime_settings.ai_provider,
+        ai_model_id=runtime_settings.ai_model_id,
+        storage_backend=runtime_settings.storage_backend,
+        task_queue_backend=runtime_settings.task_queue_backend,
+    )
 
 
 @router.get("/portrait-visibility")
 async def get_portrait_visibility_public(
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    获取人像照片可见性设置（公开接口）
-    
-    - 用于前端判断是否显示人像分类
-    """
-    result = await db.execute(
-        select(SystemConfig).filter(SystemConfig.key == ConfigKeys.PORTRAIT_VISIBILITY)
-    )
-    config = result.scalar_one_or_none()
-    
-    visibility = config.value if config else PortraitVisibility.LOGIN_REQUIRED
-    
-    return {"portrait_visibility": visibility}
+    runtime_settings = await get_runtime_settings(db)
+    return {"portrait_visibility": runtime_settings.portrait_visibility}

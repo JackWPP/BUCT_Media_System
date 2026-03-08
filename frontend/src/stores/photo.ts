@@ -1,5 +1,5 @@
 /**
- * 照片状态管理
+ * Photo state store.
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -7,7 +7,6 @@ import type { Photo, PhotoFilters, PhotoListParams } from '../types/photo'
 import * as photoApi from '../api/photo'
 
 export const usePhotoStore = defineStore('photo', () => {
-  // 状态
   const photos = ref<Photo[]>([])
   const total = ref(0)
   const currentPage = ref(1)
@@ -17,6 +16,11 @@ export const usePhotoStore = defineStore('photo', () => {
   const filters = ref<PhotoFilters>({
     season: null,
     category: null,
+    campus: null,
+    building: null,
+    gallery_series: null,
+    gallery_year: null,
+    photo_type: null,
     status: null,
     search: '',
     tag: null,
@@ -24,141 +28,94 @@ export const usePhotoStore = defineStore('photo', () => {
     sortOrder: 'desc',
   })
 
-  // 获取照片列表
+  function buildQueryParams(params?: PhotoListParams) {
+    const queryParams: Record<string, any> = {
+      skip: (currentPage.value - 1) * pageSize.value,
+      limit: pageSize.value,
+    }
+
+    if (filters.value.season) queryParams.season = filters.value.season
+    if (filters.value.category) queryParams.category = filters.value.category
+    if (filters.value.campus) queryParams.campus = filters.value.campus
+    if (filters.value.building) queryParams.building = filters.value.building
+    if (filters.value.gallery_series) queryParams.gallery_series = filters.value.gallery_series
+    if (filters.value.gallery_year) queryParams.gallery_year = filters.value.gallery_year
+    if (filters.value.photo_type) queryParams.photo_type = filters.value.photo_type
+    if (filters.value.status) queryParams.status = filters.value.status
+    if (filters.value.search) queryParams.search = filters.value.search
+    if (filters.value.tag) queryParams.tag = filters.value.tag
+    if (filters.value.sortBy) queryParams.sort_by = filters.value.sortBy
+    if (filters.value.sortOrder) queryParams.sort_order = filters.value.sortOrder
+
+    if (params) Object.assign(queryParams, params)
+    return queryParams
+  }
+
   async function fetchPhotos(params?: PhotoListParams) {
     loading.value = true
     try {
-      const queryParams: any = {
-        skip: ((currentPage.value - 1) * pageSize.value),
-        limit: pageSize.value,
-      }
-
-      // 只添加非 null 的筛选条件
-      if (filters.value.season) queryParams.season = filters.value.season
-      if (filters.value.category) queryParams.category = filters.value.category
-      if (filters.value.status) queryParams.status = filters.value.status
-      if (filters.value.search) queryParams.search = filters.value.search
-      if (filters.value.tag) queryParams.tag = filters.value.tag
-
-      // 添加额外参数
-      if (params) {
-        Object.assign(queryParams, params)
-      }
-
-      const response = await photoApi.getPhotos(queryParams)
+      const response = await photoApi.getPhotos(buildQueryParams(params))
       photos.value = response.items
       total.value = response.total
-
       return response
-    } catch (error) {
-      throw error
     } finally {
       loading.value = false
     }
   }
 
-  // 获取公开照片列表（无需登录）
   async function fetchPublicPhotos(params?: PhotoListParams) {
     loading.value = true
     try {
-      const queryParams: any = {
-        skip: ((currentPage.value - 1) * pageSize.value),
-        limit: pageSize.value,
-      }
-
-      // 只添加非 null 的筛选条件（不包括status，公开API固定返回approved）
-      if (filters.value.season) queryParams.season = filters.value.season
-      if (filters.value.category) queryParams.category = filters.value.category
-      if (filters.value.search) queryParams.search = filters.value.search
-      if (filters.value.tag) queryParams.tag = filters.value.tag
-      if (filters.value.sortBy) queryParams.sort_by = filters.value.sortBy
-      if (filters.value.sortOrder) queryParams.sort_order = filters.value.sortOrder
-
-      // 添加额外参数
-      if (params) {
-        Object.assign(queryParams, params)
-      }
-
-      const response = await photoApi.getPublicPhotos(queryParams)
+      const response = await photoApi.getPublicPhotos(buildQueryParams(params))
       photos.value = response.items
       total.value = response.total
-
       return response
-    } catch (error) {
-      throw error
     } finally {
       loading.value = false
     }
   }
 
-  // 获取公开照片详情（无需登录）
   async function fetchPublicPhotoDetail(id: string) {
-    try {
-      const photo = await photoApi.getPublicPhotoById(id)
-      selectedPhoto.value = photo
-      return photo
-    } catch (error) {
-      throw error
-    }
+    const photo = await photoApi.getPublicPhotoById(id)
+    selectedPhoto.value = photo
+    return photo
   }
 
-  // 获取照片详情
   async function fetchPhotoDetail(id: string) {
-    try {
-      const photo = await photoApi.getPhotoById(id)
-      selectedPhoto.value = photo
-      return photo
-    } catch (error) {
-      throw error
-    }
+    const photo = await photoApi.getPhotoById(id)
+    selectedPhoto.value = photo
+    return photo
   }
 
-  // 更新照片信息
   async function updatePhoto(id: string, data: any) {
-    try {
-      const updatedPhoto = await photoApi.updatePhoto(id, data)
-      // 更新列表中的照片
-      const index = photos.value.findIndex(p => p.id === id)
-      if (index !== -1) {
-        photos.value[index] = updatedPhoto
-      }
-      // 更新选中的照片
-      if (selectedPhoto.value?.id === id) {
-        selectedPhoto.value = updatedPhoto
-      }
-      return updatedPhoto
-    } catch (error) {
-      throw error
-    }
+    const updatedPhoto = await photoApi.updatePhoto(id, data)
+    const index = photos.value.findIndex((photo) => photo.id === id)
+    if (index !== -1) photos.value[index] = updatedPhoto
+    if (selectedPhoto.value?.id === id) selectedPhoto.value = updatedPhoto
+    return updatedPhoto
   }
 
-  // 删除照片
   async function deletePhoto(id: string) {
-    try {
-      await photoApi.deletePhoto(id)
-      // 从列表中移除
-      photos.value = photos.value.filter(p => p.id !== id)
-      total.value -= 1
-      // 清除选中
-      if (selectedPhoto.value?.id === id) {
-        selectedPhoto.value = null
-      }
-    } catch (error) {
-      throw error
-    }
+    await photoApi.deletePhoto(id)
+    photos.value = photos.value.filter((photo) => photo.id !== id)
+    total.value = Math.max(0, total.value - 1)
+    if (selectedPhoto.value?.id === id) selectedPhoto.value = null
   }
 
-  // 设置筛选条件
   function setFilters(newFilters: Partial<PhotoFilters>) {
     filters.value = { ...filters.value, ...newFilters }
-    currentPage.value = 1 // 重置页码
+    currentPage.value = 1
   }
 
-  // 清除筛选条件
   function clearFilters() {
     filters.value = {
       season: null,
       category: null,
+      campus: null,
+      building: null,
+      gallery_series: null,
+      gallery_year: null,
+      photo_type: null,
       status: null,
       search: '',
       tag: null,
@@ -168,7 +125,6 @@ export const usePhotoStore = defineStore('photo', () => {
     currentPage.value = 1
   }
 
-  // 设置当前页
   function setPage(page: number) {
     currentPage.value = page
   }

@@ -5,6 +5,8 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
+from app.schemas.taxonomy import TaxonomyValueResponse
+
 
 class PhotoBase(BaseModel):
     """Base photo schema"""
@@ -12,6 +14,7 @@ class PhotoBase(BaseModel):
     description: Optional[str] = Field(None, max_length=500, description="Photo description")
     season: Optional[str] = Field(None, description="Season: Spring/Summer/Autumn/Winter")
     category: Optional[str] = Field(None, description="Category: Landscape/Portrait/Activity/Documentary")
+    campus: Optional[str] = Field(None, description="Campus classification")
 
 
 class PhotoCreate(PhotoBase):
@@ -24,6 +27,7 @@ class PhotoUpdate(BaseModel):
     description: Optional[str] = Field(None, max_length=500)
     season: Optional[str] = None
     category: Optional[str] = None
+    campus: Optional[str] = None
     status: Optional[str] = None
     
     model_config = ConfigDict(extra='forbid')
@@ -40,6 +44,7 @@ class PhotoInDB(PhotoBase):
     height: Optional[int] = None
     file_size: Optional[int] = None
     mime_type: Optional[str] = None
+    campus: Optional[str] = None
     exif_data: Optional[Dict[str, Any]] = None
     captured_at: Optional[datetime] = None
     status: str
@@ -54,6 +59,11 @@ class PhotoResponse(PhotoInDB):
     """Photo response schema"""
     uploader_name: Optional[str] = None
     tags: List[str] = Field(default_factory=list, description="Associated tags")
+    free_tags: List[str] = Field(default_factory=list, description="User-visible free tags")
+    classifications: Dict[str, TaxonomyValueResponse] | Dict[str, Dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Controlled taxonomy classifications",
+    )
     
     model_config = ConfigDict(from_attributes=True)
 

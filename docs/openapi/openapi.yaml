@@ -117,26 +117,6 @@ paths:
       tags:
       - Photos
       summary: List Public Photos
-      description: 'List approved photos for public access
-
-
-        根据系统配置的人像可见性设置，对 Portrait 类别照片进行过滤：
-
-        - public: 所有人可见
-
-        - login_required: 仅登录用户可见
-
-        - authorized_only: 仅授权用户可见（暂同 login_required）
-
-
-        如果用户未登录且请求 Portrait 类别，该类别将被自动排除。
-
-
-        排序参数：
-
-        - sort_by: created_at (默认), views, published_at
-
-        - sort_order: desc (默认), asc'
       operationId: list_public_photos_api_v1_photos_public_get
       security:
       - OAuth2PasswordBearer: []
@@ -171,6 +151,46 @@ paths:
           - type: string
           - type: 'null'
           title: Category
+      - name: campus
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Campus
+      - name: building
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Building
+      - name: gallery_series
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Gallery Series
+      - name: gallery_year
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Gallery Year
+      - name: photo_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Photo Type
       - name: search
         in: query
         required: false
@@ -214,17 +234,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/photos/public/{photo_id}:
+    get:
+      tags:
+      - Photos
+      summary: Get Public Photo
+      operationId: get_public_photo_api_v1_photos_public__photo_id__get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: photo_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Photo Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/photos/{photo_id}/image/original:
     get:
       tags:
       - Photos
       summary: Get Photo Image
-      description: '获取原始照片文件
-
-
-        通过照片ID查找并返回原始图片文件。
-
-        使用 UPLOAD_DIR 配置构建路径，忽略数据库中的绝对路径。'
       operationId: get_photo_image_api_v1_photos__photo_id__image_original_get
       security:
       - OAuth2PasswordBearer: []
@@ -262,10 +304,6 @@ paths:
       tags:
       - Photos
       summary: Get Photo Thumbnail
-      description: '获取照片缩略图
-
-
-        缩略图文件名格式为 {photo_id}_thumb.jpg'
       operationId: get_photo_thumbnail_api_v1_photos__photo_id__image_thumbnail_get
       security:
       - OAuth2PasswordBearer: []
@@ -298,16 +336,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
-  /api/v1/photos/public/{photo_id}:
+  /api/v1/photos/{photo_id}/download:
     get:
       tags:
       - Photos
-      summary: Get Public Photo
-      description: 'Get a specific approved photo by ID
-
-
-        根据系统配置的人像可见性设置，对 Portrait 类别照片进行权限检查。'
-      operationId: get_public_photo_api_v1_photos_public__photo_id__get
+      summary: Download Photo
+      operationId: download_photo_api_v1_photos__photo_id__download_get
       security:
       - OAuth2PasswordBearer: []
       parameters:
@@ -317,13 +351,22 @@ paths:
         schema:
           type: string
           title: Photo Id
+      - name: access_token
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: JWT token for image requests
+          title: Access Token
+        description: JWT token for image requests
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/PhotoResponse'
+              schema: {}
         '422':
           description: Validation Error
           content:
@@ -335,16 +378,6 @@ paths:
       tags:
       - Photos
       summary: Upload Photo
-      description: 'Upload a new photo
-
-
-        - **file**: Photo file (JPEG, PNG, etc.)
-
-        - **description**: Optional description
-
-        - **season**: Optional season classification
-
-        - **category**: Optional category classification'
       operationId: upload_photo_api_v1_photos_upload_post
       requestBody:
         content:
@@ -372,22 +405,6 @@ paths:
       tags:
       - Photos
       summary: List Photos
-      description: 'List photos with filtering and pagination
-
-
-        - **skip**: Number of records to skip (for pagination)
-
-        - **limit**: Maximum number of records to return (max 100)
-
-        - **status**: Filter by status
-
-        - **season**: Filter by season
-
-        - **category**: Filter by category
-
-        - **search**: Search in filename, description, and tags
-
-        - **tag**: Filter by specific tag name'
       operationId: list_photos_api_v1_photos_get
       security:
       - OAuth2PasswordBearer: []
@@ -430,6 +447,46 @@ paths:
           - type: string
           - type: 'null'
           title: Category
+      - name: campus
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Campus
+      - name: building
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Building
+      - name: gallery_series
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Gallery Series
+      - name: gallery_year
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Gallery Year
+      - name: photo_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Photo Type
       - name: search
         in: query
         required: false
@@ -464,7 +521,6 @@ paths:
       tags:
       - Photos
       summary: List My Submissions
-      description: List current user's submissions (all statuses)
       operationId: list_my_submissions_api_v1_photos_my_submissions_get
       security:
       - OAuth2PasswordBearer: []
@@ -507,6 +563,22 @@ paths:
           - type: string
           - type: 'null'
           title: Category
+      - name: campus
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Campus
+      - name: search
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Search
       responses:
         '200':
           description: Successful Response
@@ -525,7 +597,6 @@ paths:
       tags:
       - Photos
       summary: Get Photo
-      description: Get a specific photo by ID
       operationId: get_photo_api_v1_photos__photo_id__get
       security:
       - OAuth2PasswordBearer: []
@@ -553,10 +624,6 @@ paths:
       tags:
       - Photos
       summary: Update Photo
-      description: 'Update a photo''s metadata
-
-
-        Users can only update their own photos unless they are admin'
       operationId: update_photo_api_v1_photos__photo_id__patch
       security:
       - OAuth2PasswordBearer: []
@@ -590,10 +657,6 @@ paths:
       tags:
       - Photos
       summary: Delete Photo
-      description: 'Delete a photo
-
-
-        Users can only delete their own photos unless they are admin'
       operationId: delete_photo_api_v1_photos__photo_id__delete
       security:
       - OAuth2PasswordBearer: []
@@ -618,10 +681,6 @@ paths:
       tags:
       - Photos
       summary: Approve Photo
-      description: 'Approve a photo (publish it)
-
-
-        Only reviewers can approve photos'
       operationId: approve_photo_api_v1_photos__photo_id__approve_post
       security:
       - OAuth2PasswordBearer: []
@@ -650,10 +709,6 @@ paths:
       tags:
       - Photos
       summary: Reject Photo
-      description: 'Reject a photo (unpublish it)
-
-
-        Only reviewers can reject photos'
       operationId: reject_photo_api_v1_photos__photo_id__reject_post
       security:
       - OAuth2PasswordBearer: []
@@ -682,10 +737,6 @@ paths:
       tags:
       - Photos
       summary: Batch Approve Photos
-      description: 'Batch approve multiple photos
-
-
-        Only reviewers can approve photos'
       operationId: batch_approve_photos_api_v1_photos_batch_approve_post
       requestBody:
         content:
@@ -715,10 +766,6 @@ paths:
       tags:
       - Photos
       summary: Batch Reject Photos
-      description: 'Batch reject multiple photos
-
-
-        Only reviewers can reject photos'
       operationId: batch_reject_photos_api_v1_photos_batch_reject_post
       requestBody:
         content:
@@ -748,10 +795,6 @@ paths:
       tags:
       - Photos
       summary: Batch Delete Photos
-      description: 'Batch delete multiple photos
-
-
-        Only admins can delete photos in batch'
       operationId: batch_delete_photos_api_v1_photos_batch_delete_post
       requestBody:
         content:
@@ -781,12 +824,6 @@ paths:
       tags:
       - Photos
       summary: Add Photo Tags
-      description: 'Add tags to a photo by tag names
-
-
-        Tags will be created automatically if they don''t exist
-
-        Users can only update tags for their own photos unless they are admin'
       operationId: add_photo_tags_api_v1_photos__photo_id__tags_post
       security:
       - OAuth2PasswordBearer: []
@@ -824,10 +861,6 @@ paths:
       tags:
       - Photos
       summary: Remove Photo Tag
-      description: 'Remove a tag from a photo
-
-
-        Users can only update tags for their own photos unless they are admin'
       operationId: remove_photo_tag_api_v1_photos__photo_id__tags__tag_id__delete
       security:
       - OAuth2PasswordBearer: []
@@ -857,13 +890,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
-  /api/v1/photos/{photo_id}/download:
-    get:
+  /api/v1/photos/{photo_id}/ai-analysis:
+    post:
       tags:
       - Photos
-      summary: Download Photo
-      description: Download photo by ID. Handles both relative and absolute paths.
-      operationId: download_photo_api_v1_photos__photo_id__download_get
+      summary: Create Photo Ai Analysis
+      operationId: create_photo_ai_analysis_api_v1_photos__photo_id__ai_analysis_post
       security:
       - OAuth2PasswordBearer: []
       parameters:
@@ -873,22 +905,118 @@ paths:
         schema:
           type: string
           title: Photo Id
-      - name: access_token
-        in: query
-        required: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AIAnalysisTaskCreate'
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIAnalysisTaskResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - Photos
+      summary: Get Photo Ai Analysis
+      operationId: get_photo_ai_analysis_api_v1_photos__photo_id__ai_analysis_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: photo_id
+        in: path
+        required: true
         schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: JWT token for image requests
-          title: Access Token
-        description: JWT token for image requests
+          type: string
+          title: Photo Id
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
-              schema: {}
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/AIAnalysisTaskResponse'
+                - type: 'null'
+                title: Response Get Photo Ai Analysis Api V1 Photos  Photo Id  Ai
+                  Analysis Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/photos/{photo_id}/ai-analysis/{task_id}/apply:
+    post:
+      tags:
+      - Photos
+      summary: Apply Photo Ai Analysis
+      operationId: apply_photo_ai_analysis_api_v1_photos__photo_id__ai_analysis__task_id__apply_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: photo_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Photo Id
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Task Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIApplyResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/photos/{photo_id}/ai-analysis/{task_id}/ignore:
+    post:
+      tags:
+      - Photos
+      summary: Ignore Photo Ai Analysis
+      operationId: ignore_photo_ai_analysis_api_v1_photos__photo_id__ai_analysis__task_id__ignore_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: photo_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Photo Id
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Task Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIAnalysisTaskResponse'
         '422':
           description: Validation Error
           content:
@@ -1158,6 +1286,218 @@ paths:
         schema:
           type: integer
           title: Tag Id
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/taxonomy/public:
+    get:
+      tags:
+      - Taxonomy
+      summary: List Public Taxonomy
+      operationId: list_public_taxonomy_api_v1_taxonomy_public_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/TaxonomyFacetResponse'
+                type: array
+                title: Response List Public Taxonomy Api V1 Taxonomy Public Get
+  /api/v1/taxonomy/facets:
+    get:
+      tags:
+      - Taxonomy
+      summary: List Taxonomy Facets
+      operationId: list_taxonomy_facets_api_v1_taxonomy_facets_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/TaxonomyFacetResponse'
+                type: array
+                title: Response List Taxonomy Facets Api V1 Taxonomy Facets Get
+      security:
+      - OAuth2PasswordBearer: []
+    post:
+      tags:
+      - Taxonomy
+      summary: Create Taxonomy Facet
+      operationId: create_taxonomy_facet_api_v1_taxonomy_facets_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaxonomyFacetCreate'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxonomyFacetResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/taxonomy/facets/{facet_id}:
+    get:
+      tags:
+      - Taxonomy
+      summary: Get Taxonomy Facet
+      operationId: get_taxonomy_facet_api_v1_taxonomy_facets__facet_id__get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: facet_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Facet Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxonomyFacetResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    patch:
+      tags:
+      - Taxonomy
+      summary: Update Taxonomy Facet
+      operationId: update_taxonomy_facet_api_v1_taxonomy_facets__facet_id__patch
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: facet_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Facet Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaxonomyFacetUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxonomyFacetResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/taxonomy/facets/{facet_id}/nodes:
+    post:
+      tags:
+      - Taxonomy
+      summary: Create Taxonomy Node
+      operationId: create_taxonomy_node_api_v1_taxonomy_facets__facet_id__nodes_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: facet_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Facet Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaxonomyNodeCreate'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxonomyNodeResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/taxonomy/nodes/{node_id}:
+    patch:
+      tags:
+      - Taxonomy
+      summary: Update Taxonomy Node
+      operationId: update_taxonomy_node_api_v1_taxonomy_nodes__node_id__patch
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: node_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Node Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaxonomyNodeUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxonomyNodeResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - Taxonomy
+      summary: Delete Taxonomy Node
+      operationId: delete_taxonomy_node_api_v1_taxonomy_nodes__node_id__delete
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: node_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Node Id
       responses:
         '204':
           description: Successful Response
@@ -1754,6 +2094,109 @@ paths:
               schema: {}
 components:
   schemas:
+    AIAnalysisTaskCreate:
+      properties:
+        force:
+          type: boolean
+          title: Force
+          description: Run a new analysis even if a completed result exists.
+          default: false
+      type: object
+      title: AIAnalysisTaskCreate
+    AIAnalysisTaskResponse:
+      properties:
+        id:
+          type: string
+          title: Id
+        photo_id:
+          type: string
+          title: Photo Id
+        requested_by_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Requested By Id
+        reviewed_by_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reviewed By Id
+        provider:
+          type: string
+          title: Provider
+        model_id:
+          type: string
+          title: Model Id
+        status:
+          type: string
+          title: Status
+        prompt_version:
+          type: string
+          title: Prompt Version
+        result_json:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Result Json
+        error_message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error Message
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        completed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Completed At
+        applied_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Applied At
+      type: object
+      required:
+      - id
+      - photo_id
+      - requested_by_id
+      - reviewed_by_id
+      - provider
+      - model_id
+      - status
+      - prompt_version
+      - result_json
+      - error_message
+      - created_at
+      - updated_at
+      - completed_at
+      - applied_at
+      title: AIAnalysisTaskResponse
+    AIApplyResponse:
+      properties:
+        applied:
+          type: boolean
+          title: Applied
+        task:
+          $ref: '#/components/schemas/AIAnalysisTaskResponse'
+        unresolved_classifications:
+          additionalProperties:
+            type: string
+          type: object
+          title: Unresolved Classifications
+      type: object
+      required:
+      - applied
+      - task
+      title: AIApplyResponse
     Body_login_for_access_token_api_v1_auth_token_post:
       properties:
         grant_type:
@@ -1805,17 +2248,19 @@ components:
           - type: string
           - type: 'null'
           title: Season
-          description: Spring/Summer/Autumn/Winter
         category:
           anyOf:
           - type: string
           - type: 'null'
           title: Category
-          description: Landscape/Portrait/Activity/Documentary
+        campus:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Campus
         enable_ai:
           type: boolean
           title: Enable Ai
-          description: Enable AI auto-tagging
           default: true
       type: object
       required:
@@ -2081,6 +2526,11 @@ components:
           - type: 'null'
           title: Category
           description: 'Category: Landscape/Portrait/Activity/Documentary'
+        campus:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Campus
         id:
           type: string
           title: Id
@@ -2156,6 +2606,22 @@ components:
           type: array
           title: Tags
           description: Associated tags
+        free_tags:
+          items:
+            type: string
+          type: array
+          title: Free Tags
+          description: User-visible free tags
+        classifications:
+          anyOf:
+          - additionalProperties:
+              $ref: '#/components/schemas/TaxonomyValueResponse'
+            type: object
+          - additionalProperties:
+              type: object
+            type: object
+          title: Classifications
+          description: Controlled taxonomy classifications
       type: object
       required:
       - filename
@@ -2186,6 +2652,11 @@ components:
           - type: string
           - type: 'null'
           title: Category
+        campus:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Campus
         status:
           anyOf:
           - type: string
@@ -2394,6 +2865,327 @@ components:
       type: object
       title: TagUpdate
       description: Schema for updating a tag
+    TaxonomyAliasResponse:
+      properties:
+        id:
+          type: integer
+          title: Id
+        alias:
+          type: string
+          title: Alias
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - id
+      - alias
+      - created_at
+      title: TaxonomyAliasResponse
+    TaxonomyFacetCreate:
+      properties:
+        key:
+          type: string
+          maxLength: 50
+          minLength: 1
+          title: Key
+        name:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        selection_mode:
+          type: string
+          pattern: ^(single|multiple)$
+          title: Selection Mode
+          default: single
+        is_active:
+          type: boolean
+          title: Is Active
+          default: true
+        sort_order:
+          type: integer
+          title: Sort Order
+          default: 0
+        is_system:
+          type: boolean
+          title: Is System
+          default: false
+      type: object
+      required:
+      - key
+      - name
+      title: TaxonomyFacetCreate
+    TaxonomyFacetResponse:
+      properties:
+        id:
+          type: integer
+          title: Id
+        key:
+          type: string
+          title: Key
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        selection_mode:
+          type: string
+          title: Selection Mode
+        is_system:
+          type: boolean
+          title: Is System
+        is_active:
+          type: boolean
+          title: Is Active
+        sort_order:
+          type: integer
+          title: Sort Order
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        nodes:
+          items:
+            $ref: '#/components/schemas/TaxonomyNodeResponse'
+          type: array
+          title: Nodes
+      type: object
+      required:
+      - id
+      - key
+      - name
+      - description
+      - selection_mode
+      - is_system
+      - is_active
+      - sort_order
+      - created_at
+      - updated_at
+      title: TaxonomyFacetResponse
+    TaxonomyFacetUpdate:
+      properties:
+        name:
+          anyOf:
+          - type: string
+            maxLength: 100
+            minLength: 1
+          - type: 'null'
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        selection_mode:
+          anyOf:
+          - type: string
+            pattern: ^(single|multiple)$
+          - type: 'null'
+          title: Selection Mode
+        is_active:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Is Active
+        sort_order:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Sort Order
+      additionalProperties: false
+      type: object
+      title: TaxonomyFacetUpdate
+    TaxonomyNodeCreate:
+      properties:
+        key:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Key
+        name:
+          type: string
+          maxLength: 150
+          minLength: 1
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        parent_id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Parent Id
+        sort_order:
+          type: integer
+          title: Sort Order
+          default: 0
+        is_active:
+          type: boolean
+          title: Is Active
+          default: true
+        aliases:
+          items:
+            type: string
+          type: array
+          title: Aliases
+      type: object
+      required:
+      - key
+      - name
+      title: TaxonomyNodeCreate
+    TaxonomyNodeResponse:
+      properties:
+        id:
+          type: integer
+          title: Id
+        facet_id:
+          type: integer
+          title: Facet Id
+        parent_id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Parent Id
+        key:
+          type: string
+          title: Key
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        sort_order:
+          type: integer
+          title: Sort Order
+        is_active:
+          type: boolean
+          title: Is Active
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        aliases:
+          items:
+            $ref: '#/components/schemas/TaxonomyAliasResponse'
+          type: array
+          title: Aliases
+        children:
+          items:
+            $ref: '#/components/schemas/TaxonomyNodeResponse'
+          type: array
+          title: Children
+      type: object
+      required:
+      - id
+      - facet_id
+      - parent_id
+      - key
+      - name
+      - description
+      - sort_order
+      - is_active
+      - created_at
+      - updated_at
+      title: TaxonomyNodeResponse
+    TaxonomyNodeUpdate:
+      properties:
+        key:
+          anyOf:
+          - type: string
+            maxLength: 100
+            minLength: 1
+          - type: 'null'
+          title: Key
+        name:
+          anyOf:
+          - type: string
+            maxLength: 150
+            minLength: 1
+          - type: 'null'
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        parent_id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Parent Id
+        sort_order:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Sort Order
+        is_active:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Is Active
+        aliases:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Aliases
+      additionalProperties: false
+      type: object
+      title: TaxonomyNodeUpdate
+    TaxonomyValueResponse:
+      properties:
+        facet_key:
+          type: string
+          title: Facet Key
+        facet_name:
+          type: string
+          title: Facet Name
+        node_id:
+          type: integer
+          title: Node Id
+        node_key:
+          type: string
+          title: Node Key
+        node_name:
+          type: string
+          title: Node Name
+        path:
+          items:
+            type: string
+          type: array
+          title: Path
+      type: object
+      required:
+      - facet_key
+      - facet_name
+      - node_id
+      - node_key
+      - node_name
+      title: TaxonomyValueResponse
     Token:
       properties:
         access_token:
@@ -2605,6 +3397,8 @@ tags:
   description: 照片上传、查询、审核、下载、标签维护与个人投稿管理。
 - name: Tags
   description: 标签查询与管理。
+- name: Taxonomy
+  description: 受控分类体系（facet / node）查询与审核端维护接口。
 - name: Import
   description: 管理员批量导入照片与导入路径校验。
 - name: Statistics
