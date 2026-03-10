@@ -1,12 +1,49 @@
-"""FastAPI 应用主入口。"""
-from fastapi import FastAPI
+"""
+FastAPI 应用主入口。
+
+包含安全启动校验、全局异常处理、请求日志中间件等。
+"""
+import logging
+import time
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import os
-from app.core.config import get_settings
+from app.core.config import get_settings, DEFAULT_SECRET_KEY
 from app.api.v1.router import api_router
 
+# ────────────────────────────────────────────────────────────
+# 日志配置
+# ────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)-8s [%(name)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("buct_media")
+
 settings = get_settings()
+
+# ────────────────────────────────────────────────────────────
+# SECRET_KEY 启动校验（P0 安全：防止生产环境使用默认密钥）
+# ────────────────────────────────────────────────────────────
+if not settings.DEBUG and settings.SECRET_KEY == DEFAULT_SECRET_KEY:
+    raise RuntimeError(
+        "🚨 安全错误：生产环境中 SECRET_KEY 不能使用默认值！"
+        "请在 .env 文件中设置一个强随机密钥，例如：\n"
+        "  SECRET_KEY=$(python -c \"import secrets; print(secrets.token_urlsafe(64))\")"
+    )
+
+if settings.SECRET_KEY == DEFAULT_SECRET_KEY:
+    logger.warning(
+        "⚠️  SECRET_KEY 使用默认值，仅适用于本地开发。"
+        "部署前请务必在 .env 中配置强随机密钥。"
+    )
 
 # 确保上传目录存在
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
@@ -14,7 +51,7 @@ os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 openapi_tags = [
     {
         "name": "Authentication",
-        "description": "登录、注册与当前用户信息。`/auth/login` 使用 JSON 请求体，`/auth/token` 用于 OpenAPI/OAuth2 password flow。",
+        "description": "登录、注册、Token 刷新与当前用户信息。`/auth/login` 使用 JSON 请求体，`/auth/token` 用于 OpenAPI/OAuth2 password flow。",
     },
     {
         "name": "Photos",
@@ -66,14 +103,80 @@ app = FastAPI(
     openapi_tags=openapi_tags,
 )
 
-# 配置 CORS
+
+# ────────────────────────────────────────────────────────────
+# 全局异常处理器（P0 安全：生产环境隐藏堆栈信息）
+# ────────────────────────────────────────────────────────────
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """
+    捕获所有未处理的异常，防止堆栈信息泄露给客户端。
+    """
+    logger.error(
+        "未处理的异常 [%s %s]: %s",
+        request.method,
+        request.url.path,
+        str(exc),
+        exc_info=True,
+    )
+    if settings.DEBUG:
+        # 开发环境返回详细信息便于调试
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(exc), "code": "INTERNAL_ERROR"},
+        )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "服务器内部错误，请稍后重试", "code": "INTERNAL_ERROR"},
+    )
+
+
+# ────────────────────────────────────────────────────────────
+# 请求日志中间件
+# ────────────────────────────────────────────────────────────
+@app.middleware("http")
+async def request_logging_middleware(request: Request, call_next):
+    """记录每个请求的方法、路径、状态码和耗时。"""
+    start_time = time.time()
+    response = await call_next(request)
+    duration_ms = (time.time() - start_time) * 1000
+
+    # 跳过健康检查等高频端点的日志
+    if request.url.path not in ("/health", "/docs", "/redoc", "/openapi.json"):
+        logger.info(
+            "%s %s → %d (%.1fms)",
+            request.method,
+            request.url.path,
+            response.status_code,
+            duration_ms,
+        )
+
+    return response
+
+
+# ────────────────────────────────────────────────────────────
+# CORS 配置（P0：收紧 methods 和 headers）
+# ────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Origin",
+        "X-Requested-With",
+    ],
 )
+
+# ────────────────────────────────────────────────────────────
+# 限流配置（P0：防止暴力破解和垃圾注册）
+# ────────────────────────────────────────────────────────────
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # 注册 API 路由
 app.include_router(api_router, prefix="/api/v1")

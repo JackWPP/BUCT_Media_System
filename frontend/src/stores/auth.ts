@@ -1,7 +1,7 @@
 /**
  * 认证状态管理
- * 
- * 包含用户登录状态、角色权限判断等功能。
+ *
+ * 包含用户登录状态、角色权限判断、Token 自动刷新等功能。
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
@@ -12,6 +12,7 @@ export const useAuthStore = defineStore('auth', () => {
   // 状态
   const user = ref<User | null>(null)
   const token = ref<string | null>(null)
+  const refreshTokenValue = ref<string | null>(null)
 
   // 计算属性
   const isAuthenticated = computed(() => !!token.value)
@@ -48,53 +49,81 @@ export const useAuthStore = defineStore('auth', () => {
   // 从 localStorage 初始化
   function initFromStorage() {
     const storedToken = localStorage.getItem('auth_token')
+    const storedRefreshToken = localStorage.getItem('refresh_token')
     if (storedToken) {
       token.value = storedToken
+      refreshTokenValue.value = storedRefreshToken
       // 尝试获取用户信息
       fetchCurrentUser().catch(() => {
-        // 如果获取失败，清除 token
-        logout()
+        // Access Token 可能过期，尝试刷新
+        if (storedRefreshToken) {
+          refreshAccessToken().catch(() => {
+            logout()
+          })
+        } else {
+          logout()
+        }
       })
     }
   }
 
   // 用户登录（支持学号或邮箱）
   async function login(identifier: string, password: string) {
-    try {
-      const response = await authApi.login({ identifier, password })
-      token.value = response.access_token
-      user.value = response.user
+    const response = await authApi.login({ identifier, password })
+    token.value = response.access_token
+    refreshTokenValue.value = response.refresh_token
+    user.value = response.user
 
-      // 保存 token 到 localStorage
-      localStorage.setItem('auth_token', response.access_token)
+    // 保存 token 到 localStorage
+    localStorage.setItem('auth_token', response.access_token)
+    localStorage.setItem('refresh_token', response.refresh_token)
 
-      return response
-    } catch (error) {
-      throw error
-    }
+    return response
   }
 
   // 用户登出
   function logout() {
     user.value = null
     token.value = null
+    refreshTokenValue.value = null
     localStorage.removeItem('auth_token')
+    localStorage.removeItem('refresh_token')
   }
 
   // 获取当前用户信息
   async function fetchCurrentUser() {
-    try {
-      const userData = await authApi.getCurrentUser()
-      user.value = userData
-      return userData
-    } catch (error) {
-      throw error
+    const userData = await authApi.getCurrentUser()
+    user.value = userData
+    return userData
+  }
+
+  /**
+   * 使用 Refresh Token 刷新 Access Token
+   *
+   * 刷新成功后更新 localStorage 和内存中的 Token。
+   */
+  async function refreshAccessToken() {
+    if (!refreshTokenValue.value) {
+      throw new Error('No refresh token available')
     }
+
+    const response = await authApi.refreshToken(refreshTokenValue.value)
+    token.value = response.access_token
+    refreshTokenValue.value = response.refresh_token
+
+    localStorage.setItem('auth_token', response.access_token)
+    localStorage.setItem('refresh_token', response.refresh_token)
+
+    // 刷新后重新获取用户信息
+    await fetchCurrentUser()
+
+    return response
   }
 
   return {
     user,
     token,
+    refreshTokenValue,
     isAuthenticated,
     isAdmin,
     isAuditor,
@@ -104,6 +133,6 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     logout,
     fetchCurrentUser,
+    refreshAccessToken,
   }
 })
-

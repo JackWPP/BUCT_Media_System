@@ -10,6 +10,9 @@ from app.models.permission import ResourcePermission, ResourceType, PermissionTy
 from app.models.taxonomy import TaxonomyFacet, TaxonomyNode, TaxonomyAlias, PhotoClassification
 from app.models.ai_analysis import AIAnalysisTask
 from app.models.ai_provider import AIProviderConfig, AIProviderType
+from app.models.audit_log import AuditLog
+from app.models.notification import Notification
+from app.models.favorite import Favorite
 
 __all__ = [
     "User",
@@ -31,6 +34,8 @@ __all__ = [
     "AIAnalysisTask",
     "AIProviderConfig",
     "AIProviderType",
+    "AuditLog",
+    "Notification",
+    "Favorite",
 ]
-
 

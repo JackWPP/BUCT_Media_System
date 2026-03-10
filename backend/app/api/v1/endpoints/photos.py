@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -37,6 +37,8 @@ from app.services.runtime_settings import get_runtime_settings
 from app.services.storage import cleanup_staged_files, get_storage, stage_photo_upload
 from app.services.task_dispatcher import dispatch_ai_analysis_task
 from app.services.taxonomy import ensure_default_taxonomy, serialize_classifications
+from app.services.audit import log_audit
+from app.services.notification import notify_user as send_notification
 
 settings = get_settings()
 router = APIRouter()
@@ -409,6 +411,7 @@ async def update_photo(
 @router.delete("/{photo_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_photo(
     photo_id: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -422,12 +425,16 @@ async def delete_photo(
     storage.delete_file(photo.thumb_path)
     storage.delete_file(photo.processed_path)
     await photo_crud.delete_photo(db, photo)
+    await log_audit(db, user_id=current_user.id, action="photo.delete",
+                    resource_type="photo", resource_id=photo_id,
+                    detail=f"删除照片: {photo.filename}", request=request)
     return None
 
 
 @router.post("/{photo_id}/approve", response_model=PhotoResponse)
 async def approve_photo(
     photo_id: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_auditor_user),
 ):
@@ -436,6 +443,14 @@ async def approve_photo(
         raise HTTPException(status_code=404, detail="Photo not found")
     photo.status = "approved"
     photo.published_at = datetime.utcnow()
+    await log_audit(db, user_id=current_user.id, action="photo.approve",
+                    resource_type="photo", resource_id=photo_id, request=request)
+    # 通知上传者
+    if photo.uploader_id and photo.uploader_id != current_user.id:
+        await send_notification(db, user_id=photo.uploader_id, type="photo_approved",
+                                title="您的照片已通过审核",
+                                content=f"照片 {photo.filename} 已被审核通过并发布",
+                                related_id=photo_id)
     await db.commit()
     await db.refresh(photo)
     return await serialize_photo(db, await photo_crud.get_photo_with_tags(db, photo_id))
@@ -444,6 +459,7 @@ async def approve_photo(
 @router.post("/{photo_id}/reject", response_model=PhotoResponse)
 async def reject_photo(
     photo_id: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_auditor_user),
 ):
@@ -452,6 +468,14 @@ async def reject_photo(
         raise HTTPException(status_code=404, detail="Photo not found")
     photo.status = "rejected"
     photo.published_at = None
+    await log_audit(db, user_id=current_user.id, action="photo.reject",
+                    resource_type="photo", resource_id=photo_id, request=request)
+    # 通知上传者
+    if photo.uploader_id and photo.uploader_id != current_user.id:
+        await send_notification(db, user_id=photo.uploader_id, type="photo_rejected",
+                                title="您的照片未通过审核",
+                                content=f"照片 {photo.filename} 未通过审核",
+                                related_id=photo_id)
     await db.commit()
     await db.refresh(photo)
     return await serialize_photo(db, await photo_crud.get_photo_with_tags(db, photo_id))
@@ -460,6 +484,7 @@ async def reject_photo(
 @router.post("/batch-approve")
 async def batch_approve_photos(
     photo_ids: List[str],
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_auditor_user),
 ):
@@ -470,6 +495,8 @@ async def batch_approve_photos(
             photo.status = "approved"
             photo.published_at = datetime.utcnow()
             updated_count += 1
+    await log_audit(db, user_id=current_user.id, action="photo.batch_approve",
+                    resource_type="photo", detail=f"批量通过 {updated_count} 张照片", request=request)
     await db.commit()
     return {"message": f"Successfully approved {updated_count} photos", "updated_count": updated_count, "total_requested": len(photo_ids)}
 
@@ -477,6 +504,7 @@ async def batch_approve_photos(
 @router.post("/batch-reject")
 async def batch_reject_photos(
     photo_ids: List[str],
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_auditor_user),
 ):
@@ -487,6 +515,8 @@ async def batch_reject_photos(
             photo.status = "rejected"
             photo.published_at = None
             updated_count += 1
+    await log_audit(db, user_id=current_user.id, action="photo.batch_reject",
+                    resource_type="photo", detail=f"批量拒绝 {updated_count} 张照片", request=request)
     await db.commit()
     return {"message": f"Successfully rejected {updated_count} photos", "updated_count": updated_count, "total_requested": len(photo_ids)}
 

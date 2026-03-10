@@ -24,3 +24,25 @@ export function getCurrentUser(): Promise<User> {
     method: 'get',
   })
 }
+
+/**
+ * 使用 Refresh Token 刷新 Access Token
+ */
+export function refreshToken(refresh_token: string): Promise<{ access_token: string; refresh_token: string; token_type: string }> {
+  return request({
+    url: '/api/v1/auth/refresh',
+    method: 'post',
+    data: { refresh_token },
+  })
+}
+
+/**
+ * 用户自助修改密码
+ */
+export function changePassword(old_password: string, new_password: string): Promise<{ detail: string }> {
+  return request({
+    url: '/api/v1/auth/password',
+    method: 'put',
+    data: { old_password, new_password },
+  })
+}

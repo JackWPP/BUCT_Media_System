@@ -51,6 +51,7 @@
                 </template>
               </n-button>
             </n-badge>
+            <NotificationBell v-if="authStore.isAuthenticated" />
             <n-button v-if="authStore.isAuthenticated" type="primary" @click="router.push('/upload')">
               <template #icon>
                 <n-icon :component="CloudUploadOutline" />
@@ -273,6 +274,9 @@
         />
       </n-drawer-content>
     </n-drawer>
+
+    <!-- 修改密码对话框 -->
+    <ChangePasswordDialog v-model:show="showChangePassword" />
   </div>
 </template>
 
@@ -300,6 +304,8 @@ import EmptyState from '../components/common/EmptyState.vue'
 import MasonryLayout from '../components/common/MasonryLayout.vue'
 import PhotoCardSkeleton from '../components/common/PhotoCardSkeleton.vue'
 import PhotoDetail from '../components/photo/PhotoDetail.vue'
+import ChangePasswordDialog from '../components/common/ChangePasswordDialog.vue'
+import NotificationBell from '../components/common/NotificationBell.vue'
 import { useAppStore } from '../stores/app'
 import { useAuthStore } from '../stores/auth'
 import { usePhotoStore } from '../stores/photo'
@@ -321,6 +327,7 @@ const selectedPhotoId = ref<string | null>(null)
 const gridCols = ref(4)
 const showMobileDrawer = ref(false)
 const showFilters = ref(false)
+const showChangePassword = ref(false)
 const loadingTags = ref(false)
 const popularTags = ref<Tag[]>([])
 const taxonomyFacets = ref<TaxonomyFacet[]>([])
@@ -355,11 +362,16 @@ const userMenuOptions = computed(() => {
     })
   }
 
-  options.push({
-    label: '退出登录',
-    key: 'logout',
-    icon: () => h(NIcon, null, { default: () => h(LogOutOutline) }),
-  })
+    options.push({
+      label: '修改密码',
+      key: 'change-password',
+    })
+
+    options.push({
+      label: '退出登录',
+      key: 'logout',
+      icon: () => h(NIcon, null, { default: () => h(LogOutOutline) }),
+    })
 
   return options
 })
@@ -536,6 +548,10 @@ function handleUserMenuSelect(key: string) {
   }
   if (key === 'submissions') {
     router.push('/my-submissions')
+    return
+  }
+  if (key === 'change-password') {
+    showChangePassword.value = true
     return
   }
   if (key === 'logout') {

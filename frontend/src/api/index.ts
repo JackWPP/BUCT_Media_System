@@ -1,5 +1,7 @@
 /**
  * Axios 请求封装
+ *
+ * 包含 Token 自动刷新、全局错误处理等功能。
  */
 import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import type { ApiError } from '../types/api'
@@ -19,6 +21,23 @@ const request = axios.create({
     'Content-Type': 'application/json',
   },
 })
+
+// ────────────────────────────────────────────────────────────
+// Token 刷新状态管理
+// ────────────────────────────────────────────────────────────
+let isRefreshing = false
+let failedQueue: { resolve: (value: any) => void; reject: (error: any) => void }[] = []
+
+function processQueue(error: any, token: string | null = null) {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error)
+    } else {
+      prom.resolve(token)
+    }
+  })
+  failedQueue = []
+}
 
 // 请求拦截器
 request.interceptors.request.use(
@@ -41,11 +60,67 @@ request.interceptors.response.use(
   (response: AxiosResponse) => {
     return response.data
   },
-  (error: AxiosError<ApiError>) => {
+  async (error: AxiosError<ApiError>) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
     const { response } = error
+
+    // ── 401 自动刷新 Token ──
+    if (
+      response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes('/auth/refresh') &&
+      !originalRequest.url?.includes('/auth/login')
+    ) {
+      const refreshTokenStr = localStorage.getItem('refresh_token')
+
+      if (refreshTokenStr) {
+        if (isRefreshing) {
+          // 已在刷新中，排队等待
+          return new Promise((resolve, reject) => {
+            failedQueue.push({ resolve, reject })
+          }).then((newToken) => {
+            originalRequest.headers.Authorization = `Bearer ${newToken}`
+            return request(originalRequest)
+          })
+        }
+
+        originalRequest._retry = true
+        isRefreshing = true
+
+        try {
+          // 直接用 axios 发刷新请求，避免拦截器循环
+          const baseURL = import.meta.env.VITE_API_BASE_URL || ''
+          const res = await axios.post(`${baseURL}/api/v1/auth/refresh`, {
+            refresh_token: refreshTokenStr,
+          })
+
+          const { access_token, refresh_token } = res.data
+          localStorage.setItem('auth_token', access_token)
+          localStorage.setItem('refresh_token', refresh_token)
+
+          processQueue(null, access_token)
+
+          // 重试原始请求
+          originalRequest.headers.Authorization = `Bearer ${access_token}`
+          return request(originalRequest)
+        } catch (refreshError) {
+          processQueue(refreshError, null)
+          // 刷新失败，清除 Token 跳转登录
+          localStorage.removeItem('auth_token')
+          localStorage.removeItem('refresh_token')
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login'
+          }
+          return Promise.reject(refreshError)
+        } finally {
+          isRefreshing = false
+        }
+      }
+    }
+
+    // ── 通用错误处理 ──
     let errorMessage = '请求失败'
 
-    // 处理不同的错误状态码
     if (response) {
       switch (response.status) {
         case 400:
@@ -53,8 +128,8 @@ request.interceptors.response.use(
           break
         case 401:
           errorMessage = '身份验证失败，请重新登录'
-          // 未授权，清除 token 并跳转到登录页
           localStorage.removeItem('auth_token')
+          localStorage.removeItem('refresh_token')
           if (window.location.pathname !== '/login') {
             setTimeout(() => {
               window.location.href = '/login'
@@ -69,6 +144,9 @@ request.interceptors.response.use(
           break
         case 422:
           errorMessage = response.data?.detail || '数据验证失败'
+          break
+        case 429:
+          errorMessage = '操作过于频繁，请稍后再试'
           break
         case 500:
           errorMessage = '服务器错误，请稍后重试'

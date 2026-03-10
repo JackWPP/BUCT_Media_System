@@ -25,6 +25,8 @@
           <n-space>
             <n-tag :type="roleTagType" size="small">{{ roleLabel }}</n-tag>
             <n-text>{{ user?.full_name || user?.email }}</n-text>
+            <NotificationBell />
+            <n-button secondary size="small" @click="showChangePassword = true">修改密码</n-button>
             <n-button secondary @click="handleLogout">退出登录</n-button>
           </n-space>
         </n-space>
@@ -35,6 +37,8 @@
       </n-layout-content>
     </n-layout>
   </n-layout>
+
+  <ChangePasswordDialog v-model:show="showChangePassword" />
 </template>
 
 <script setup lang="ts">
@@ -45,6 +49,7 @@ import {
   BarChartOutline,
   CheckmarkCircleOutline,
   CloudUploadOutline,
+  DocumentTextOutline,
   GitNetworkOutline,
   ImagesOutline,
   PeopleOutline,
@@ -53,6 +58,8 @@ import {
 } from '@vicons/ionicons5'
 import type { MenuOption } from 'naive-ui'
 import { useAuthStore } from '../stores/auth'
+import ChangePasswordDialog from '../components/common/ChangePasswordDialog.vue'
+import NotificationBell from '../components/common/NotificationBell.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -61,6 +68,7 @@ const authStore = useAuthStore()
 const collapsed = ref(false)
 const activeKey = ref(route.name?.toString() || 'PhotoReview')
 const user = computed(() => authStore.user)
+const showChangePassword = ref(false)
 
 const roleLabel = computed(() => {
   const roleMap: Record<string, string> = {
@@ -98,6 +106,7 @@ const adminOnlyMenuOptions: MenuOption[] = [
   { label: '批量导入', key: 'PhotoImport', icon: renderMenuIcon(CloudUploadOutline) },
   { label: '用户管理', key: 'UserManagement', icon: renderMenuIcon(PeopleOutline) },
   { label: '系统设置', key: 'SystemSettings', icon: renderMenuIcon(SettingsOutline) },
+  { label: '审计日志', key: 'AuditLog', icon: renderMenuIcon(DocumentTextOutline) },
 ]
 
 const bottomMenuOptions: MenuOption[] = [

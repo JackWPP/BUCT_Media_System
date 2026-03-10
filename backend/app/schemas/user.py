@@ -98,3 +98,12 @@ class UserList(BaseModel):
     total: int
 
 
+class PasswordChange(BaseModel):
+    """用户自助修改密码"""
+    old_password: str
+    new_password: str
+
+
+class AdminPasswordReset(BaseModel):
+    """管理员重置用户密码"""
+    new_password: str

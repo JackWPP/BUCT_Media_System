@@ -229,3 +229,42 @@ async def delete_user(db: AsyncSession, user_id: str) -> bool:
     await db.commit()
     return True
 
+
+async def change_user_password(
+    db: AsyncSession,
+    user_id: str,
+    old_password: str,
+    new_password: str,
+) -> bool:
+    """
+    用户自助修改密码
+
+    验证旧密码后更新为新密码。返回 True 表示成功，False 表示旧密码错误。
+    """
+    user = await get_user_by_id(db, user_id)
+    if not user:
+        return False
+
+    if not verify_password(old_password, user.hashed_password):
+        return False
+
+    user.hashed_password = get_password_hash(new_password)
+    await db.commit()
+    return True
+
+
+async def reset_user_password(
+    db: AsyncSession,
+    user_id: str,
+    new_password: str,
+) -> bool:
+    """
+    管理员重置用户密码（无需旧密码）
+    """
+    user = await get_user_by_id(db, user_id)
+    if not user:
+        return False
+
+    user.hashed_password = get_password_hash(new_password)
+    await db.commit()
+    return True
