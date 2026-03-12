@@ -109,6 +109,12 @@ class LocalStorageBackend(StorageBackend):
         clean = path.replace("\\", "/")
         if os.path.isabs(clean):
             return clean
+        # 兼容旧数据：如果路径已经以 upload_dir 名称开头（如 "uploads/thumbnails/..."），
+        # 则不再拼接 UPLOAD_DIR，避免出现 "uploads/uploads/..." 双重前缀
+        upload_dir_name = Path(settings.UPLOAD_DIR).name  # e.g. "uploads"
+        if clean.startswith(upload_dir_name + "/"):
+            # 路径已经包含 upload_dir 前缀，直接相对于 UPLOAD_DIR 的父目录解析
+            return str((Path(settings.UPLOAD_DIR).parent / clean).resolve())
         return str((Path(settings.UPLOAD_DIR) / clean).resolve())
 
     def persist_photo_files(

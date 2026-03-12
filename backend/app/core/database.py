@@ -3,6 +3,7 @@
 """
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
+from sqlalchemy import text
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -49,6 +50,32 @@ async def get_db():
 async def init_db():
     """
     初始化数据库表
+
+    1. create_all: 创建所有尚不存在的表
+    2. _migrate_columns: 为已有表补齐新增列（SQLite 不支持 IF NOT EXISTS）
     """
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_migrate_columns)
+
+
+def _migrate_columns(conn):
+    """
+    给已有表添加缺失的列。
+
+    SQLite 的 ALTER TABLE ADD COLUMN 如果列已存在会报错，
+    所以用 try/except 逐条执行，跳过已存在的列。
+    """
+    import sqlite3
+
+    migrations = [
+        "ALTER TABLE users ADD COLUMN auth_provider VARCHAR(20) DEFAULT 'local'",
+        "ALTER TABLE users ADD COLUMN sso_id VARCHAR(100)",
+    ]
+
+    for sql in migrations:
+        try:
+            conn.execute(text(sql))
+        except Exception:
+            # 列已存在，跳过
+            pass

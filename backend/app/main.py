@@ -5,6 +5,7 @@ FastAPI 应用主入口。
 """
 import logging
 import time
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,7 +16,9 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import os
 from app.core.config import get_settings, DEFAULT_SECRET_KEY
+from app.core.database import init_db
 from app.api.v1.router import api_router
+import app.models  # noqa: F401  确保所有模型被导入，create_all 才能发现它们
 
 # ────────────────────────────────────────────────────────────
 # 日志配置
@@ -88,12 +91,21 @@ openapi_tags = [
 ]
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """应用生命周期：启动时自动建表"""
+    await init_db()
+    logger.info("数据库表已同步")
+    yield
+
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     debug=settings.DEBUG,
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
     description=(
         "北京化工大学媒体资源管理系统后端接口。\n\n"
         "认证方式：大多数受保护接口使用 `Authorization: Bearer <token>`。\n"
