@@ -160,6 +160,9 @@ class LocalStorageBackend(StorageBackend):
         download_name: Optional[str] = None,
     ) -> Response:
         target = self._normalize(file_path)
+        if not os.path.exists(target):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail=f"Media file not found: {file_path}")
         return FileResponse(target, filename=download_name)
 
     @contextmanager

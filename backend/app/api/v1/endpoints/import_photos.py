@@ -119,6 +119,7 @@ async def import_photos(
             # 复制图片到 uploads 目录
             file_extension = os.path.splitext(filename)[1] or '.jpg'
             original_filename = f"{photo_uuid}{file_extension}"
+            original_relative = f"originals/{original_filename}"
             original_dest = os.path.join(originals_dir, original_filename)
             
             shutil.copy2(image_path, original_dest)
@@ -140,11 +141,11 @@ async def import_photos(
             # 清理EXIF数据，确保可JSON序列化
             exif_data = sanitize_exif_data(exif_data)
             
-            # 创建照片记录
+            # 创建照片记录 - 使用相对路径存储 original_path
             new_photo_data = {
                 'id': photo_uuid,
                 'filename': filename,
-                'original_path': original_dest,
+                'original_path': original_relative,
                 'thumb_path': processing_result.get('thumb_path'),
                 'width': photo_data.get('width') or processing_result.get('width'),
                 'height': photo_data.get('height') or processing_result.get('height'),

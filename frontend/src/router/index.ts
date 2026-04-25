@@ -1,5 +1,5 @@
 /**
- * Vue Router configuration.
+ * Vue Router configuration - VCG Style Refactor
  */
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
@@ -14,9 +14,25 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/',
-    name: 'Gallery',
-    component: () => import('../views/Gallery.vue'),
+    component: () => import('../layouts/PublicLayout.vue'),
     meta: { requiresAuth: false },
+    children: [
+      {
+        path: '',
+        name: 'Home',
+        component: () => import('../views/HomeView.vue'),
+      },
+      {
+        path: 'gallery',
+        name: 'Gallery',
+        component: () => import('../views/GalleryView.vue'),
+      },
+      {
+        path: 'photo/:id',
+        name: 'PhotoDetail',
+        component: () => import('../views/PhotoDetailView.vue'),
+      },
+    ],
   },
   {
     path: '/upload',
