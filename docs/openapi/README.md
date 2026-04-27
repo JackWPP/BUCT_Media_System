@@ -1,4 +1,4 @@
-# BUCT Media HUB OpenAPI 文档
+# 视觉北化 (Visual BUCT) OpenAPI 文档
 
 本目录存放后端接口的 OpenAPI 导出文件，可直接导入 ApiFox、Apifox CLI、Postman 等工具。
 

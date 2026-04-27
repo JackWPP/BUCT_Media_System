@@ -1,6 +1,5 @@
 """
-批量导入服务模块
-用于从 BUCT Tagger 系统导入照片数据
+Import service for batch photo import from legacy systems.
 """
 import json
 import os

@@ -6,7 +6,14 @@
       "Bash(git -C \"D:/BUCTuploader\" log --oneline -5)",
       "Bash(git -C \"D:/BUCT_Media_System\" remote -v)",
       "Bash(git -C \"D:/BUCT_Media_System\" log --oneline -3)",
-      "Bash(sqlite3:*)"
+      "Bash(sqlite3:*)",
+      "Bash(uv run python -c ':*)",
+      "Bash(python migrations/import_oss_photos.py --limit 3)",
+      "Bash(python migrations/import_oss_photos.py)",
+      "Bash(python3:*)",
+      "Bash(python migrations/migrate_building_to_landmark.py --apply)",
+      "Bash(ls:*)",
+      "Bash(cp:*)"
     ]
   }
 }

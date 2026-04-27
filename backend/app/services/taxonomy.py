@@ -34,6 +34,12 @@ DEFAULT_TAXONOMY = [
         "is_system": True,
         "sort_order": 10,
         "nodes": ["春季", "夏季", "秋季", "冬季"],
+        "aliases": {
+            "春季": ["春天", "春日", "春"],
+            "夏季": ["夏天", "夏日", "夏"],
+            "秋季": ["秋天", "秋日", "秋", "金秋"],
+            "冬季": ["冬天", "冬日", "冬"],
+        },
     },
     {
         "key": "campus",
@@ -41,13 +47,39 @@ DEFAULT_TAXONOMY = [
         "is_system": True,
         "sort_order": 20,
         "nodes": ["昌平校区", "朝阳校区"],
+        "aliases": {
+            "昌平校区": ["昌平", "北化昌平"],
+            "朝阳校区": ["朝阳", "北化朝阳"],
+        },
     },
     {
-        "key": "building",
-        "name": "楼宇",
+        "key": "landmark",
+        "name": "地标",
         "is_system": True,
         "sort_order": 30,
-        "nodes": ["一教", "二教", "图书馆", "樱花苑学生公寓"],
+        "nodes": [
+            # 建筑类
+            "一教", "二教", "三教", "图书馆", "实验楼",
+            "行政楼", "体育馆", "学生活动中心", "樱花苑学生公寓",
+            "主楼", "科技大厦",
+            # 自然/区域类
+            "柳湖", "樱花大道", "操场", "校门", "主楼广场",
+        ],
+        "aliases": {
+            "图书馆": ["北化图书馆", "新图书馆"],
+            "樱花苑学生公寓": ["樱花苑", "樱花苑公寓"],
+            "学生活动中心": ["活动中心", "学生中心"],
+            "柳湖": ["湖", "校园湖", "学校湖"],
+            "樱花大道": ["樱花路", "樱花园"],
+            "校门": ["北门", "南门", "东门", "西门", "正门"],
+            "一教": ["第一教学楼"],
+            "二教": ["第二教学楼"],
+            "三教": ["第三教学楼"],
+            "实验楼": ["实验中心", "综合实验楼"],
+            "行政楼": ["办公楼", "行政办公楼"],
+            "体育馆": ["体育中心", "室内体育馆"],
+            "主楼": ["学校主楼", "中心主楼"],
+        },
     },
     {
         "key": "gallery_series",
@@ -55,6 +87,11 @@ DEFAULT_TAXONOMY = [
         "is_system": True,
         "sort_order": 40,
         "nodes": ["摄影大赛", "校园风光", "活动纪实"],
+        "aliases": {
+            "摄影大赛": ["摄影比赛", "摄影大赛作品"],
+            "校园风光": ["校园景色", "校园风景"],
+            "活动纪实": ["校园活动纪实"],
+        },
     },
     {
         "key": "gallery_year",
@@ -62,6 +99,7 @@ DEFAULT_TAXONOMY = [
         "is_system": True,
         "sort_order": 50,
         "nodes": [str(year) for year in range(2018, 2026)],
+        "aliases": {},
     },
     {
         "key": "photo_type",
@@ -69,6 +107,12 @@ DEFAULT_TAXONOMY = [
         "is_system": True,
         "sort_order": 60,
         "nodes": ["风光", "人像", "活动", "纪实"],
+        "aliases": {
+            "风光": ["风景", "风景照", "自然风光", "景色", "风光摄影"],
+            "纪实": ["记录", "纪实摄影", "记录片"],
+            "人像": ["人物", "人物照", "肖像"],
+            "活动": ["活动照", "集体活动"],
+        },
     },
 ]
 
@@ -78,7 +122,7 @@ def _node_key(name: str) -> str:
 
 
 async def ensure_default_taxonomy(db: AsyncSession) -> None:
-    """Seed system facets and base nodes if they are missing."""
+    """Seed system facets, base nodes, and aliases if they are missing."""
     for facet_seed in DEFAULT_TAXONOMY:
         result = await db.execute(select(TaxonomyFacet).where(TaxonomyFacet.key == facet_seed["key"]))
         facet = result.scalar_one_or_none()
@@ -97,9 +141,9 @@ async def ensure_default_taxonomy(db: AsyncSession) -> None:
         existing_nodes_result = await db.execute(
             select(TaxonomyNode).where(TaxonomyNode.facet_id == facet.id)
         )
-        existing_names = {node.name for node in existing_nodes_result.scalars().all()}
+        existing_nodes = {node.name: node for node in existing_nodes_result.scalars().all()}
         for index, node_name in enumerate(facet_seed.get("nodes", []), start=1):
-            if node_name in existing_names:
+            if node_name in existing_nodes:
                 continue
             db.add(
                 TaxonomyNode(
@@ -110,6 +154,32 @@ async def ensure_default_taxonomy(db: AsyncSession) -> None:
                     is_active=True,
                 )
             )
+
+        # Flush new nodes so they get IDs
+        await db.flush()
+
+        # Seed aliases for nodes in this facet
+        aliases_map = facet_seed.get("aliases", {})
+        if aliases_map:
+            # Re-fetch nodes to include newly created ones
+            nodes_result = await db.execute(
+                select(TaxonomyNode).where(TaxonomyNode.facet_id == facet.id)
+            )
+            all_nodes = {node.name: node for node in nodes_result.scalars().all()}
+
+            for node_name, alias_list in aliases_map.items():
+                node = all_nodes.get(node_name)
+                if node is None:
+                    continue
+                # Get existing aliases for this node
+                existing_aliases_result = await db.execute(
+                    select(TaxonomyAlias.alias).where(TaxonomyAlias.node_id == node.id)
+                )
+                existing_aliases = {row[0] for row in existing_aliases_result.all()}
+                for alias in alias_list:
+                    clean = alias.strip()
+                    if clean and clean not in existing_aliases:
+                        db.add(TaxonomyAlias(node_id=node.id, alias=clean))
 
     await db.commit()
 

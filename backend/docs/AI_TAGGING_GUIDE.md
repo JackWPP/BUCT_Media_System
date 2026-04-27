@@ -2,7 +2,7 @@
 
 ## 功能概述
 
-BUCT Media HUB 集成了基于视觉语言模型(VLM)的 AI 自动打标功能,可以自动分析上传的照片并生成:
+视觉北化 (Visual BUCT) 集成了基于视觉语言模型(VLM)的 AI 自动打标功能,可以自动分析上传的照片并生成:
 - 季节分类 (Spring/Summer/Autumn/Winter)
 - 场景类型 (Landscape/Portrait/Activity/Documentary)
 - 关键词标签 (中文,最多5个)

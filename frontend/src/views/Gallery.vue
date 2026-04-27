@@ -30,7 +30,7 @@
                 <n-icon :component="MenuOutline" />
               </template>
             </n-button>
-            <h2 class="header-title">BUCT Media HUB</h2>
+            <img src="/logo.png" alt="视觉北化" class="gallery-logo" />
             <n-input
               v-model:value="searchKeyword"
               placeholder="搜索照片、描述或自由标签"
@@ -681,9 +681,10 @@ onMounted(async () => {
   flex: 1;
 }
 
-.header-title {
-  margin: 0;
-  white-space: nowrap;
+.gallery-logo {
+  height: 32px;
+  width: auto;
+  display: block;
 }
 
 .search-input {
@@ -812,10 +813,9 @@ onMounted(async () => {
     gap: 8px;
   }
 
-  .header-title {
-    font-size: 18px;
-    flex: 1;
-    min-width: 0;
+  .gallery-logo {
+    height: 24px;
+  }
   }
 
   .search-input {

@@ -3,8 +3,9 @@ Persisted AI task lifecycle helpers.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +19,15 @@ from app.services.ai_tagging import analyze_photo_with_runtime_settings
 from app.services.runtime_settings import get_runtime_settings
 from app.services.storage import get_storage
 from app.services.taxonomy import resolve_taxonomy_node, set_photo_classification
+
+
+# Mapping from English category values (stored in Photo.category) to Chinese taxonomy values
+_CATEGORY_TO_PHOTO_TYPE = {
+    "Landscape": "风光",
+    "Documentary": "纪实",
+    "Portrait": "人像",
+    "Activity": "活动",
+}
 
 
 async def create_ai_analysis_task(
@@ -54,6 +64,42 @@ async def get_latest_ai_task_for_photo(db: AsyncSession, photo_id: str) -> Optio
     return result.scalars().first()
 
 
+def _build_photo_context(photo: Photo) -> dict[str, Any]:
+    """Build prompt context from photo metadata for contest-aware analysis."""
+    context: dict[str, Any] = {}
+
+    # Map English category to Chinese photo_type
+    if photo.category:
+        photo_type = _CATEGORY_TO_PHOTO_TYPE.get(photo.category)
+        if photo_type:
+            context["photo_type"] = photo_type
+
+    # Detect photography contest photos from description
+    desc = photo.description or ""
+    if "摄影大赛" in desc:
+        context["gallery_series"] = "摄影大赛"
+        # All contest photos are from 昌平校区
+        context["campus"] = "昌平校区"
+        # Try to extract year from description (e.g., "2018年昌平校区摄影大赛1ST")
+        m = re.search(r"(\d{4})年", desc)
+        if m:
+            context["gallery_year"] = m.group(1)
+
+    return context
+
+
+def _override_with_context(result: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    """Override AI result fields with known context values (safety net)."""
+    if not context or "classifications" not in result:
+        return result
+    classifications = result.get("classifications", {})
+    for key in ("campus", "gallery_series", "gallery_year", "photo_type"):
+        if key in context and context[key]:
+            classifications[key] = context[key]
+    result["classifications"] = classifications
+    return result
+
+
 async def run_ai_analysis_task(task_id: str) -> Optional[AIAnalysisTask]:
     storage = get_storage()
     async with AsyncSessionLocal() as db:
@@ -74,12 +120,14 @@ async def run_ai_analysis_task(task_id: str) -> Optional[AIAnalysisTask]:
         await db.commit()
 
         try:
+            context = _build_photo_context(photo)
             runtime_settings = await get_runtime_settings(db)
             with storage.local_copy(photo.original_path) as local_path:
                 result = await analyze_photo_with_runtime_settings(
                     local_path,
                     providers=runtime_settings.providers,
                     enabled=runtime_settings.ai_enabled,
+                    context=context,
                 )
 
             if result is None:
@@ -87,10 +135,13 @@ async def run_ai_analysis_task(task_id: str) -> Optional[AIAnalysisTask]:
                 task.error_message = "AI analysis returned no result."
                 photo.processing_status = "failed"
             else:
+                # Override known fields from context (safety net for AI hallucination)
+                result = _override_with_context(result, context)
                 task.status = "completed"
                 task.result_json = result
                 task.provider = result.get("provider", task.provider)
                 task.model_id = result.get("model_id", task.model_id)
+                task.prompt_version = "v3"
                 task.completed_at = datetime.utcnow()
                 photo.processing_status = "completed"
         except Exception as exc:  # noqa: BLE001

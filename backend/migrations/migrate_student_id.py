@@ -11,7 +11,7 @@
 import sqlite3
 import uuid
 
-DB_PATH = "buct_media.db"
+DB_PATH = "visual_buct.db"
 
 def migrate():
     conn = sqlite3.connect(DB_PATH)

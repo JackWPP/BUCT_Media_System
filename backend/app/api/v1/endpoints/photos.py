@@ -6,10 +6,13 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile, status
+from pydantic import BaseModel, Field
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.deps import (
+    get_current_admin_user,
     get_current_auditor_user,
     get_current_user,
     get_db,
@@ -621,6 +624,88 @@ async def create_photo_ai_analysis(
     )
     dispatch_ai_analysis_task(background_tasks, task.id)
     return AIAnalysisTaskResponse.model_validate(task)
+
+
+class BatchAIAnalysisRequest(BaseModel):
+    processing_status: str = Field(default="pending", description="Filter by processing_status")
+    category: Optional[str] = Field(default=None, description="Filter by category")
+    created_after: Optional[datetime] = Field(default=None, description="Filter photos created after this timestamp")
+    max_count: int = Field(default=50, ge=1, le=100, description="Max number of AI tasks to create")
+    prompt_version: str = Field(default="v3", description="Prompt version to use (v2, v3)")
+
+
+class BatchAIAnalysisResponse(BaseModel):
+    tasks_created: int
+    photos_scanned: int
+    photos_matched: int
+    photos_skipped_no_path: int
+    photos_skipped_has_task: int
+    filters_applied: dict
+
+
+@router.post("/batch-ai-analysis", response_model=BatchAIAnalysisResponse)
+async def batch_ai_analysis(
+    payload: BatchAIAnalysisRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Admin-only: trigger AI analysis for multiple photos in batch."""
+    conditions = [Photo.original_path.isnot(None), Photo.original_path != ""]
+    if payload.processing_status:
+        conditions.append(Photo.processing_status == payload.processing_status)
+    if payload.category:
+        conditions.append(Photo.category == payload.category)
+    if payload.created_after:
+        conditions.append(Photo.created_at >= payload.created_after)
+
+    result = await db.execute(
+        select(Photo).where(and_(*conditions)).limit(payload.max_count * 3)
+    )
+    photos = result.scalars().all()
+
+    photos_scanned = len(photos)
+    photos_skipped_no_path = 0
+    photos_skipped_has_task = 0
+    tasks_created = 0
+
+    runtime_settings = await get_runtime_settings(db)
+
+    for photo in photos:
+        if not photo.original_path:
+            photos_skipped_no_path += 1
+            continue
+
+        existing = await get_latest_ai_task_for_photo(db, photo.id)
+        if existing and existing.status in {"pending", "processing", "completed", "applied"}:
+            photos_skipped_has_task += 1
+            continue
+
+        task = await create_ai_analysis_task(
+            db,
+            photo=photo,
+            requested_by_id=current_user.id,
+            provider=runtime_settings.ai_provider,
+            model_id=runtime_settings.ai_model_id,
+        )
+        dispatch_ai_analysis_task(background_tasks, task.id)
+        tasks_created += 1
+
+        if tasks_created >= payload.max_count:
+            break
+
+    return BatchAIAnalysisResponse(
+        tasks_created=tasks_created,
+        photos_scanned=photos_scanned,
+        photos_matched=tasks_created,
+        photos_skipped_no_path=photos_skipped_no_path,
+        photos_skipped_has_task=photos_skipped_has_task,
+        filters_applied={
+            "processing_status": payload.processing_status,
+            "category": payload.category,
+            "created_after": payload.created_after.isoformat() if payload.created_after else None,
+        },
+    )
 
 
 @router.get("/{photo_id}/ai-analysis", response_model=Optional[AIAnalysisTaskResponse])

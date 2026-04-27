@@ -9,8 +9,7 @@
     <div class="header-container">
       <!-- Logo -->
       <div class="header-logo" @click="router.push('/')">
-        <span class="logo-text">BUCT Media</span>
-        <span class="logo-badge">HUB</span>
+        <img src="/logo.png" alt="视觉北化" class="logo-image" />
       </div>
 
       <!-- 搜索框 - 仅在非首页或滚动后显示 -->
@@ -203,27 +202,15 @@ function handleUserMenuSelect(key: string) {
 .header-logo {
   display: flex;
   align-items: center;
-  gap: 4px;
   cursor: pointer;
   flex-shrink: 0;
   user-select: none;
 }
 
-.logo-text {
-  font-size: 20px;
-  font-weight: 700;
-  color: #e60012;
-  letter-spacing: -0.5px;
-}
-
-.logo-badge {
-  font-size: 12px;
-  font-weight: 600;
-  color: white;
-  background: #e60012;
-  padding: 2px 6px;
-  border-radius: 4px;
-  line-height: 1;
+.logo-image {
+  height: 36px;
+  width: auto;
+  display: block;
 }
 
 .header-search-mini {
@@ -278,8 +265,8 @@ function handleUserMenuSelect(key: string) {
     padding: 0 12px;
   }
 
-  .logo-text {
-    font-size: 16px;
+  .logo-image {
+    height: 28px;
   }
 
   .action-text {

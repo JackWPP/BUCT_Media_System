@@ -13,10 +13,10 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency for local 
 
 if Celery is not None:
     celery_app = Celery(
-        "buct_media",
+        "visual_buct",
         broker=settings.REDIS_URL,
         backend=settings.REDIS_URL,
     )
-    celery_app.conf.task_default_queue = "buct_media"
+    celery_app.conf.task_default_queue = "visual_buct"
 else:
     celery_app = None

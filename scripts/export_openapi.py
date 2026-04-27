@@ -17,7 +17,7 @@ OUTPUT_DIR = ROOT / "docs" / "openapi"
 def ensure_env() -> None:
     """Set safe defaults so schema export does not depend on local runtime env."""
     os.environ["DEBUG"] = "false"
-    os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./buct_media.db")
+    os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./visual_buct.db")
     os.environ.setdefault("UPLOAD_DIR", "./uploads")
 
 

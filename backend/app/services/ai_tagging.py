@@ -23,7 +23,7 @@ DEFAULT_RESULT = {
     "classifications": {
         "season": None,
         "campus": None,
-        "building": None,
+        "landmark": None,
         "gallery_series": None,
         "gallery_year": None,
         "photo_type": None,
@@ -154,19 +154,9 @@ class AITaggingService:
             return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
     @staticmethod
-    def _build_prompt() -> str:
-        return (
-            "你是校园媒体图库审核助手。请只返回 JSON，不要输出其他文本。"
-            "字段必须包含：summary、classifications、free_tags、quality_flags、risk_flags、confidence。"
-            "classifications 的键固定为 season、campus、building、gallery_series、gallery_year、photo_type。"
-            "无法判断时填 null。"
-            "season 优先使用 春季、夏季、秋季、冬季。"
-            "photo_type 优先使用 风光、人像、活动、纪实。"
-            "free_tags 最多 10 个中文标签。"
-            "quality_flags 可包含 模糊、过曝、欠曝、构图杂乱、疑似重复。"
-            "risk_flags 可包含 含人物、证件信息、屏幕内容、敏感文本。"
-            "confidence 返回 0 到 1 之间的小数。"
-        )
+    def _build_prompt(context: dict[str, Any] | None = None) -> str:
+        from app.prompts.photo_analysis import get_prompt
+        return get_prompt(version="v3", context=context)
 
     @staticmethod
     def _normalize_result(payload: dict[str, Any]) -> dict[str, Any]:
@@ -216,13 +206,13 @@ class AITaggingService:
             logger.warning("Failed to parse AI response: %s", exc)
             return json.loads(json.dumps(DEFAULT_RESULT))
 
-    async def analyze_image(self, image_path: str) -> dict[str, Any] | None:
+    async def analyze_image(self, image_path: str, context: dict[str, Any] | None = None) -> dict[str, Any] | None:
         if not self.enabled or not self.providers:
             logger.info("AI service disabled or no provider available. Skipping image analysis.")
             return None
 
         image_base64 = self._compress_and_encode_image(image_path)
-        prompt = self._build_prompt()
+        prompt = self._build_prompt(context=context)
         last_error: Exception | None = None
 
         for provider_config in self.providers:
@@ -249,7 +239,8 @@ async def analyze_photo_with_runtime_settings(
     image_path: str,
     providers: list[ResolvedAIProvider],
     enabled: bool,
+    context: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Run AI analysis with resolved runtime provider settings."""
     service = AITaggingService(providers=providers, enabled=enabled)
-    return await service.analyze_image(image_path)
+    return await service.analyze_image(image_path, context=context)

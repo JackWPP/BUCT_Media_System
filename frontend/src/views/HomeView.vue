@@ -10,7 +10,7 @@
       </div>
       <div class="hero-content" :style="{ opacity: heroOpacity, transform: heroTranslate }">
         <h1 class="hero-slogan">视觉之美  触动世界</h1>
-        <p class="hero-subtitle">探索 BUCT 校园精彩瞬间</p>
+        <p class="hero-subtitle">探索北化校园精彩瞬间</p>
 
         <!-- 搜索框 -->
         <div class="hero-search">

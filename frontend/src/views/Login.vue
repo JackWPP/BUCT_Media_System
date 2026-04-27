@@ -3,10 +3,7 @@
     <n-card class="login-card" size="large">
       <template #header>
         <div class="card-header">
-          <n-icon size="40" color="#18a058">
-            <ImagesOutline />
-          </n-icon>
-          <h2>BUCT Media HUB</h2>
+          <img src="/logo.png" alt="视觉北化" class="login-logo" />
         </div>
       </template>
       
@@ -133,7 +130,6 @@ import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import type { FormInst, FormRules } from 'naive-ui'
-import { ImagesOutline } from '@vicons/ionicons5'
 import { useAuthStore } from '../stores/auth'
 import request from '../api/index'
 
@@ -280,13 +276,12 @@ function goToGallery() {
 
 .card-header {
   display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 12px;
 }
 
-.card-header h2 {
-  margin: 0;
-  font-size: 24px;
-  color: #18a058;
+.login-logo {
+  height: 56px;
+  width: auto;
 }
 </style>

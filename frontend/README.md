@@ -1,4 +1,4 @@
-# BUCT Media HUB - Frontend
+# 视觉北化 - 前端
 
 基于 Vue 3 + TypeScript + Vite + Naive UI 的现代化前端应用。
 
@@ -77,13 +77,13 @@ npm run preview
 ### .env.development
 ```
 VITE_API_BASE_URL=http://localhost:8000
-VITE_APP_TITLE=BUCT Media HUB - Dev
+VITE_APP_TITLE=视觉北化 - Dev
 ```
 
 ### .env.production
 ```
 VITE_API_BASE_URL=/api
-VITE_APP_TITLE=BUCT Media HUB
+VITE_APP_TITLE=视觉北化
 ```
 
 ## 功能特性

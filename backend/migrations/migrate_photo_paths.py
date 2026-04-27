@@ -24,7 +24,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
-DB_PATH = "buct_media.db"
+DB_PATH = "visual_buct.db"
 UPLOAD_DIR = "./uploads"
 
 ORIG_DIR_NAME = "originals"

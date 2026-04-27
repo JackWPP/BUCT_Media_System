@@ -1,4 +1,4 @@
-# BUCT Media System - 代码审查报告
+# 视觉北化 (Visual BUCT) - 代码审查报告
 
 **审查日期**: 2026-03-02  
 **审查范围**: 后端 (FastAPI)、前端 (Vue 3)、部署配置  
@@ -497,7 +497,7 @@ backend/
 SECRET_KEY=your-secret-key-change-this
 DEBUG=false
 DATABASE_URL=sqlite+aiosqlite:///./prod.db
-UPLOAD_DIR=/var/www/buct_media/uploads
+UPLOAD_DIR=/var/www/visual-buct/uploads
 MAX_UPLOAD_SIZE=20971520
 OLLAMA_API_URL=http://localhost:11434
 AI_ENABLED=true

@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "BUCT Media HUB",
-    "description": "北京化工大学媒体资源管理系统后端接口。\n\n认证方式：大多数受保护接口使用 `Authorization: Bearer <token>`。\n前端常用登录接口为 `POST /api/v1/auth/login`，OpenAPI 工具链兼容登录接口为 `POST /api/v1/auth/token`。",
+    "title": "视觉北化",
+    "description": "视觉北化 (Visual BUCT) - 北京化工大学媒体资源管理系统后端接口。\n\n认证方式：大多数受保护接口使用 `Authorization: Bearer <token>`。\n前端常用登录接口为 `POST /api/v1/auth/login`，OpenAPI 工具链兼容登录接口为 `POST /api/v1/auth/token`。",
     "version": "1.0.0"
   },
   "paths": {

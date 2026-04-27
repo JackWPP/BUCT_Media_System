@@ -15,12 +15,13 @@ class Settings(BaseSettings):
     """应用配置类"""
     
     # 应用基础配置
-    APP_NAME: str = "BUCT Media HUB"
+    APP_NAME: str = "视觉北化"
+    APP_NAME_EN: str = "Visual BUCT"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
     
     # 数据库配置
-    DATABASE_URL: str = "sqlite+aiosqlite:///./buct_media.db"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./visual_buct.db"
     REDIS_URL: str = "redis://localhost:6379/0"
     TASK_QUEUE_BACKEND: Literal["background", "celery"] = "background"
     

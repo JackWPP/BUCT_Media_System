@@ -28,7 +28,7 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)-8s [%(name)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-logger = logging.getLogger("buct_media")
+logger = logging.getLogger("visual_buct")
 
 settings = get_settings()
 
@@ -107,7 +107,7 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
     description=(
-        "北京化工大学媒体资源管理系统后端接口。\n\n"
+        "视觉北化 (Visual BUCT) - 北京化工大学媒体资源管理系统后端接口。\n\n"
         "认证方式：大多数受保护接口使用 `Authorization: Bearer <token>`。\n"
         "前端常用登录接口为 `POST /api/v1/auth/login`，"
         "OpenAPI 工具链兼容登录接口为 `POST /api/v1/auth/token`。"

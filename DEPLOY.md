@@ -1,6 +1,6 @@
-# BUCT Media System 部署指南
+# 视觉北化 (Visual BUCT) 部署指南
 
-本指南详细说明如何将 BUCT Media System 部署到 Ubuntu/Debian 云服务器。
+本指南详细说明如何将视觉北化 (Visual BUCT) 部署到 Ubuntu/Debian 云服务器。
 
 ---
 
@@ -75,8 +75,8 @@ nginx -v            # 应显示 1.18+
 
 ```bash
 # 创建目录
-mkdir -p /var/www/buct_media
-cd /var/www/buct_media
+mkdir -p /var/www/visual-buct
+cd /var/www/visual-buct
 
 # 克隆代码（替换为你的仓库地址）
 git clone https://github.com/your-username/BUCT_Media_System.git .
@@ -91,16 +91,16 @@ git clone https://github.com/your-username/BUCT_Media_System.git .
 cd /path/to/BUCT_Media_System
 tar --exclude='node_modules' --exclude='__pycache__' --exclude='.git' \
     --exclude='*.db' --exclude='uploads/*' \
-    -czvf buct_media.tar.gz .
+    -czvf visual-buct.tar.gz .
 
 # 上传到服务器
-scp buct_media.tar.gz root@your-server-ip:/var/www/
+scp visual-buct.tar.gz root@your-server-ip:/var/www/
 
 # 在服务器上解压
 ssh root@your-server-ip
-mkdir -p /var/www/buct_media
-cd /var/www/buct_media
-tar -xzvf /var/www/buct_media.tar.gz
+mkdir -p /var/www/visual-buct
+cd /var/www/visual-buct
+tar -xzvf /var/www/visual-buct.tar.gz
 ```
 
 ---
@@ -110,7 +110,7 @@ tar -xzvf /var/www/buct_media.tar.gz
 ### 1. 创建 Python 虚拟环境
 
 ```bash
-cd /var/www/buct_media
+cd /var/www/visual-buct
 python3 -m venv venv
 source venv/bin/activate
 ```
@@ -144,7 +144,7 @@ nano .env
 SECRET_KEY=你生成的密钥
 
 # 修改上传目录
-UPLOAD_DIR=/var/www/buct_media/uploads
+UPLOAD_DIR=/var/www/visual-buct/uploads
 
 # 如果没有 AI 服务，设置为 false
 AI_ENABLED=false
@@ -153,14 +153,14 @@ AI_ENABLED=false
 ### 4. 创建上传目录
 
 ```bash
-mkdir -p /var/www/buct_media/uploads
-chown -R www-data:www-data /var/www/buct_media/uploads
+mkdir -p /var/www/visual-buct/uploads
+chown -R www-data:www-data /var/www/visual-buct/uploads
 ```
 
 ### 5. 初始化数据库
 
 ```bash
-cd /var/www/buct_media/backend
+cd /var/www/visual-buct/backend
 source ../venv/bin/activate
 python3 -c "from app.core.database import init_db; import asyncio; asyncio.run(init_db())"
 ```
@@ -181,7 +181,7 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 ### 1. 安装依赖
 
 ```bash
-cd /var/www/buct_media/frontend
+cd /var/www/visual-buct/frontend
 npm ci
 ```
 
@@ -203,8 +203,8 @@ npm run build
 ### 4. 移动构建产物
 
 ```bash
-mkdir -p /var/www/buct_media/public
-cp -r dist/* /var/www/buct_media/public/
+mkdir -p /var/www/visual-buct/public
+cp -r dist/* /var/www/visual-buct/public/
 ```
 
 ---
@@ -214,7 +214,7 @@ cp -r dist/* /var/www/buct_media/public/
 ### 1. 创建配置文件
 
 ```bash
-nano /etc/nginx/sites-available/buct_media
+nano /etc/nginx/sites-available/visual-buct
 ```
 
 粘贴以下内容（**修改 server_name**）：
@@ -236,7 +236,7 @@ server {
     
     # 前端静态文件
     location / {
-        root /var/www/buct_media/public;
+        root /var/www/visual-buct/public;
         try_files $uri $uri/ /index.html;
         
         location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
@@ -257,7 +257,7 @@ server {
     
     # 上传的文件
     location /uploads {
-        alias /var/www/buct_media/uploads;
+        alias /var/www/visual-buct/uploads;
         expires 30d;
     }
     
@@ -277,7 +277,7 @@ server {
 ### 2. 启用站点
 
 ```bash
-ln -sf /etc/nginx/sites-available/buct_media /etc/nginx/sites-enabled/
+ln -sf /etc/nginx/sites-available/visual-buct /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 ```
 
@@ -295,23 +295,23 @@ systemctl reload nginx
 ### 1. 创建服务文件
 
 ```bash
-nano /etc/systemd/system/buct_media.service
+nano /etc/systemd/system/visual-buct.service
 ```
 
 粘贴以下内容：
 
 ```ini
 [Unit]
-Description=BUCT Media System Backend
+Description=Visual BUCT Backend API
 After=network.target
 
 [Service]
 Type=simple
 User=www-data
 Group=www-data
-WorkingDirectory=/var/www/buct_media/backend
-Environment="PATH=/var/www/buct_media/venv/bin"
-ExecStart=/var/www/buct_media/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+WorkingDirectory=/var/www/visual-buct/backend
+Environment="PATH=/var/www/visual-buct/venv/bin"
+ExecStart=/var/www/visual-buct/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
 Restart=always
 RestartSec=5
 
@@ -322,15 +322,15 @@ WantedBy=multi-user.target
 ### 2. 设置目录权限
 
 ```bash
-chown -R www-data:www-data /var/www/buct_media
+chown -R www-data:www-data /var/www/visual-buct
 ```
 
 ### 3. 启用并启动服务
 
 ```bash
 systemctl daemon-reload
-systemctl enable buct_media
-systemctl start buct_media
+systemctl enable visual-buct
+systemctl start visual-buct
 ```
 
 ---
@@ -341,7 +341,7 @@ systemctl start buct_media
 
 ```bash
 # 后端服务状态
-systemctl status buct_media
+systemctl status visual-buct
 
 # Nginx 状态
 systemctl status nginx
@@ -351,7 +351,7 @@ systemctl status nginx
 
 ```bash
 # 后端日志
-journalctl -u buct_media -f
+journalctl -u visual-buct -f
 
 # Nginx 日志
 tail -f /var/log/nginx/error.log
@@ -372,9 +372,9 @@ tail -f /var/log/nginx/error.log
 
 **解决**：
 ```bash
-systemctl status buct_media
-systemctl restart buct_media
-journalctl -u buct_media -n 50
+systemctl status visual-buct
+systemctl restart visual-buct
+journalctl -u visual-buct -n 50
 ```
 
 ### 2. 静态文件 404
@@ -383,7 +383,7 @@ journalctl -u buct_media -n 50
 
 **解决**：
 ```bash
-ls -la /var/www/buct_media/public/
+ls -la /var/www/visual-buct/public/
 # 确保 index.html 存在
 ```
 
@@ -396,8 +396,8 @@ ls -la /var/www/buct_media/public/
 ### 4. 文件权限问题
 
 ```bash
-chown -R www-data:www-data /var/www/buct_media
-chmod -R 755 /var/www/buct_media
+chown -R www-data:www-data /var/www/visual-buct
+chmod -R 755 /var/www/visual-buct
 ```
 
 ### 5. 数据库锁定错误
@@ -405,7 +405,7 @@ chmod -R 755 /var/www/buct_media
 SQLite 在高并发时可能出问题：
 ```bash
 # 临时解决
-systemctl restart buct_media
+systemctl restart visual-buct
 ```
 
 ---
@@ -414,22 +414,22 @@ systemctl restart buct_media
 
 ```bash
 # 重启后端
-systemctl restart buct_media
+systemctl restart visual-buct
 
 # 重载 Nginx 配置
 systemctl reload nginx
 
 # 查看后端日志
-journalctl -u buct_media -f
+journalctl -u visual-buct -f
 
 # 更新代码后重新部署
-cd /var/www/buct_media
+cd /var/www/visual-buct
 git pull
 source venv/bin/activate
 pip install -r backend/requirements.txt
 cd frontend && npm ci && npm run build
-cp -r dist/* /var/www/buct_media/public/
-systemctl restart buct_media
+cp -r dist/* /var/www/visual-buct/public/
+systemctl restart visual-buct
 ```
 
 ---
@@ -450,10 +450,9 @@ certbot --nginx -d your-domain.com
 如果你信任自动化脚本，可以直接运行：
 
 ```bash
-cd /var/www/buct_media
+cd /var/www/visual-buct
 chmod +x deploy/deploy.sh
 sudo ./deploy/deploy.sh
-```
 
 **注意**：运行前请修改脚本中的 `DOMAIN` 变量。
 
@@ -462,6 +461,6 @@ sudo ./deploy/deploy.sh
 ## 联系支持
 
 如遇到问题，请检查：
-1. 服务日志 (`journalctl -u buct_media -n 100`)
+1. 服务日志 (`journalctl -u visual-buct -n 100`)
 2. Nginx 错误日志 (`/var/log/nginx/error.log`)
 3. 确保防火墙开放 80/443 端口

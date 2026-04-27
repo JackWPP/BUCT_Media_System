@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# BUCT Media System 部署脚本
+# Visual BUCT 部署脚本
 # ============================================================
 # 
 # 使用方法:
@@ -25,7 +25,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # 配置变量 (根据需要修改)
-APP_NAME="buct_media"
+APP_NAME="visual-buct"
 APP_DIR="/var/www/${APP_NAME}"
 DOMAIN="your-domain.com"  # 修改为你的域名或IP
 PYTHON_VERSION="python3"
@@ -148,7 +148,7 @@ configure_systemd() {
     log_info "配置 Systemd 服务..."
     
     # 复制服务文件
-    cp deploy/buct_media.service /etc/systemd/system/
+    cp deploy/visual-buct.service /etc/systemd/system/
     
     # 重新加载 systemd
     systemctl daemon-reload
@@ -173,7 +173,7 @@ print_success() {
     echo "管理命令:"
     echo "  查看后端日志:    journalctl -u ${APP_NAME} -f"
     echo "  重启后端:        systemctl restart ${APP_NAME}"
-    echo "  查看 Nginx 日志: tail -f /var/log/nginx/buct_media_*.log"
+    echo "  查看 Nginx 日志: tail -f /var/log/nginx/visual_buct_*.log"
     echo ""
     echo "重要提醒:"
     echo "  1. 请修改 ${APP_DIR}/backend/.env 中的 SECRET_KEY"
@@ -185,7 +185,7 @@ print_success() {
 main() {
     check_root
     
-    log_info "开始部署 BUCT Media System..."
+    log_info "开始部署 Visual BUCT..."
     
     install_dependencies
     create_directories
