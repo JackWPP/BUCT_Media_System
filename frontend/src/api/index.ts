@@ -6,18 +6,8 @@
  * 注意：响应拦截器返回 response.data（已解包），
  * 因此 request.get<T>() 实际返回 Promise<T>，而非 Promise<AxiosResponse<T>>。
  */
-import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestConfig, type AxiosRequestConfig, type AxiosInstance } from 'axios'
+import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import type { ApiError } from '../types/api'
-
-type UnwrapResponse<T> = T extends AxiosResponse<infer U> ? U : T
-
-interface TypedRequest extends Omit<AxiosInstance, 'get' | 'post' | 'put' | 'patch' | 'delete'> {
-  get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>
-  post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>
-  put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>
-  patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>
-  delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>
-}
 
 // 全局错误处理器(在App.vue中设置)
 let globalErrorHandler: ((message: string, type: 'error' | 'warning' | 'info') => void) | null = null
@@ -35,7 +25,8 @@ const _axiosInstance = axios.create({
   },
 })
 
-const request = _axiosInstance as unknown as TypedRequest
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const request = _axiosInstance as any
 
 // ────────────────────────────────────────────────────────────
 // Token 刷新状态管理
