@@ -64,6 +64,7 @@ async def list_public_taxonomy(
     db: AsyncSession = Depends(get_db),
 ):
     await ensure_default_taxonomy(db)
+    await db.commit()
     facets = await get_facets(db, active_only=True)
     return [_serialize_facet(facet) for facet in facets]
 
@@ -74,6 +75,7 @@ async def list_taxonomy_facets(
     current_user: User = Depends(get_current_auditor_user),
 ):
     await ensure_default_taxonomy(db)
+    await db.commit()
     facets = await get_facets(db, active_only=False)
     return [_serialize_facet(facet) for facet in facets]
 
@@ -84,6 +86,7 @@ async def get_taxonomy_insights(
     current_user: User = Depends(get_current_auditor_user),
 ):
     await ensure_default_taxonomy(db)
+    await db.commit()
 
     facet_count_rows = await db.execute(
         select(
@@ -99,28 +102,29 @@ async def get_taxonomy_insights(
         .order_by(TaxonomyFacet.sort_order.asc(), func.count(Photo.id).desc(), TaxonomyNode.sort_order.asc())
     )
 
-    unclassified_query = (
-        select(Photo)
-        .outerjoin(PhotoClassification, PhotoClassification.photo_id == Photo.id)
-        .group_by(Photo.id)
-        .having(func.count(PhotoClassification.id) == 0)
-        .order_by(Photo.created_at.desc())
+    unclassified_exists = (
+        select(PhotoClassification.id)
+        .where(PhotoClassification.photo_id == Photo.id)
+        .correlate(Photo)
+        .exists()
     )
-    unclassified_items_result = await db.execute(unclassified_query.limit(10))
+    unclassified_base = select(Photo).where(~unclassified_exists)
+
+    unclassified_items_result = await db.execute(
+        unclassified_base.order_by(Photo.created_at.desc()).limit(10)
+    )
     unclassified_total_result = await db.execute(
-        select(func.count())
-        .select_from(
-            select(Photo.id)
-            .outerjoin(PhotoClassification, PhotoClassification.photo_id == Photo.id)
-            .group_by(Photo.id)
-            .having(func.count(PhotoClassification.id) == 0)
-            .subquery()
+        select(func.count()).select_from(
+            unclassified_base.with_only_columns(Photo.id).subquery()
         )
     )
 
     return TaxonomyInsightsResponse(
         unclassified_total=unclassified_total_result.scalar_one(),
-        unclassified_items=[UnclassifiedPhotoItem.model_validate(item) for item in unclassified_items_result.scalars().all()],
+        unclassified_items=[
+            UnclassifiedPhotoItem(id=item.id, filename=item.filename, status=item.status)
+            for item in unclassified_items_result.scalars().all()
+        ],
         facet_counts=[
             TaxonomyFacetInsight(
                 facet_key=facet_key,

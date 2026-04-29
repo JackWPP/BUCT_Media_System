@@ -122,7 +122,11 @@ def _node_key(name: str) -> str:
 
 
 async def ensure_default_taxonomy(db: AsyncSession) -> None:
-    """Seed system facets, base nodes, and aliases if they are missing."""
+    """Seed system facets, base nodes, and aliases if they are missing.
+
+    Uses flush instead of commit so the caller controls the transaction boundary.
+    """
+    created = False
     for facet_seed in DEFAULT_TAXONOMY:
         result = await db.execute(select(TaxonomyFacet).where(TaxonomyFacet.key == facet_seed["key"]))
         facet = result.scalar_one_or_none()
@@ -137,6 +141,7 @@ async def ensure_default_taxonomy(db: AsyncSession) -> None:
             )
             db.add(facet)
             await db.flush()
+            created = True
 
         existing_nodes_result = await db.execute(
             select(TaxonomyNode).where(TaxonomyNode.facet_id == facet.id)
@@ -154,14 +159,12 @@ async def ensure_default_taxonomy(db: AsyncSession) -> None:
                     is_active=True,
                 )
             )
+            created = True
 
-        # Flush new nodes so they get IDs
         await db.flush()
 
-        # Seed aliases for nodes in this facet
         aliases_map = facet_seed.get("aliases", {})
         if aliases_map:
-            # Re-fetch nodes to include newly created ones
             nodes_result = await db.execute(
                 select(TaxonomyNode).where(TaxonomyNode.facet_id == facet.id)
             )
@@ -171,7 +174,6 @@ async def ensure_default_taxonomy(db: AsyncSession) -> None:
                 node = all_nodes.get(node_name)
                 if node is None:
                     continue
-                # Get existing aliases for this node
                 existing_aliases_result = await db.execute(
                     select(TaxonomyAlias.alias).where(TaxonomyAlias.node_id == node.id)
                 )
@@ -180,13 +182,18 @@ async def ensure_default_taxonomy(db: AsyncSession) -> None:
                     clean = alias.strip()
                     if clean and clean not in existing_aliases:
                         db.add(TaxonomyAlias(node_id=node.id, alias=clean))
+                        created = True
 
-    await db.commit()
+    if created:
+        await db.flush()
 
 
 async def get_facets(db: AsyncSession, active_only: bool = False) -> list[TaxonomyFacet]:
     query = select(TaxonomyFacet).options(
-        selectinload(TaxonomyFacet.nodes).selectinload(TaxonomyNode.aliases)
+        selectinload(TaxonomyFacet.nodes).options(
+            selectinload(TaxonomyNode.aliases),
+            selectinload(TaxonomyNode.children),
+        )
     ).order_by(TaxonomyFacet.sort_order.asc(), TaxonomyFacet.id.asc())
     if active_only:
         query = query.where(TaxonomyFacet.is_active.is_(True))
