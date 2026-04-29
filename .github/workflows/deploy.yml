@@ -45,44 +45,35 @@ jobs:
           SOURCE: "backend/"
           REMOTE_HOST: ${{ secrets.SSH_HOST }}
           REMOTE_USER: ${{ secrets.SSH_USER }}
-          TARGET: "/opt/visual_buct/backend/"
+          TARGET: "/opt/visual_buct/BUCT_Media_System/backend/"
 
       - name: Deploy frontend to server
         uses: easingthemes/ssh-deploy@v5
         with:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          ARGS: "-rlgoDzvc -i --delete"
+          ARGS: "-rlgoDzvc -i"
           SOURCE: "frontend/dist/"
           REMOTE_HOST: ${{ secrets.SSH_HOST }}
           REMOTE_USER: ${{ secrets.SSH_USER }}
           TARGET: "/home/wwwroot/visual_buct/"
 
       # ── Server-side setup and restart ──
-      - name: Install Python dependencies and restart service
+      - name: Restart backend service
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /opt/visual_buct/backend
-
-            # Create venv if not exists
-            if [ ! -d ".venv" ]; then
-              python3 -m venv .venv
-            fi
+            set -e
+            cd /opt/visual_buct/BUCT_Media_System/backend
 
             # Install/update dependencies
             .venv/bin/pip install -r requirements.txt -q
 
-            # Copy production .env if not exists
-            if [ ! -f ".env" ]; then
-              cp ../deploy/.env.production .env
-            fi
-
             # Run database migrations
             .venv/bin/alembic upgrade head
 
-            # Restart the service
+            # Restart service
             echo "${{ secrets.SUDO_PASS }}" | sudo -S systemctl restart visual-buct
             echo "${{ secrets.SUDO_PASS }}" | sudo -S systemctl status visual-buct --no-pager
