@@ -11,12 +11,12 @@ import type { ApiError } from '../types/api'
 
 type UnwrapResponse<T> = T extends AxiosResponse<infer U> ? U : T
 
-interface TypedRequest extends AxiosInstance {
-  get<T = any>(url: string, config?: AxiosRequestConfig): Promise<UnwrapResponse<T>>
-  post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<UnwrapResponse<T>>
-  put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<UnwrapResponse<T>>
-  patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<UnwrapResponse<T>>
-  delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<UnwrapResponse<T>>
+interface TypedRequest extends Omit<AxiosInstance, 'get' | 'post' | 'put' | 'patch' | 'delete'> {
+  get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>
+  post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>
+  put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>
+  patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>
+  delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>
 }
 
 // 全局错误处理器(在App.vue中设置)
