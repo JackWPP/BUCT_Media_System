@@ -5,7 +5,7 @@
 预留 SSO/OAuth 字段，为对接学校统一身份认证（类似 Google OAuth）做准备。
 """
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from sqlalchemy import Column, String, Boolean, DateTime
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -31,7 +31,7 @@ class User(Base):
     full_name = Column(String(100))
     role = Column(String(20), default="user", nullable=False)  # admin/auditor/dept_user/user
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # ── SSO/OAuth 预留字段 ──
     auth_provider = Column(

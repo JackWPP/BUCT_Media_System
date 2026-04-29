@@ -4,7 +4,7 @@
 记录系统中的关键操作，用于安全审计和问题追溯。
 """
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from sqlalchemy import Column, String, DateTime, Text, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -32,7 +32,7 @@ class AuditLog(Base):
     resource_id = Column(String(36), nullable=True, comment="资源ID")
     detail = Column(Text, nullable=True, comment="操作详情")
     ip_address = Column(String(45), nullable=True, comment="IP地址")
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 
     # 关系
     user = relationship("User", backref="audit_logs", lazy="selectin")

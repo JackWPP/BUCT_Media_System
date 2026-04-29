@@ -4,7 +4,7 @@
 支持通知用户照片审核结果、权限变更等系统事件。
 """
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from sqlalchemy import Column, String, Boolean, DateTime, Text, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -30,7 +30,7 @@ class Notification(Base):
     content = Column(Text, nullable=True)
     is_read = Column(Boolean, default=False, nullable=False)
     related_id = Column(String(36), nullable=True, comment="关联资源ID")
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 
     # 关系
     user = relationship("User", backref="notifications")
