@@ -9,6 +9,15 @@
 import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import type { ApiError } from '../types/api'
 
+type RequestFn = {
+  <T = any>(config: any): Promise<T>
+  get<T = any>(url: string, config?: any): Promise<T>
+  post<T = any>(url: string, data?: any, config?: any): Promise<T>
+  put<T = any>(url: string, data?: any, config?: any): Promise<T>
+  patch<T = any>(url: string, data?: any, config?: any): Promise<T>
+  delete<T = any>(url: string, config?: any): Promise<T>
+}
+
 // 全局错误处理器(在App.vue中设置)
 let globalErrorHandler: ((message: string, type: 'error' | 'warning' | 'info') => void) | null = null
 
@@ -25,8 +34,7 @@ const _axiosInstance = axios.create({
   },
 })
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const request = _axiosInstance as any
+const request = _axiosInstance as unknown as RequestFn
 
 // ────────────────────────────────────────────────────────────
 // Token 刷新状态管理
