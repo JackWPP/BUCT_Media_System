@@ -301,6 +301,11 @@ def migrate(
                 for jc in json_cols:
                     if jc in row and row[jc] is not None and not isinstance(row[jc], str):
                         row[jc] = json.dumps(row[jc])
+                # SQLite stores enum names (uppercase), PG expects enum values (lowercase)
+                if table_name == "resource_permissions":
+                    for ec in ("resource_type", "permission_type"):
+                        if ec in row and isinstance(row[ec], str):
+                            row[ec] = row[ec].lower()
                 placeholders = ", ".join([f":{c}" for c in columns])
                 col_names = ", ".join([f'"{c}"' for c in columns])
                 sql = f'INSERT INTO "{table_name}" ({col_names}) VALUES ({placeholders})'
