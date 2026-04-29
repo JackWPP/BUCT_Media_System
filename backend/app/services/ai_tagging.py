@@ -66,6 +66,9 @@ class BaseAIProvider(ABC):
     async def analyze(self, image_base64: str, prompt: str) -> str:
         raise NotImplementedError
 
+    async def analyze_text(self, prompt: str) -> str:
+        raise NotImplementedError
+
 
 class OllamaProvider(BaseAIProvider):
     async def analyze(self, image_base64: str, prompt: str) -> str:
@@ -76,6 +79,19 @@ class OllamaProvider(BaseAIProvider):
             "stream": False,
         }
         async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+            response = await client.post(f"{self.config.base_url.rstrip('/')}/api/generate", json=payload)
+            response.raise_for_status()
+            data = response.json()
+            return data.get("response", "")
+
+    async def analyze_text(self, prompt: str) -> str:
+        payload = {
+            "model": self.model_id,
+            "prompt": prompt,
+            "stream": False,
+        }
+        text_timeout = min(self.timeout_seconds, 15)
+        async with httpx.AsyncClient(timeout=text_timeout) as client:
             response = await client.post(f"{self.config.base_url.rstrip('/')}/api/generate", json=payload)
             response.raise_for_status()
             data = response.json()
@@ -98,6 +114,33 @@ class OpenAICompatibleProvider(BaseAIProvider):
             "temperature": 0.2,
         }
         async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+            response = await client.post(
+                f"{self.config.base_url.rstrip('/')}/chat/completions",
+                json=payload,
+                headers=self.headers,
+            )
+            response.raise_for_status()
+            data = response.json()
+            choices = data.get("choices") or []
+            if not choices:
+                return ""
+            message = choices[0].get("message") or {}
+            content = message.get("content", "")
+            if isinstance(content, list):
+                texts = [str(item.get("text", "")) for item in content if isinstance(item, dict)]
+                return "\n".join(filter(None, texts))
+            return str(content)
+
+    async def analyze_text(self, prompt: str) -> str:
+        payload = {
+            "model": self.model_id,
+            "messages": [
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.1,
+        }
+        text_timeout = min(self.timeout_seconds, 15)
+        async with httpx.AsyncClient(timeout=text_timeout) as client:
             response = await client.post(
                 f"{self.config.base_url.rstrip('/')}/chat/completions",
                 json=payload,

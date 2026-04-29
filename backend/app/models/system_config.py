@@ -30,6 +30,9 @@ class ConfigKeys:
     AI_ENABLED = "ai_enabled"
     AI_PROVIDER = "ai_provider"
     AI_MODEL_ID = "ai_model_id"
+    AI_SEARCH_ENABLED = "ai_search_enabled"
+    AI_SEARCH_PROVIDER = "ai_search_provider"
+    AI_SEARCH_MODEL_ID = "ai_search_model_id"
 
 
 class PortraitVisibility:

@@ -171,8 +171,10 @@ def _ensure_provider_is_valid(
     model_id: str,
     api_key: str | None,
 ) -> None:
-    if provider_type in {AIProviderType.DASHSCOPE, AIProviderType.OPENAI_COMPATIBLE} and not api_key:
-        raise ValueError("This provider requires an API key.")
+    if provider_type == AIProviderType.DASHSCOPE and not api_key:
+        raise ValueError("DashScope requires an API key.")
+    if provider_type == AIProviderType.OPENAI_COMPATIBLE and not base_url:
+        raise ValueError("OpenAI-compatible base_url is required.")
     if provider_type == AIProviderType.OLLAMA and not base_url:
         raise ValueError("Ollama base_url is required.")
     if not model_id:
@@ -231,9 +233,9 @@ def _env_provider_from_legacy(
             source="env",
         )
     if provider_type == AIProviderType.OPENAI_COMPATIBLE:
-        api_key = settings.OPENAI_COMPATIBLE_API_KEY
-        if not api_key or not settings.OPENAI_COMPATIBLE_BASE_URL:
+        if not settings.OPENAI_COMPATIBLE_BASE_URL:
             return None
+        api_key = settings.OPENAI_COMPATIBLE_API_KEY
         return ResolvedAIProvider(
             provider_type=provider_type,
             display_name="OpenAI Compatible (env fallback)",

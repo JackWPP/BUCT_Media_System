@@ -17,6 +17,10 @@ settings = get_settings()
 class RuntimeSettings:
     portrait_visibility: str
     ai_enabled: bool
+    ai_search_enabled: bool
+    ai_search_provider: str | None
+    ai_search_model_id: str | None
+    ai_search_timeout: int
     storage_backend: str
     task_queue_backend: str
     database_backend: str
@@ -90,9 +94,18 @@ async def get_runtime_settings(db: AsyncSession) -> RuntimeSettings:
         env_provider = resolve_env_provider(legacy_provider, legacy_model_id)
         providers = [env_provider] if env_provider else []
 
+    ai_search_enabled = _parse_bool(config_map.get(ConfigKeys.AI_SEARCH_ENABLED), settings.AI_SEARCH_ENABLED)
+    ai_search_provider = config_map.get(ConfigKeys.AI_SEARCH_PROVIDER, settings.AI_SEARCH_PROVIDER)
+    ai_search_model_id = config_map.get(ConfigKeys.AI_SEARCH_MODEL_ID, settings.AI_SEARCH_MODEL_ID)
+    ai_search_timeout = settings.AI_SEARCH_TIMEOUT
+
     return RuntimeSettings(
         portrait_visibility=config_map.get(ConfigKeys.PORTRAIT_VISIBILITY, PortraitVisibility.LOGIN_REQUIRED),
         ai_enabled=_parse_bool(config_map.get(ConfigKeys.AI_ENABLED), settings.AI_ENABLED),
+        ai_search_enabled=ai_search_enabled,
+        ai_search_provider=ai_search_provider,
+        ai_search_model_id=ai_search_model_id,
+        ai_search_timeout=ai_search_timeout,
         storage_backend=settings.STORAGE_BACKEND,
         task_queue_backend=settings.TASK_QUEUE_BACKEND,
         database_backend=_database_backend_name(),

@@ -85,6 +85,7 @@ class PhotoListResponse(BaseModel):
     page: int
     page_size: int
     items: List[PhotoResponse]
+    search_interpretation: Optional[Dict[str, Any]] = Field(None, description="Smart search interpretation result")
 
 
 class PhotoUploadResponse(BaseModel):

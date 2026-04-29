@@ -29,6 +29,7 @@ async def toggle_favorite(
         raise HTTPException(status_code=404, detail="照片不存在")
 
     is_now_favorited = await fav_crud.toggle_favorite(db, current_user.id, photo_id)
+    await db.commit()
     count = await fav_crud.get_photo_favorite_count(db, photo_id)
 
     return {

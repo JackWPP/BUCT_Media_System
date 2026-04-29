@@ -23,13 +23,13 @@ oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token", aut
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     Database session dependency
-    
+
     获取异步数据库会话，用于 CRUD 操作。
+    事务由端点/服务层自行管理（显式 commit/rollback）。
     """
     async with AsyncSessionLocal() as session:
         try:
             yield session
-            await session.commit()
         except Exception:
             await session.rollback()
             raise

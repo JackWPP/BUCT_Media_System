@@ -185,8 +185,7 @@ def process_uploaded_image(
         thumb_path = str(thumbnails_dir / thumb_filename)
         
         create_thumbnail(original_path, thumb_path)
-        thumb_relative = f"thumbnails/{thumb_filename}"
-        results['thumb_path'] = thumb_relative
+        results['thumb_path'] = thumb_path
         
     except Exception as e:
         # Log error but don't fail

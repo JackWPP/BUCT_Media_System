@@ -55,6 +55,7 @@ async def mark_notification_read(
     success = await notif_crud.mark_as_read(db, notification_id, current_user.id)
     if not success:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="通知不存在")
+    await db.commit()
     return {"detail": "已标记为已读"}
 
 
@@ -65,4 +66,5 @@ async def mark_all_read(
 ):
     """标记所有通知为已读"""
     count = await notif_crud.mark_all_as_read(db, current_user.id)
+    await db.commit()
     return {"detail": f"已标记 {count} 条通知为已读"}

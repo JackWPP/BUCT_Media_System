@@ -1,8 +1,7 @@
+import re
 from logging.config import fileConfig
-import asyncio
 
 from sqlalchemy import pool, engine_from_config
-from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
@@ -21,8 +20,18 @@ settings = get_settings()
 # access to the values within the .ini file in use.
 config = context.config
 
+
+def _to_sync_url(url: str) -> str:
+    """Convert async SQLAlchemy URL to sync equivalent for Alembic.
+
+    sqlite+aiosqlite:///...  → sqlite:///...
+    postgresql+asyncpg://... → postgresql://...
+    """
+    return re.sub(r"^(sqlite|postgresql|mysql)(?:\+[^:]+)(?=://)", r"\1", url)
+
+
 # Set database URL from configuration file
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("+aiosqlite", ""))
+config.set_main_option("sqlalchemy.url", _to_sync_url(settings.DATABASE_URL))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -73,20 +82,6 @@ def do_run_migrations(connection):
 
     with context.begin_transaction():
         context.run_migrations()
-
-
-async def run_async_migrations():
-    """Run migrations asynchronously"""
-    connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-
-    await connectable.dispose()
 
 
 def run_migrations_online() -> None:

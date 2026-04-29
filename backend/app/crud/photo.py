@@ -1,7 +1,9 @@
 """
 CRUD operations for photos.
 """
-from typing import List, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,8 +11,11 @@ from sqlalchemy.orm import selectinload
 
 from app.models.photo import Photo
 from app.models.tag import PhotoTag, Tag
-from app.models.taxonomy import PhotoClassification, TaxonomyFacet, TaxonomyNode
+from app.models.taxonomy import PhotoClassification, TaxonomyAlias, TaxonomyFacet, TaxonomyNode
 from app.schemas.photo import PhotoUpdate
+
+if TYPE_CHECKING:
+    from app.services.search_interpreter import SearchInterpretation
 
 
 def _photo_with_relations():
@@ -65,6 +70,7 @@ async def get_photos(
     gallery_series: Optional[str] = None,
     gallery_year: Optional[str] = None,
     photo_type: Optional[str] = None,
+    interpretation: Optional["SearchInterpretation"] = None,
 ) -> tuple[List[Photo], int]:
     query = select(Photo)
     count_query = select(func.count(Photo.id.distinct()))
@@ -78,16 +84,34 @@ async def get_photos(
         count_query = count_query.where(Photo.status == status)
 
     if season:
-        query = query.where(Photo.season == season)
-        count_query = count_query.where(Photo.season == season)
+        season_subquery = (
+            select(PhotoClassification.photo_id)
+            .join(TaxonomyFacet, TaxonomyFacet.id == PhotoClassification.facet_id)
+            .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
+            .where(
+                TaxonomyFacet.key == "season",
+                TaxonomyNode.name == season,
+            )
+        )
+        query = query.where(Photo.id.in_(season_subquery))
+        count_query = count_query.where(Photo.id.in_(season_subquery))
 
     if category:
         query = query.where(Photo.category == category)
         count_query = count_query.where(Photo.category == category)
 
     if campus:
-        query = query.where(Photo.campus == campus)
-        count_query = count_query.where(Photo.campus == campus)
+        campus_subquery = (
+            select(PhotoClassification.photo_id)
+            .join(TaxonomyFacet, TaxonomyFacet.id == PhotoClassification.facet_id)
+            .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
+            .where(
+                TaxonomyFacet.key == "campus",
+                TaxonomyNode.name == campus,
+            )
+        )
+        query = query.where(Photo.id.in_(campus_subquery))
+        count_query = count_query.where(Photo.id.in_(campus_subquery))
 
     if exclude_categories:
         for exc_cat in exclude_categories:
@@ -103,17 +127,34 @@ async def get_photos(
         query = query.where(Photo.id.in_(tag_subquery))
         count_query = count_query.where(Photo.id.in_(tag_subquery))
 
-    if search:
+    if interpretation and (interpretation.facet_filters or interpretation.keywords):
+        query, count_query = await _apply_interpretation_filters(
+            query, count_query, interpretation
+        )
+    elif search:
         search_pattern = f"%{search}%"
         tag_photo_subquery = (
             select(PhotoTag.photo_id)
             .join(Tag)
             .where(Tag.name.ilike(search_pattern))
         )
+        taxonomy_node_subquery = (
+            select(PhotoClassification.photo_id)
+            .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
+            .where(TaxonomyNode.name.ilike(search_pattern))
+        )
+        taxonomy_alias_subquery = (
+            select(PhotoClassification.photo_id)
+            .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
+            .join(TaxonomyAlias, TaxonomyAlias.node_id == TaxonomyNode.id)
+            .where(TaxonomyAlias.alias.ilike(search_pattern))
+        )
         search_filter = or_(
             Photo.filename.ilike(search_pattern),
             Photo.description.ilike(search_pattern),
             Photo.id.in_(tag_photo_subquery),
+            Photo.id.in_(taxonomy_node_subquery),
+            Photo.id.in_(taxonomy_alias_subquery),
         )
         query = query.where(search_filter)
         count_query = count_query.where(search_filter)
@@ -216,3 +257,65 @@ async def get_photo_tags(db: AsyncSession, photo_id: str) -> List[Tag]:
         .where(PhotoTag.photo_id == photo_id)
     )
     return list(result.scalars().all())
+
+
+async def _apply_interpretation_filters(
+    query,
+    count_query,
+    interpretation: "SearchInterpretation",
+):
+    from sqlalchemy import and_
+
+    if interpretation.facet_filters:
+        for facet_key, node_name in interpretation.facet_filters.items():
+            normalized_key = node_name.lower().replace(" ", "-")
+            classification_subquery = (
+                select(PhotoClassification.photo_id)
+                .join(TaxonomyFacet, TaxonomyFacet.id == PhotoClassification.facet_id)
+                .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
+                .where(
+                    TaxonomyFacet.key == facet_key,
+                    or_(
+                        TaxonomyNode.name == node_name,
+                        TaxonomyNode.key == normalized_key,
+                    ),
+                )
+            )
+            query = query.where(Photo.id.in_(classification_subquery))
+            count_query = count_query.where(Photo.id.in_(classification_subquery))
+
+    if interpretation.keywords:
+        keyword_filters = []
+        for kw in interpretation.keywords:
+            pattern = f"%{kw}%"
+            tag_sub = (
+                select(PhotoTag.photo_id)
+                .join(Tag)
+                .where(Tag.name.ilike(pattern))
+            )
+            node_sub = (
+                select(PhotoClassification.photo_id)
+                .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
+                .where(TaxonomyNode.name.ilike(pattern))
+            )
+            alias_sub = (
+                select(PhotoClassification.photo_id)
+                .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
+                .join(TaxonomyAlias, TaxonomyAlias.node_id == TaxonomyNode.id)
+                .where(TaxonomyAlias.alias.ilike(pattern))
+            )
+            keyword_filters.append(
+                or_(
+                    Photo.filename.ilike(pattern),
+                    Photo.description.ilike(pattern),
+                    Photo.id.in_(tag_sub),
+                    Photo.id.in_(node_sub),
+                    Photo.id.in_(alias_sub),
+                )
+            )
+        if keyword_filters:
+            combined = or_(*keyword_filters) if len(keyword_filters) > 1 else keyword_filters[0]
+            query = query.where(combined)
+            count_query = count_query.where(combined)
+
+    return query, count_query

@@ -75,3 +75,4 @@ htmlcov/
 backend/alembic/versions/*.pyc
 
 .qoder/
+.trae/

@@ -58,6 +58,12 @@ class Settings(BaseSettings):
     OPENAI_COMPATIBLE_BASE_URL: str | None = None
     OPENAI_COMPATIBLE_MODEL_ID: str | None = None
     OPENAI_COMPATIBLE_HEADERS: dict[str, str] = Field(default_factory=dict)
+
+    # AI 搜索专用配置（可选，未设置时回退到默认AI配置）
+    AI_SEARCH_ENABLED: bool = True
+    AI_SEARCH_PROVIDER: str | None = None
+    AI_SEARCH_MODEL_ID: str | None = None
+    AI_SEARCH_TIMEOUT: int = 15
     
     # SSO/OAuth 预留配置（对接学校统一身份认证）
     # 认证流程类似 Google OAuth: authorize → callback → token → userinfo
