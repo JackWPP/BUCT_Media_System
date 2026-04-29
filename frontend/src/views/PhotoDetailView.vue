@@ -265,9 +265,10 @@ import {
 } from '@vicons/ionicons5'
 import dayjs from 'dayjs'
 import { getPublicPhotos } from '../api/photo'
+import { incrementView } from '../api/stats'
 import { usePhotoStore } from '../stores/photo'
 import type { Photo } from '../types/photo'
-import { getPhotoUrl } from '../utils/format'
+import { getPhotoUrl, getPhotoDownloadUrl } from '../utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -441,7 +442,7 @@ function handleKeywordClick(tag: string) {
 
 function downloadImage() {
   if (!photo.value) return
-  window.open(getPhotoUrl(photo.value.id, 'original'), '_blank')
+  window.open(getPhotoDownloadUrl(photo.value.id), '_blank')
 }
 
 async function shareImage() {
@@ -494,6 +495,8 @@ async function loadPhotoDetail(id: string) {
       await loadContextPhotos()
     }
     photo.value = await photoStore.fetchPublicPhotoDetail(id)
+    // 上报浏览量
+    incrementView(id).catch(() => {})
     // 推荐图片从上下文列表中过滤
     relatedPhotos.value = contextPhotos.value
       .filter((p) => p.id !== id)

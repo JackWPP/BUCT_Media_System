@@ -64,6 +64,9 @@
                 <n-form-item label="季节">
                   <n-select v-model:value="formData.season" :options="seasonOptions" clearable />
                 </n-form-item>
+                <n-form-item label="校区">
+                  <n-select v-model:value="formData.campus" :options="campusOptions" clearable />
+                </n-form-item>
                 <n-form-item label="类别">
                   <n-select v-model:value="formData.category" :options="categoryOptions" clearable />
                 </n-form-item>
@@ -238,7 +241,8 @@ import { incrementView } from '../../api/stats'
 import { SEASON_OPTIONS, CATEGORY_OPTIONS } from '../../constants/options'
 import { usePhotoStore } from '../../stores/photo'
 import type { Photo, PhotoUpdate } from '../../types/photo'
-import { getPhotoUrl } from '../../utils/format'
+import { getPhotoUrl, getPhotoDownloadUrl } from '../../utils/format'
+import { getPublicTaxonomy, type TaxonomyFacet } from '../../api/taxonomy'
 
 interface Props {
   photoId?: string | null
@@ -283,17 +287,26 @@ const unresolvedClassifications = ref<Record<string, string>>({})
 const formData = ref({
   season: null as string | null,
   category: null as string | null,
+  campus: null as string | null,
   description: null as string | null,
 })
 
 const seasonOptions = SEASON_OPTIONS
 const categoryOptions = CATEGORY_OPTIONS
+const taxonomyFacets = ref<TaxonomyFacet[]>([])
+
+const campusOptions = computed(() => {
+  const facet = taxonomyFacets.value.find((f) => f.key === 'campus')
+  if (!facet) return []
+  return facet.nodes.map((node) => ({ label: node.name, value: node.name }))
+})
 
 const hasChanges = computed(() => {
   if (!photo.value) return false
   return (
     formData.value.season !== photo.value.season ||
     formData.value.category !== photo.value.category ||
+    formData.value.campus !== photo.value.campus ||
     formData.value.description !== photo.value.description
   )
 })
@@ -415,10 +428,12 @@ async function loadPhotoDetail() {
     formData.value = {
       season: data.season,
       category: data.category,
+      campus: data.campus,
       description: data.description,
     }
     incrementView(props.photoId).catch(() => {})
     await loadAllTags()
+    await loadTaxonomy()
     if (props.adminMode) {
       await loadAITask()
     }
@@ -494,6 +509,14 @@ async function handleIgnoreAI() {
   }
 }
 
+async function loadTaxonomy() {
+  try {
+    taxonomyFacets.value = await getPublicTaxonomy()
+  } catch (error) {
+    console.error('加载分类失败:', error)
+  }
+}
+
 async function handleSave() {
   if (!photo.value || !hasChanges.value) return
   saving.value = true
@@ -501,6 +524,7 @@ async function handleSave() {
     const updateData: PhotoUpdate = {}
     if (formData.value.season !== photo.value.season) updateData.season = formData.value.season || undefined
     if (formData.value.category !== photo.value.category) updateData.category = formData.value.category || undefined
+    if (formData.value.campus !== photo.value.campus) updateData.campus = formData.value.campus || undefined
     if (formData.value.description !== photo.value.description) updateData.description = formData.value.description || undefined
     await photoStore.updatePhoto(photo.value.id, updateData)
     message.success('保存成功')
@@ -560,7 +584,7 @@ async function handleAddTag() {
 
 function downloadImage() {
   if (!photo.value) return
-  window.open(getPhotoUrl(photo.value.id, 'original'), '_blank')
+  window.open(getPhotoDownloadUrl(photo.value.id), '_blank')
 }
 
 async function shareImage() {

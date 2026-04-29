@@ -1,6 +1,7 @@
 """
 Storage backends for local filesystem and S3-compatible object storage.
 """
+import logging
 import os
 import shutil
 import tempfile
@@ -171,7 +172,16 @@ class LocalStorageBackend(StorageBackend):
 
 
 class S3StorageBackend(StorageBackend):
-    """S3-compatible object storage backend."""
+    """S3-compatible object storage backend.
+
+    Uses boto3 for read operations (list, get, head) which work through VPN.
+    Uses SSH + mc pipe for write operations (put, delete) which are blocked
+    by the firewall when accessing MinIO from outside.
+    """
+
+    # SSH connection info for write operations
+    _ssh_host = "121.195.148.85"
+    _ssh_user = "yanp"
 
     def __init__(self) -> None:
         if boto3 is None or BotoConfig is None:
@@ -190,6 +200,36 @@ class S3StorageBackend(StorageBackend):
             config=BotoConfig(signature_version="s3v4"),
         )
 
+    # ── SSH helpers for write operations ──
+
+    def _mc_pipe(self, local_path: str, key: str) -> None:
+        """Upload a local file to MinIO via SSH + mc pipe."""
+        import subprocess
+        cmd = f"mc pipe local/{self.bucket}/{key}"
+        with open(local_path, "rb") as fh:
+            proc = subprocess.run(
+                ["ssh", f"{self._ssh_user}@{self._ssh_host}", cmd],
+                stdin=fh,
+                capture_output=True,
+                timeout=120,
+            )
+        if proc.returncode != 0:
+            stderr = proc.stderr.decode("utf-8", errors="replace").strip()
+            raise RuntimeError(f"mc pipe failed for {key}: {stderr}")
+
+    def _mc_rm(self, key: str) -> bool:
+        """Delete an object from MinIO via SSH + mc rm."""
+        import subprocess
+        cmd = f"mc rm local/{self.bucket}/{key}"
+        proc = subprocess.run(
+            ["ssh", f"{self._ssh_user}@{self._ssh_host}", cmd],
+            capture_output=True,
+            timeout=30,
+        )
+        return proc.returncode == 0
+
+    # ── StorageBackend interface ──
+
     def persist_photo_files(
         self,
         photo_uuid: str,
@@ -198,12 +238,21 @@ class S3StorageBackend(StorageBackend):
     ) -> PersistedMedia:
         extension = Path(staged_original_path).suffix.lower()
         original_key = f"originals/{photo_uuid}{extension}"
-        self.client.upload_file(staged_original_path, self.bucket, original_key)
+
+        # Try direct upload first (works when running on the server),
+        # fall back to SSH + mc pipe (works through VPN)
+        try:
+            self.client.upload_file(staged_original_path, self.bucket, original_key)
+        except Exception:
+            self._mc_pipe(staged_original_path, original_key)
 
         thumb_key = None
-        if staged_thumbnail_path:
+        if staged_thumbnail_path and os.path.exists(staged_thumbnail_path):
             thumb_key = f"thumbnails/{photo_uuid}_thumb.jpg"
-            self.client.upload_file(staged_thumbnail_path, self.bucket, thumb_key)
+            try:
+                self.client.upload_file(staged_thumbnail_path, self.bucket, thumb_key)
+            except Exception:
+                self._mc_pipe(staged_thumbnail_path, thumb_key)
 
         size = os.path.getsize(staged_original_path) if os.path.exists(staged_original_path) else None
         return PersistedMedia(original_path=original_key, thumb_path=thumb_key, file_size=size)
@@ -215,22 +264,31 @@ class S3StorageBackend(StorageBackend):
             self.client.delete_object(Bucket=self.bucket, Key=file_path)
             return True
         except Exception:
-            return False
+            return self._mc_rm(file_path)
 
     def build_media_response(
         self,
         file_path: str,
         download_name: Optional[str] = None,
     ) -> Response:
-        params = {"Bucket": self.bucket, "Key": file_path}
-        if download_name:
-            params["ResponseContentDisposition"] = f'attachment; filename="{download_name}"'
-        signed_url = self.client.generate_presigned_url(
-            "get_object",
-            Params=params,
-            ExpiresIn=settings.S3_PRESIGN_EXPIRE_SECONDS,
-        )
-        return RedirectResponse(signed_url)
+        try:
+            from fastapi.responses import StreamingResponse
+            response = self.client.get_object(Bucket=self.bucket, Key=file_path)
+            headers = {}
+            if download_name:
+                headers["Content-Disposition"] = f'attachment; filename="{download_name}"'
+            return StreamingResponse(
+                response["Body"],
+                media_type=response.get("ContentType", "image/jpeg"),
+                headers=headers,
+            )
+        except Exception as exc:
+            logging.getLogger(__name__).warning(
+                "Media fetch failed for key=%s bucket=%s: %s",
+                file_path, self.bucket, exc
+            )
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Media file not found")
 
     @contextmanager
     def local_copy(self, file_path: str) -> Iterator[str]:

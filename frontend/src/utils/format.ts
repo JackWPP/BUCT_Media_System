@@ -68,3 +68,10 @@ export function getPhotoUrl(photoId: string, type: 'original' | 'thumbnail' = 'o
   const query = token ? `?access_token=${encodeURIComponent(token)}` : ''
   return `${base}/api/v1/photos/${photoId}/image/${type}${query}`
 }
+
+export function getPhotoDownloadUrl(photoId: string): string {
+  const base = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')
+  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+  const query = token ? `?access_token=${encodeURIComponent(token)}` : ''
+  return `${base}/api/v1/photos/${photoId}/download${query}`
+}
