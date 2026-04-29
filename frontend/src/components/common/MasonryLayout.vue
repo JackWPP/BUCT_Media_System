@@ -80,31 +80,34 @@ const columns = computed(() => {
   const count = columnCount.value
   const res = Array.from({ length: count }, () => [] as any[])
   const colHeights = new Array(count).fill(0)
-  
+
   props.items.forEach((item) => {
     // 找到当前高度最小的列
     let minHeight = colHeights[0]
     let minIndex = 0
-    
+
     for (let i = 1; i < count; i++) {
       if (colHeights[i] < minHeight) {
         minHeight = colHeights[i]
         minIndex = i
       }
     }
-    
+
     // 将图片添加到该列
     res[minIndex].push(item)
-    
+
     // 更新列高度
-    // 默认假设宽高比为 4:3 (0.75)
-    let aspectRatio = 0.75
+    // 使用更合理的默认宽高比 3:4 (1.33) 竖图更常见
+    // 同时限制极端比例，避免某列过高/过低
+    let aspectRatio = 1.0
     if (item.width && item.height) {
-      aspectRatio = item.height / item.width
+      const rawRatio = item.height / item.width
+      // 限制比例在 0.5 (2:1 宽图) 到 2.0 (1:2 高图) 之间
+      aspectRatio = Math.max(0.5, Math.min(2.0, rawRatio))
     }
     colHeights[minIndex] += aspectRatio
   })
-  
+
   return res
 })
 </script>
