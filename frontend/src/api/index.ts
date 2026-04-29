@@ -2,9 +2,22 @@
  * Axios 请求封装
  *
  * 包含 Token 自动刷新、全局错误处理等功能。
+ *
+ * 注意：响应拦截器返回 response.data（已解包），
+ * 因此 request.get<T>() 实际返回 Promise<T>，而非 Promise<AxiosResponse<T>>。
  */
-import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
+import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestConfig, type AxiosRequestConfig, type AxiosInstance } from 'axios'
 import type { ApiError } from '../types/api'
+
+type UnwrapResponse<T> = T extends AxiosResponse<infer U> ? U : T
+
+interface TypedRequest extends AxiosInstance {
+  get<T = any>(url: string, config?: AxiosRequestConfig): Promise<UnwrapResponse<T>>
+  post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<UnwrapResponse<T>>
+  put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<UnwrapResponse<T>>
+  patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<UnwrapResponse<T>>
+  delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<UnwrapResponse<T>>
+}
 
 // 全局错误处理器(在App.vue中设置)
 let globalErrorHandler: ((message: string, type: 'error' | 'warning' | 'info') => void) | null = null
@@ -14,13 +27,15 @@ export function setGlobalErrorHandler(handler: (message: string, type: 'error' |
 }
 
 // 创建 axios 实例
-const request = axios.create({
+const _axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
 })
+
+const request = _axiosInstance as unknown as TypedRequest
 
 // ────────────────────────────────────────────────────────────
 // Token 刷新状态管理
@@ -40,9 +55,8 @@ function processQueue(error: any, token: string | null = null) {
 }
 
 // 请求拦截器
-request.interceptors.request.use(
+_axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // 从 localStorage 获取 token
     const token = localStorage.getItem('auth_token')
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
@@ -56,7 +70,7 @@ request.interceptors.request.use(
 )
 
 // 响应拦截器
-request.interceptors.response.use(
+_axiosInstance.interceptors.response.use(
   (response: AxiosResponse) => {
     return response.data
   },
@@ -64,7 +78,6 @@ request.interceptors.response.use(
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
     const { response } = error
 
-    // ── 401 自动刷新 Token ──
     if (
       response?.status === 401 &&
       !originalRequest._retry &&
@@ -75,12 +88,11 @@ request.interceptors.response.use(
 
       if (refreshTokenStr) {
         if (isRefreshing) {
-          // 已在刷新中，排队等待
           return new Promise((resolve, reject) => {
             failedQueue.push({ resolve, reject })
           }).then((newToken) => {
             originalRequest.headers.Authorization = `Bearer ${newToken}`
-            return request(originalRequest)
+            return _axiosInstance(originalRequest)
           })
         }
 
@@ -88,7 +100,6 @@ request.interceptors.response.use(
         isRefreshing = true
 
         try {
-          // 直接用 axios 发刷新请求，避免拦截器循环
           const baseURL = import.meta.env.VITE_API_BASE_URL || ''
           const res = await axios.post(`${baseURL}/api/v1/auth/refresh`, {
             refresh_token: refreshTokenStr,
@@ -100,12 +111,10 @@ request.interceptors.response.use(
 
           processQueue(null, access_token)
 
-          // 重试原始请求
           originalRequest.headers.Authorization = `Bearer ${access_token}`
-          return request(originalRequest)
+          return _axiosInstance(originalRequest)
         } catch (refreshError) {
           processQueue(refreshError, null)
-          // 刷新失败，清除 Token 跳转登录
           localStorage.removeItem('auth_token')
           localStorage.removeItem('refresh_token')
           if (window.location.pathname !== '/login') {
@@ -118,7 +127,6 @@ request.interceptors.response.use(
       }
     }
 
-    // ── 通用错误处理 ──
     let errorMessage = '请求失败'
 
     if (response) {
@@ -164,7 +172,6 @@ request.interceptors.response.use(
       errorMessage = '请求配置错误'
     }
 
-    // 调用全局错误处理器
     if (globalErrorHandler) {
       globalErrorHandler(errorMessage, 'error')
     }

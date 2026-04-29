@@ -100,6 +100,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/admin/AuditLog.vue'),
         meta: { requiresAuth: true, requiresAdmin: true },
       },
+      {
+        path: 'database',
+        name: 'DatabaseManagement',
+        component: () => import('../views/admin/DatabaseManagement.vue'),
+        meta: { requiresAuth: true, requiresAdmin: true },
+      },
     ],
   },
   {

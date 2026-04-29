@@ -16,17 +16,31 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
+export interface ColumnsConfig {
+  base?: number
+  sm?: number
+  lg?: number
+  xl?: number
+  '2xl'?: number
+}
+
 const props = defineProps<{
   items: any[]
   gap?: number
-  // Optional fixed columns
+  // Optional fixed columns (deprecated, use columnsConfig instead)
   cols?: number
+  // Responsive columns config
+  columnsConfig?: ColumnsConfig
 }>()
 
 const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
 
+let resizeTimer: ReturnType<typeof setTimeout> | null = null
 const updateWidth = () => {
-  windowWidth.value = window.innerWidth
+  if (resizeTimer) clearTimeout(resizeTimer)
+  resizeTimer = setTimeout(() => {
+    windowWidth.value = window.innerWidth
+  }, 100)
 }
 
 onMounted(() => {
@@ -40,16 +54,26 @@ onUnmounted(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('resize', updateWidth)
   }
+  if (resizeTimer) clearTimeout(resizeTimer)
 })
+
+const defaultColumnsConfig: ColumnsConfig = {
+  base: 1,
+  sm: 2,
+  lg: 3,
+  xl: 4,
+  '2xl': 5,
+}
 
 const columnCount = computed(() => {
   if (props.cols) return props.cols
+  const config = props.columnsConfig || defaultColumnsConfig
   const w = windowWidth.value
-  if (w >= 1536) return 5 // 2xl
-  if (w >= 1280) return 4 // xl
-  if (w >= 1024) return 3 // lg
-  if (w >= 640) return 2  // sm
-  return 1                // base
+  if (w >= 1536) return config['2xl'] ?? config.xl ?? config.lg ?? config.sm ?? config.base ?? 1
+  if (w >= 1280) return config.xl ?? config.lg ?? config.sm ?? config.base ?? 1
+  if (w >= 1024) return config.lg ?? config.sm ?? config.base ?? 1
+  if (w >= 640) return config.sm ?? config.base ?? 1
+  return config.base ?? 1
 })
 
 const columns = computed(() => {

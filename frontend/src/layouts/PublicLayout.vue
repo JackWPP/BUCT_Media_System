@@ -30,9 +30,14 @@ watch(() => route.query.search, (val) => {
   searchKeyword.value = typeof val === 'string' ? val : ''
 }, { immediate: true })
 
-function handleHeaderSearch(keyword: string) {
+function handleHeaderSearch(keyword: string, smart: boolean) {
+  const query: Record<string, string> = {}
   if (keyword.trim()) {
-    router.push({ path: '/gallery', query: { search: keyword.trim() } })
+    query.search = keyword.trim()
+    if (smart) query.smart = 'true'
+  }
+  if (Object.keys(query).length > 0) {
+    router.push({ path: '/gallery', query })
   } else {
     router.push('/gallery')
   }

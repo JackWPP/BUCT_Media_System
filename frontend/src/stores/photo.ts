@@ -10,7 +10,7 @@ export const usePhotoStore = defineStore('photo', () => {
   const photos = ref<Photo[]>([])
   const total = ref(0)
   const currentPage = ref(1)
-  const pageSize = ref(20)
+  const pageSize = ref(30)
   const loading = ref(false)
   const selectedPhoto = ref<Photo | null>(null)
   const filters = ref<PhotoFilters>({
@@ -51,6 +51,15 @@ export const usePhotoStore = defineStore('photo', () => {
     return queryParams
   }
 
+  function buildPublicQueryParams(params?: PhotoListParams) {
+    const queryParams = buildQueryParams(params)
+    const smartEnabled = localStorage.getItem('smart_search_enabled') !== 'false'
+    if (queryParams.search && smartEnabled) {
+      queryParams.smart = true
+    }
+    return queryParams
+  }
+
   async function fetchPhotos(params?: PhotoListParams) {
     loading.value = true
     try {
@@ -66,7 +75,7 @@ export const usePhotoStore = defineStore('photo', () => {
   async function fetchPublicPhotos(params?: PhotoListParams) {
     loading.value = true
     try {
-      const response = await photoApi.getPublicPhotos(buildQueryParams(params))
+      const response = await photoApi.getPublicPhotos(buildPublicQueryParams(params))
       photos.value = response.items
       total.value = response.total
       return response
@@ -146,5 +155,7 @@ export const usePhotoStore = defineStore('photo', () => {
     setFilters,
     clearFilters,
     setPage,
+    buildQueryParams,
+    buildPublicQueryParams,
   }
 })

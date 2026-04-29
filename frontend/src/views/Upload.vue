@@ -165,6 +165,14 @@
                     placeholder="为所有照片设置类别"
                   />
                 </n-form-item>
+                <n-form-item label="校区">
+                  <n-select
+                    v-model:value="metadata.campus"
+                    :options="campusOptions"
+                    clearable
+                    placeholder="为所有照片设置校区"
+                  />
+                </n-form-item>
                 <n-form-item label="描述">
                   <n-input
                     v-model:value="metadata.description"
@@ -257,11 +265,13 @@ const allUploaded = computed(() => {
          successCount.value > 0
 })
 
-import { SEASON_OPTIONS, CATEGORY_OPTIONS } from '../constants/options'
+import { SEASON_OPTIONS, CATEGORY_OPTIONS, CAMPUS_OPTIONS } from '../constants/options'
 
 const seasonOptions = SEASON_OPTIONS
 
 const categoryOptions = CATEGORY_OPTIONS
+
+const campusOptions = CAMPUS_OPTIONS
 
 function handleBeforeUpload(options: { file: File }) {
   const { file } = options

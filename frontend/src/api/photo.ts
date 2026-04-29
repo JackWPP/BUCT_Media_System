@@ -8,6 +8,7 @@ import type {
   PhotoListResponse,
   PhotoUpdate,
   PhotoUploadResponse,
+  SearchInterpretation,
 } from '../types/photo'
 
 export interface AIAnalysisTask {
@@ -43,6 +44,10 @@ export function getPublicPhotos(params?: PhotoListParams): Promise<PhotoListResp
 
 export function getMySubmissions(params?: PhotoListParams): Promise<PhotoListResponse> {
   return request({ url: '/api/v1/photos/my-submissions', method: 'get', params })
+}
+
+export function interpretSearch(query: string): Promise<SearchInterpretation> {
+  return request({ url: '/api/v1/photos/interpret-search', method: 'post', data: { query } })
 }
 
 export function getPhotoById(id: string): Promise<Photo> {

@@ -20,6 +20,7 @@ export const useUploadStore = defineStore('upload', () => {
     const metadata = ref({
         season: null as string | null,
         category: null as string | null,
+        campus: null as string | null,
         description: null as string | null,
     })
 
@@ -69,6 +70,7 @@ export const useUploadStore = defineStore('upload', () => {
         metadata.value = {
             season: null,
             category: null,
+            campus: null,
             description: null,
         }
         uploading.value = false
@@ -104,6 +106,7 @@ export const useUploadStore = defineStore('upload', () => {
             const metadataToSend: any = {}
             if (metadata.value.season) metadataToSend.season = metadata.value.season
             if (metadata.value.category) metadataToSend.category = metadata.value.category
+            if (metadata.value.campus) metadataToSend.campus = metadata.value.campus
             if (metadata.value.description) metadataToSend.description = metadata.value.description
 
             // Pass progress callback

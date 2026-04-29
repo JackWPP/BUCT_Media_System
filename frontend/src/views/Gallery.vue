@@ -31,17 +31,41 @@
               </template>
             </n-button>
             <img src="/logo.png" alt="视觉北化" class="gallery-logo" />
-            <n-input
-              v-model:value="searchKeyword"
-              placeholder="搜索照片、描述或自由标签"
-              clearable
-              class="search-input"
-              @update:value="handleSearch"
-            >
-              <template #prefix>
-                <n-icon :component="SearchOutline" />
-              </template>
-            </n-input>
+            <div class="search-area">
+              <n-input
+                v-model:value="searchKeyword"
+                :placeholder="smartSearchEnabled ? '试试自然语言搜索：秋天的图书馆、春天的樱花...' : '输入关键词搜索照片...'"
+                clearable
+                class="search-input"
+                :class="{ 'search-interpreting': isInterpreting, 'search-pulse': isInterpreting }"
+                @update:value="handleSearch"
+              >
+                <template #prefix>
+                  <n-icon :component="SearchOutline" />
+                </template>
+              </n-input>
+              <div class="search-smart-toggle">
+                <n-switch
+                  v-model:value="smartSearchEnabled"
+                  size="small"
+                  @update:value="handleSmartToggle"
+                />
+                <n-text depth="3" class="smart-label" :class="{ 'smart-active': smartSearchEnabled }">
+                  {{ smartSearchEnabled ? '✨ 智能搜索' : '普通搜索' }}
+                </n-text>
+              </div>
+              <div v-if="isInterpreting" class="interpreting-dots">
+                <span class="dot"></span>
+                <span class="dot"></span>
+                <span class="dot"></span>
+              </div>
+              <SearchInterpretation
+                :interpretation="currentInterpretation"
+                @remove-facet="handleRemoveFacet"
+                @remove-keyword="handleRemoveKeyword"
+                @dismiss="handleDismissInterpretation"
+              />
+            </div>
           </div>
           <div class="header-right">
             <n-badge :value="photoStore.total" :max="999" show-zero>
@@ -219,6 +243,9 @@
                         <n-tag v-if="photo.classifications?.season" size="small" type="success">
                           {{ photo.classifications.season.node_name }}
                         </n-tag>
+                        <n-tag v-if="photo.classifications?.campus" size="small" type="warning">
+                          {{ photo.classifications.campus.node_name }}
+                        </n-tag>
                         <n-tag v-if="photo.classifications?.photo_type" size="small" type="info">
                           {{ photo.classifications.photo_type.node_name }}
                         </n-tag>
@@ -300,16 +327,18 @@ import { useDebounceFn } from '@vueuse/core'
 import type { SelectOption } from 'naive-ui'
 import { getPopularTags, type Tag } from '../api/tag'
 import { getPublicTaxonomy, type TaxonomyFacet } from '../api/taxonomy'
+import { interpretSearch } from '../api/photo'
 import EmptyState from '../components/common/EmptyState.vue'
 import MasonryLayout from '../components/common/MasonryLayout.vue'
 import PhotoCardSkeleton from '../components/common/PhotoCardSkeleton.vue'
 import PhotoDetail from '../components/photo/PhotoDetail.vue'
 import ChangePasswordDialog from '../components/common/ChangePasswordDialog.vue'
 import NotificationBell from '../components/common/NotificationBell.vue'
+import SearchInterpretation from '../components/search/SearchInterpretation.vue'
 import { useAppStore } from '../stores/app'
 import { useAuthStore } from '../stores/auth'
 import { usePhotoStore } from '../stores/photo'
-import type { Photo, PhotoFilters } from '../types/photo'
+import type { Photo, PhotoFilters, SearchInterpretation as SearchInterpretationType } from '../types/photo'
 import { getPhotoUrl } from '../utils/format'
 
 const router = useRouter()
@@ -330,8 +359,11 @@ const showFilters = ref(false)
 const showChangePassword = ref(false)
 const loadingTags = ref(false)
 const popularTags = ref<Tag[]>([])
+const smartSearchEnabled = ref(true)
 const taxonomyFacets = ref<TaxonomyFacet[]>([])
 const syncingRoute = ref(false)
+const isInterpreting = ref(false)
+const currentInterpretation = ref<SearchInterpretationType | null>(null)
 
 const menuOptions = [
   {
@@ -425,14 +457,40 @@ const hasPrevPhoto = computed(() => currentPhotoIndex.value > 0)
 const hasNextPhoto = computed(() => currentPhotoIndex.value >= 0 && currentPhotoIndex.value < photoStore.photos.length - 1)
 
 function facetOptions(key: string): SelectOption[] {
+  // 优先从 taxonomy API 动态获取
   const facet = facetMap.value[key]
-  if (!facet) return []
-  const flatten = (nodes: TaxonomyFacet['nodes']): SelectOption[] =>
-    nodes.flatMap((node) => [
-      { label: node.name, value: node.name },
-      ...flatten(node.children || []),
-    ])
-  return flatten(facet.nodes || [])
+  if (facet && facet.nodes && facet.nodes.length > 0) {
+    const flatten = (nodes: TaxonomyFacet['nodes']): SelectOption[] =>
+      nodes.flatMap((node) => [
+        { label: node.name, value: node.name },
+        ...flatten(node.children || []),
+      ])
+    return flatten(facet.nodes)
+  }
+
+  // 降级：taxonomy 未返回时，使用与后端一致的硬编码选项
+  if (key === 'season') {
+    return [
+      { label: '春季', value: '春季' },
+      { label: '夏季', value: '夏季' },
+      { label: '秋季', value: '秋季' },
+      { label: '冬季', value: '冬季' },
+    ]
+  }
+  if (key === 'campus') {
+    return [
+      { label: '昌平校区', value: '昌平校区' },
+      { label: '朝阳校区', value: '朝阳校区' },
+    ]
+  }
+  if (key === 'photo_type') {
+    return [
+      { label: '风光', value: '风光' },
+      { label: '纪实', value: '纪实' },
+    ]
+  }
+
+  return []
 }
 
 function getImageUrl(photo: Photo) {
@@ -461,7 +519,10 @@ function buildQuery() {
     const value = filters[key]
     if (value) query[key] = value
   })
-  if (filters.search) query.search = filters.search
+  if (filters.search) {
+    query.search = filters.search
+    if (smartSearchEnabled.value) query.smart = 'true'
+  }
   if (filters.sortBy) query.sort_by = filters.sortBy
   if (filters.sortOrder) query.sort_order = filters.sortOrder
   if (photoStore.currentPage > 1) query.page = String(photoStore.currentPage)
@@ -500,9 +561,108 @@ async function syncQueryAndFetch() {
 }
 
 const handleSearch = useDebounceFn(async (value: string) => {
-  photoStore.setFilters({ search: value })
-  await syncQueryAndFetch()
+  if (!value.trim()) {
+    currentInterpretation.value = null
+    photoStore.setFilters({ search: '' })
+    await syncQueryAndFetch()
+    return
+  }
+
+  if (!smartSearchEnabled.value) {
+    currentInterpretation.value = null
+    photoStore.setFilters({ search: value.trim() })
+    await syncQueryAndFetch()
+    return
+  }
+
+  isInterpreting.value = true
+  try {
+    const result = await interpretSearch(value.trim())
+    currentInterpretation.value = result
+
+    if (result.facet_filters && Object.keys(result.facet_filters).length > 0) {
+      const filters: Partial<PhotoFilters> = {}
+      for (const [facetKey, nodeValue] of Object.entries(result.facet_filters)) {
+        if (facetKey === 'season') filters.season = nodeValue
+        else if (facetKey === 'campus') filters.campus = nodeValue
+        else if (facetKey === 'landmark') filters.building = nodeValue
+        else if (facetKey === 'gallery_series') filters.gallery_series = nodeValue
+        else if (facetKey === 'gallery_year') filters.gallery_year = nodeValue
+        else if (facetKey === 'photo_type') filters.photo_type = nodeValue
+      }
+      if (result.keywords.length > 0) {
+        filters.search = result.keywords.join(' ')
+      } else {
+        filters.search = ''
+      }
+      photoStore.setFilters(filters)
+    } else {
+      photoStore.setFilters({ search: value })
+    }
+
+    await syncQueryAndFetch()
+  } catch {
+    currentInterpretation.value = null
+    photoStore.setFilters({ search: value })
+    await syncQueryAndFetch()
+  } finally {
+    isInterpreting.value = false
+  }
 }, 500)
+
+function handleSmartToggle(enabled: boolean) {
+  smartSearchEnabled.value = enabled
+  localStorage.setItem('smart_search_enabled', enabled ? 'true' : 'false')
+  if (searchKeyword.value.trim()) {
+    handleSearch(searchKeyword.value)
+  }
+}
+
+async function handleRemoveFacet(facetKey: string) {
+  if (!currentInterpretation.value) return
+  const newFilters = { ...currentInterpretation.value.facet_filters }
+  delete newFilters[facetKey]
+  currentInterpretation.value = {
+    ...currentInterpretation.value,
+    facet_filters: newFilters,
+  }
+
+  const filters: Partial<PhotoFilters> = {}
+  for (const [key, value] of Object.entries(newFilters)) {
+    if (key === 'season') filters.season = value
+    else if (key === 'campus') filters.campus = value
+    else if (key === 'landmark') filters.building = value
+    else if (key === 'gallery_series') filters.gallery_series = value
+    else if (key === 'gallery_year') filters.gallery_year = value
+    else if (key === 'photo_type') filters.photo_type = value
+  }
+  if (currentInterpretation.value.keywords.length > 0) {
+    filters.search = currentInterpretation.value.keywords.join(' ')
+  }
+  photoStore.setFilters(filters)
+  await syncQueryAndFetch()
+}
+
+async function handleRemoveKeyword(keyword: string) {
+  if (!currentInterpretation.value) return
+  const newKeywords = currentInterpretation.value.keywords.filter(k => k !== keyword)
+  currentInterpretation.value = {
+    ...currentInterpretation.value,
+    keywords: newKeywords,
+  }
+  if (newKeywords.length > 0) {
+    photoStore.setFilters({ search: newKeywords.join(' ') })
+  } else if (Object.keys(currentInterpretation.value.facet_filters).length === 0) {
+    photoStore.setFilters({ search: '' })
+  } else {
+    photoStore.setFilters({ search: '' })
+  }
+  await syncQueryAndFetch()
+}
+
+function handleDismissInterpretation() {
+  currentInterpretation.value = null
+}
 
 async function handleFilterChange() {
   await syncQueryAndFetch()
@@ -510,6 +670,7 @@ async function handleFilterChange() {
 
 async function handleClearFilters() {
   searchKeyword.value = ''
+  currentInterpretation.value = null
   photoStore.clearFilters()
   selectedPhotoId.value = null
   showPhotoDetail.value = false
@@ -647,6 +808,9 @@ watch(showPhotoDetail, async (value) => {
 })
 
 onMounted(async () => {
+  const saved = localStorage.getItem('smart_search_enabled')
+  smartSearchEnabled.value = saved !== 'false'
+
   applyRouteQuery()
   try {
     await Promise.all([
@@ -690,6 +854,69 @@ onMounted(async () => {
 .search-input {
   width: 320px;
   max-width: 100%;
+}
+
+.search-area {
+  width: 360px;
+  max-width: 100%;
+}
+
+.search-smart-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0 0 4px;
+}
+
+.smart-label {
+  font-size: 12px;
+  transition: color 0.3s ease;
+}
+
+.smart-label.smart-active {
+  color: #e60012;
+  font-weight: 500;
+}
+
+.search-interpreting {
+  border-color: rgba(230, 0, 18, 0.4) !important;
+}
+
+.search-pulse {
+  animation: search-pulse-border 1.5s ease-in-out infinite;
+}
+
+@keyframes search-pulse-border {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(230, 0, 18, 0.2); }
+  50% { box-shadow: 0 0 0 3px rgba(230, 0, 18, 0.1); }
+}
+
+.interpreting-dots {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 0 0 4px;
+}
+
+.interpreting-dots .dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #e60012;
+  animation: dot-bounce 1.2s ease-in-out infinite;
+}
+
+.interpreting-dots .dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.interpreting-dots .dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes dot-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.3; }
+  30% { transform: translateY(-4px); opacity: 1; }
 }
 
 .header-right {
@@ -819,6 +1046,11 @@ onMounted(async () => {
   }
 
   .search-input {
+    width: 100%;
+    order: 3;
+  }
+
+  .search-area {
     width: 100%;
     order: 3;
   }

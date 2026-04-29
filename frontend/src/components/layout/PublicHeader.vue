@@ -19,7 +19,7 @@
       >
         <n-input
           v-model:value="localKeyword"
-          placeholder="搜索照片、描述或标签"
+          :placeholder="smartSearchEnabled ? '试试自然语言搜索...' : '搜索照片、描述或标签'"
           clearable
           size="small"
           @keyup.enter="handleSearch"
@@ -38,6 +38,16 @@
             </n-button>
           </template>
         </n-input>
+        <div class="header-smart-toggle">
+          <n-switch
+            v-model:value="smartSearchEnabled"
+            size="small"
+            @update:value="handleSmartToggle"
+          />
+          <n-text depth="3" class="smart-label" :class="{ 'smart-active': smartSearchEnabled }">
+            {{ smartSearchEnabled ? '✨ 智能' : '普通' }}
+          </n-text>
+        </div>
       </div>
 
       <!-- 右侧操作区 -->
@@ -81,7 +91,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, ref } from 'vue'
+import { computed, h, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { NIcon, useDialog, useMessage } from 'naive-ui'
 import {
@@ -106,7 +116,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<{
-  search: [keyword: string]
+  search: [keyword: string, smart: boolean]
 }>()
 
 const router = useRouter()
@@ -117,6 +127,17 @@ const { y: scrollY } = useWindowScroll()
 
 const isScrolled = computed(() => scrollY.value > 60)
 const localKeyword = ref(props.searchKeyword)
+const smartSearchEnabled = ref(true)
+
+onMounted(() => {
+  const saved = localStorage.getItem('smart_search_enabled')
+  smartSearchEnabled.value = saved !== 'false'
+})
+
+function handleSmartToggle(enabled: boolean) {
+  smartSearchEnabled.value = enabled
+  localStorage.setItem('smart_search_enabled', enabled ? 'true' : 'false')
+}
 
 const userMenuOptions = computed(() => {
   const options: any[] = [
@@ -142,7 +163,7 @@ const userMenuOptions = computed(() => {
 })
 
 function handleSearch() {
-  emit('search', localKeyword.value)
+  emit('search', localKeyword.value, smartSearchEnabled.value)
 }
 
 function handleUserMenuSelect(key: string) {
@@ -216,6 +237,27 @@ function handleUserMenuSelect(key: string) {
 .header-search-mini {
   flex: 1;
   max-width: 480px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-smart-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.smart-label {
+  font-size: 11px;
+  transition: color 0.3s ease;
+  white-space: nowrap;
+}
+
+.smart-label.smart-active {
+  color: #e60012;
+  font-weight: 500;
 }
 
 .header-search-mini :deep(.n-input) {

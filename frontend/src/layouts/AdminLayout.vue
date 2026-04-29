@@ -54,6 +54,7 @@ import {
   ImagesOutline,
   PeopleOutline,
   PricetagsOutline,
+  ServerOutline,
   SettingsOutline,
 } from '@vicons/ionicons5'
 import type { MenuOption } from 'naive-ui'
@@ -107,6 +108,7 @@ const adminOnlyMenuOptions: MenuOption[] = [
   { label: '用户管理', key: 'UserManagement', icon: renderMenuIcon(PeopleOutline) },
   { label: '系统设置', key: 'SystemSettings', icon: renderMenuIcon(SettingsOutline) },
   { label: '审计日志', key: 'AuditLog', icon: renderMenuIcon(DocumentTextOutline) },
+  { label: '数据库管理', key: 'DatabaseManagement', icon: renderMenuIcon(ServerOutline) },
 ]
 
 const bottomMenuOptions: MenuOption[] = [

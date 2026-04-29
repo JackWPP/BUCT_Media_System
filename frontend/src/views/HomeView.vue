@@ -24,7 +24,7 @@
               v-model="searchKeyword"
               type="text"
               class="search-input"
-              placeholder="可以输入搜索关键词、图片ID或一句话"
+              :placeholder="smartSearchEnabled ? '试试自然语言搜索：秋天的图书馆、春天的樱花...' : '输入关键词搜索照片...'"
               @keyup.enter="handleSearch"
             />
             <n-button
@@ -46,6 +46,16 @@
                 <n-icon :component="SearchOutline" size="18" />
               </template>
             </n-button>
+          </div>
+          <div class="home-smart-toggle">
+            <n-switch
+              v-model:value="smartSearchEnabled"
+              size="small"
+              @update:value="handleSmartToggle"
+            />
+            <n-text depth="3" class="smart-label" :class="{ 'smart-active': smartSearchEnabled }">
+              {{ smartSearchEnabled ? '✨ 智能搜索' : '普通搜索' }}
+            </n-text>
           </div>
         </div>
 
@@ -135,6 +145,7 @@ const searchKeyword = ref('')
 const photos = ref<Photo[]>([])
 const loading = ref(false)
 const hotTags = ref<string[]>(['春天', '天空', '风景', '校园', '建筑', '人物', '运动', '实验室'])
+const smartSearchEnabled = ref(true)
 
 // Hero 区域滚动动效
 const heroOpacity = computed(() => {
@@ -162,15 +173,27 @@ function handleImageError(event: Event, photo: Photo) {
 }
 
 function handleSearch() {
+  const query: Record<string, string> = {}
   if (searchKeyword.value.trim()) {
-    router.push({ path: '/gallery', query: { search: searchKeyword.value.trim() } })
+    query.search = searchKeyword.value.trim()
+    if (smartSearchEnabled.value) query.smart = 'true'
+  }
+  if (Object.keys(query).length > 0) {
+    router.push({ path: '/gallery', query })
   } else {
     router.push('/gallery')
   }
 }
 
 function handleTagClick(tag: string) {
-  router.push({ path: '/gallery', query: { search: tag } })
+  const query: Record<string, string> = { search: tag }
+  if (smartSearchEnabled.value) query.smart = 'true'
+  router.push({ path: '/gallery', query })
+}
+
+function handleSmartToggle(enabled: boolean) {
+  smartSearchEnabled.value = enabled
+  localStorage.setItem('smart_search_enabled', enabled ? 'true' : 'false')
 }
 
 function handlePhotoClick(photo: Photo) {
@@ -201,6 +224,9 @@ async function loadHotTags() {
 }
 
 onMounted(() => {
+  const saved = localStorage.getItem('smart_search_enabled')
+  smartSearchEnabled.value = saved !== 'false'
+
   loadPhotos()
   loadHotTags()
 })
@@ -296,6 +322,24 @@ onMounted(() => {
 /* 搜索框 */
 .hero-search {
   margin-bottom: 24px;
+}
+
+.home-smart-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.home-smart-toggle .smart-label {
+  font-size: 12px;
+  transition: color 0.3s ease;
+}
+
+.home-smart-toggle .smart-label.smart-active {
+  color: #e60012;
+  font-weight: 500;
 }
 
 .search-box {

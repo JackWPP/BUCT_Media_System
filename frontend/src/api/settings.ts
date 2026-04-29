@@ -23,6 +23,9 @@ export interface RuntimeProviderSummary {
 export interface SystemSettings {
   portrait_visibility: PortraitVisibility
   ai_enabled: boolean
+  ai_search_enabled: boolean
+  ai_search_provider: string | null
+  ai_search_model_id: string | null
   storage_backend: string
   task_queue_backend: string
   database_backend: string
@@ -97,6 +100,18 @@ export async function updateAISettings(enabled: boolean): Promise<SystemSettings
     url: `${SETTINGS_BASE_URL}/ai`,
     method: 'put',
     data: { enabled },
+  })
+}
+
+export async function updateAISearchSettings(
+  enabled: boolean,
+  provider?: string,
+  modelId?: string,
+): Promise<SystemSettings> {
+  return request({
+    url: `${SETTINGS_BASE_URL}/ai-search`,
+    method: 'put',
+    data: { enabled, provider, model_id: modelId },
   })
 }
 

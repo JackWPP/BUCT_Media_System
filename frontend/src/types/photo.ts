@@ -58,6 +58,15 @@ export interface PhotoUpdate {
   status?: string
 }
 
+export interface SearchInterpretation {
+  facet_filters: Record<string, string>
+  keywords: string[]
+  original_query: string
+  method: 'rule' | 'ai' | 'fallback'
+  confidence: number
+  explanation: string | null
+}
+
 export interface PhotoListParams {
   skip?: number
   limit?: number
@@ -73,6 +82,7 @@ export interface PhotoListParams {
   tag?: string
   sort_by?: string
   sort_order?: string
+  smart?: boolean
 }
 
 export interface PhotoListResponse {
@@ -80,6 +90,7 @@ export interface PhotoListResponse {
   total: number
   page: number
   page_size: number
+  search_interpretation?: SearchInterpretation | null
 }
 
 export interface PhotoFilters {

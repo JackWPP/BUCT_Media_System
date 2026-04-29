@@ -21,6 +21,22 @@
                 <n-text>{{ settings.default_provider?.model_id || '-' }}</n-text>
               </n-statistic>
             </n-grid-item>
+            <n-grid-item>
+              <n-statistic label="AI 智能搜索">
+                <n-tag :type="settings.ai_search_enabled ? 'success' : 'default'">
+                  {{ settings.ai_search_enabled ? '已启用' : '已关闭' }}
+                </n-tag>
+              </n-statistic>
+            </n-grid-item>
+            <n-grid-item>
+              <n-statistic label="搜索模型">
+                <n-text>
+                  {{ settings.ai_search_provider && settings.ai_search_model_id
+                    ? `${settings.ai_search_provider} / ${settings.ai_search_model_id}`
+                    : '使用默认模型' }}
+                </n-text>
+              </n-statistic>
+            </n-grid-item>
           </n-grid>
         </n-spin>
       </n-card>
@@ -39,6 +55,25 @@
             </n-form-item>
             <n-form-item label="AI 分析开关">
               <n-switch v-model:value="settings.ai_enabled" />
+            </n-form-item>
+            <n-form-item label="AI 智能搜索开关">
+              <n-switch v-model:value="settings.ai_search_enabled" />
+            </n-form-item>
+            <n-form-item label="搜索专用模型">
+              <n-space>
+                <n-select
+                  v-model:value="aiSearchProvider"
+                  :options="[{ label: '使用默认模型', value: '' }, ...providerTypeOptions]"
+                  style="width: 180px;"
+                  placeholder="使用默认模型"
+                />
+                <n-input
+                  v-model:value="aiSearchModelId"
+                  placeholder="模型ID，如 qwen-turbo"
+                  style="width: 200px;"
+                  :disabled="!aiSearchProvider"
+                />
+              </n-space>
             </n-form-item>
             <n-space>
               <n-button type="primary" :loading="savingSettings" @click="handleSaveSettings">保存设置</n-button>
@@ -224,11 +259,17 @@ const editingProviderId = ref<string | null>(null)
 const settings = reactive<SystemSettings>({
   portrait_visibility: 'login_required',
   ai_enabled: true,
+  ai_search_enabled: true,
+  ai_search_provider: null,
+  ai_search_model_id: null,
   storage_backend: 'local',
   task_queue_backend: 'background',
   database_backend: 'sqlite',
   default_provider: null,
 })
+
+const aiSearchProvider = ref('')
+const aiSearchModelId = ref('')
 
 const providers = ref<AIProviderConfigSummary[]>([])
 
@@ -273,6 +314,8 @@ async function fetchAll() {
 async function fetchSettings() {
   const data = await settingsApi.getSettings()
   Object.assign(settings, data)
+  aiSearchProvider.value = data.ai_search_provider || ''
+  aiSearchModelId.value = data.ai_search_model_id || ''
 }
 
 async function fetchProviders() {
@@ -291,6 +334,11 @@ async function handleSaveSettings() {
   try {
     await settingsApi.updatePortraitVisibility(settings.portrait_visibility as PortraitVisibility)
     await settingsApi.updateAISettings(settings.ai_enabled)
+    await settingsApi.updateAISearchSettings(
+      settings.ai_search_enabled,
+      aiSearchProvider.value || undefined,
+      aiSearchModelId.value || undefined,
+    )
     await fetchSettings()
     message.success('系统设置已保存')
   } catch (error: any) {

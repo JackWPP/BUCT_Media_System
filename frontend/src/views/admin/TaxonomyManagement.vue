@@ -157,12 +157,20 @@ onMounted(() => {
 async function loadAll() {
   loading.value = true
   try {
-    const [facetData, insightData] = await Promise.all([
+    const [facetData, insightData] = await Promise.allSettled([
       getTaxonomyFacets(),
       getTaxonomyInsights(),
     ])
-    facets.value = facetData
-    insights.value = insightData
+    if (facetData.status === 'fulfilled') {
+      facets.value = facetData.value
+    } else {
+      message.error('加载分面数据失败')
+    }
+    if (insightData.status === 'fulfilled') {
+      insights.value = insightData.value
+    } else {
+      message.error('加载治理摘要失败')
+    }
   } catch (error: any) {
     message.error(error?.response?.data?.detail || '加载分类治理数据失败')
   } finally {
