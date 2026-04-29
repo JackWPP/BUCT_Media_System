@@ -76,3 +76,4 @@ backend/alembic/versions/*.pyc
 
 .qoder/
 .trae/
+backend/sh.exe.stackdump
