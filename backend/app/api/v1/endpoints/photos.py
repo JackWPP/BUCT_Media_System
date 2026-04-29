@@ -29,6 +29,7 @@ from app.models.system_config import PortraitVisibility
 from app.models.user import User
 from app.schemas.ai_analysis import AIAnalysisTaskCreate, AIAnalysisTaskResponse, AIApplyResponse
 from app.schemas.photo import PhotoListResponse, PhotoResponse, PhotoUpdate, PhotoUploadResponse
+from app.schemas.search import SearchInterpretRequest, SearchInterpretResponse
 from app.services.ai_tasks import (
     apply_ai_analysis_task,
     create_ai_analysis_task,
@@ -37,6 +38,7 @@ from app.services.ai_tasks import (
 )
 from app.services.image_processing import process_uploaded_image
 from app.services.runtime_settings import get_runtime_settings
+from app.services.search_interpreter import get_search_interpreter
 from app.services.storage import cleanup_staged_files, get_storage, stage_photo_upload
 from app.services.task_dispatcher import dispatch_ai_analysis_task
 from app.services.taxonomy import ensure_default_taxonomy, serialize_classifications
@@ -128,6 +130,7 @@ async def list_public_photos(
     tag: Optional[str] = None,
     sort_by: str = "created_at",
     sort_order: str = "desc",
+    smart: bool = False,
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_current_user),
     portrait_visibility: str = Depends(get_portrait_visibility),
@@ -145,6 +148,25 @@ async def list_public_photos(
         if not current_user or not await can_access_portrait_photo(db, current_user, portrait_visibility):
             should_filter_portrait = True
 
+    interpretation = None
+    search_interpretation_data = None
+
+    if smart and search:
+        runtime_settings = await get_runtime_settings(db)
+        if runtime_settings.ai_search_enabled:
+            interpreter = get_search_interpreter()
+            interpretation = await interpreter.interpret(search, db)
+            search_interpretation_data = {
+                "facet_filters": interpretation.facet_filters,
+                "keywords": interpretation.keywords,
+                "original_query": interpretation.original_query,
+                "method": interpretation.method,
+                "confidence": interpretation.confidence,
+                "explanation": interpretation.explanation,
+            }
+        else:
+            smart = False
+
     photos, total = await photo_crud.get_photos(
         db,
         skip=skip,
@@ -157,17 +179,37 @@ async def list_public_photos(
         gallery_series=gallery_series,
         gallery_year=gallery_year,
         photo_type=photo_type,
-        search=search,
+        search=search if not interpretation else None,
         tag=tag,
         exclude_categories=["Portrait"] if should_filter_portrait else None,
         sort_by=sort_by,
         sort_order=sort_order,
+        interpretation=interpretation,
     )
     return PhotoListResponse(
         total=total,
         page=skip // limit + 1 if limit > 0 else 1,
         page_size=limit,
         items=await serialize_photos(db, photos),
+        search_interpretation=search_interpretation_data,
+    )
+
+
+@router.post("/interpret-search", response_model=SearchInterpretResponse)
+async def interpret_search(
+    payload: SearchInterpretRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
+):
+    interpreter = get_search_interpreter()
+    result = await interpreter.interpret(payload.query, db)
+    return SearchInterpretResponse(
+        facet_filters=result.facet_filters,
+        keywords=result.keywords,
+        original_query=result.original_query,
+        method=result.method,
+        confidence=result.confidence,
+        explanation=result.explanation,
     )
 
 
@@ -206,10 +248,12 @@ async def get_photo_thumbnail(
     portrait_visibility: str = Depends(get_portrait_visibility),
 ):
     photo = await photo_crud.get_photo(db, photo_id)
-    if photo is None or not photo.thumb_path:
+    if photo is None:
         raise HTTPException(status_code=404, detail="Photo not found")
     await _assert_photo_access(db, photo, current_user, portrait_visibility)
-    return get_storage().build_media_response(photo.thumb_path)
+    # Fall back to original if no thumbnail exists
+    path = photo.thumb_path or photo.original_path
+    return get_storage().build_media_response(path)
 
 
 @router.get("/{photo_id}/download")
@@ -306,6 +350,10 @@ async def upload_photo(
     except Exception as exc:  # noqa: BLE001
         cleanup_staged_files(staged_original_path, staged_thumb_path)
         raise HTTPException(status_code=500, detail=f"Failed to upload photo: {exc}") from exc
+    finally:
+        # Clean up temp files on success too (S3 backend copies, doesn't move)
+        if staged_original_path:
+            cleanup_staged_files(staged_original_path, staged_thumb_path)
 
 
 @router.get("", response_model=PhotoListResponse)
@@ -427,10 +475,12 @@ async def delete_photo(
     storage.delete_file(photo.original_path)
     storage.delete_file(photo.thumb_path)
     storage.delete_file(photo.processed_path)
-    await photo_crud.delete_photo(db, photo)
+    # Log BEFORE delete — photo_crud.delete_photo internally calls db.commit()
+    # which also commits the flushed audit log
     await log_audit(db, user_id=current_user.id, action="photo.delete",
                     resource_type="photo", resource_id=photo_id,
                     detail=f"删除照片: {photo.filename}", request=request)
+    await photo_crud.delete_photo(db, photo)
     return None
 
 
@@ -527,6 +577,7 @@ async def batch_reject_photos(
 @router.post("/batch-delete")
 async def batch_delete_photos(
     photo_ids: List[str],
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -542,6 +593,11 @@ async def batch_delete_photos(
             storage.delete_file(photo.processed_path)
             await photo_crud.delete_photo(db, photo)
             deleted_count += 1
+    await log_audit(db, user_id=current_user.id, action="photo.batch_delete",
+                    resource_type="photo",
+                    detail=f"批量删除 {deleted_count} 张照片",
+                    request=request)
+    await db.commit()
     return {"message": f"Successfully deleted {deleted_count} photos", "deleted_count": deleted_count, "total_requested": len(photo_ids)}
 
 

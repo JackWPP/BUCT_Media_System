@@ -60,6 +60,8 @@ const actionOptions = [
   { label: '用户删除', value: 'user.delete' },
   { label: '密码重置', value: 'user.password_reset' },
   { label: '权限变更', value: 'permission.grant' },
+  { label: '批量删除', value: 'photo.batch_delete' },
+  { label: '照片导入', value: 'import.photos' },
 ]
 
 const resourceTypeOptions = [
@@ -79,6 +81,8 @@ function getActionTag(action: string) {
     'user.delete': { type: 'error', label: '删除用户' },
     'user.password_reset': { type: 'warning', label: '密码重置' },
     'permission.grant': { type: 'info', label: '授权' },
+    'photo.batch_delete': { type: 'error', label: '批量删除' },
+    'import.photos': { type: 'info', label: '导入' },
   }
   const info = map[action]
   return info || { type: 'info' as const, label: action }

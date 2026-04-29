@@ -4,12 +4,13 @@
 仅限超级管理员访问，用于用户的增删改查、角色管理和密码重置。
 """
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_db, get_current_admin_user
 from app.crud import user as user_crud
 from app.models.user import User
+from app.services.audit import log_audit
 from app.schemas.user import (
     User as UserSchema,
     UserList,
@@ -44,8 +45,9 @@ async def get_users(
 @router.post("", response_model=UserSchema, status_code=status.HTTP_201_CREATED)
 async def create_user(
     user_data: UserCreateByAdmin,
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_admin_user),
+    current_user: User = Depends(get_current_admin_user),
 ):
     """
     创建新用户
@@ -61,6 +63,11 @@ async def create_user(
         )
 
     new_user = await user_crud.create_user_by_admin(db, user_data)
+    await log_audit(db, user_id=current_user.id, action="user.create",
+                    resource_type="user", resource_id=new_user.id,
+                    detail=f"创建用户: {user_data.email} (角色: {user_data.role.value})",
+                    request=request)
+    await db.commit()
     return UserSchema.model_validate(new_user)
 
 
@@ -149,6 +156,7 @@ async def update_user_role(
 async def admin_reset_password(
     user_id: str,
     body: AdminPasswordReset,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
@@ -171,12 +179,18 @@ async def admin_reset_password(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="密码重置失败"
         )
+    await log_audit(db, user_id=current_user.id, action="user.password_reset",
+                    resource_type="user", resource_id=user_id,
+                    detail=f"管理员重置用户密码: {target_user.student_id}",
+                    request=request)
+    await db.commit()
     return {"detail": f"用户 {target_user.student_id} 的密码已重置"}
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
     user_id: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
@@ -199,6 +213,10 @@ async def delete_user(
             detail="用户不存在"
         )
 
+    await log_audit(db, user_id=current_user.id, action="user.delete",
+                    resource_type="user", resource_id=user_id,
+                    detail=f"删除用户: {target_user.student_id} ({target_user.email})",
+                    request=request)
     success = await user_crud.delete_user(db, user_id)
     if not success:
         raise HTTPException(

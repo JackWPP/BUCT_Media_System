@@ -4,7 +4,7 @@
 import os
 import shutil
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Request, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 import logging
@@ -12,6 +12,7 @@ import logging
 from app.core.deps import get_db, get_current_admin_user
 from app.models.user import User
 from app.services.import_service import scan_and_parse_json_files, import_service, sanitize_exif_data
+from app.services.audit import log_audit
 from app.services.storage import ensure_upload_dirs
 from app.services.image_processing import process_uploaded_image
 from app.crud import photo as photo_crud
@@ -41,6 +42,7 @@ class ImportResponse(BaseModel):
 @router.post("/import", response_model=ImportResponse)
 async def import_photos(
     request: ImportRequest,
+    req: Request,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
@@ -185,9 +187,17 @@ async def import_photos(
             # 回滚事务，以便继续处理下一个
             await db.rollback()
     
+    # 记录审计日志
+    await log_audit(db, user_id=current_user.id, action="import.photos",
+                    resource_type="photo",
+                    detail=f"批量导入: 总计{total_count}张, 成功{imported_count}张, "
+                           f"跳过{skipped_count}张, 失败{error_count}张",
+                    request=req)
+    await db.commit()
+
     # 返回结果
     message = f"导入完成: 总计 {total_count} 张, 成功 {imported_count} 张, 跳过 {skipped_count} 张, 失败 {error_count} 张"
-    
+
     return ImportResponse(
         total_count=total_count,
         imported_count=imported_count,
