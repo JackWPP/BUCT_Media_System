@@ -1,0 +1,88 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      # ── Frontend build ──
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+      # ── Deploy to server ──
+      - name: Deploy backend to server
+        uses: easingthemes/ssh-deploy@v5
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ARGS: "-rlgoDzvc -i --delete"
+          SOURCE: "backend/"
+          REMOTE_HOST: ${{ secrets.SSH_HOST }}
+          REMOTE_USER: ${{ secrets.SSH_USER }}
+          TARGET: "/opt/visual_buct/backend/"
+
+      - name: Deploy frontend to server
+        uses: easingthemes/ssh-deploy@v5
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ARGS: "-rlgoDzvc -i --delete"
+          SOURCE: "frontend/dist/"
+          REMOTE_HOST: ${{ secrets.SSH_HOST }}
+          REMOTE_USER: ${{ secrets.SSH_USER }}
+          TARGET: "/home/wwwroot/visual_buct/"
+
+      # ── Server-side setup and restart ──
+      - name: Install Python dependencies and restart service
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/visual_buct/backend
+
+            # Create venv if not exists
+            if [ ! -d ".venv" ]; then
+              python3 -m venv .venv
+            fi
+
+            # Install/update dependencies
+            .venv/bin/pip install -r requirements.txt -q
+
+            # Copy production .env if not exists
+            if [ ! -f ".env" ]; then
+              cp ../deploy/.env.production .env
+            fi
+
+            # Run database migrations
+            .venv/bin/alembic upgrade head
+
+            # Restart the service
+            echo "${{ secrets.SUDO_PASS }}" | sudo -S systemctl restart visual-buct
+            echo "${{ secrets.SUDO_PASS }}" | sudo -S systemctl status visual-buct --no-pager
