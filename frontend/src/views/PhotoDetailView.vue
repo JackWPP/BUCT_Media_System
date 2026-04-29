@@ -153,13 +153,9 @@
             <div class="meta-section">
               <h3 class="meta-title">图片信息</h3>
               <div class="meta-list">
-                <div class="meta-item">
-                  <span class="meta-label">编号</span>
-                  <span class="meta-value">{{ photo.id.slice(0, 16) }}</span>
-                </div>
-                <div class="meta-item">
+                <div v-if="photo.width && photo.height" class="meta-item">
                   <span class="meta-label">尺寸</span>
-                  <span class="meta-value">{{ photo.width || '-' }} x {{ photo.height || '-' }} px</span>
+                  <span class="meta-value">{{ photo.width }} x {{ photo.height }} px</span>
                 </div>
                 <div class="meta-item">
                   <span class="meta-label">大小</span>
@@ -177,18 +173,12 @@
                   <span class="meta-label">拍摄时间</span>
                   <span class="meta-value">{{ formatDate(photo.captured_at) }}</span>
                 </div>
-                <div class="meta-item">
-                  <span class="meta-label">状态</span>
-                  <n-tag :type="getStatusType(photo.status)" size="small">
-                    {{ getStatusText(photo.status) }}
-                  </n-tag>
-                </div>
               </div>
             </div>
 
             <!-- 分类标签 -->
             <div v-if="photo.classifications && Object.keys(photo.classifications).length" class="meta-section">
-              <h3 class="meta-title">受控分类</h3>
+              <h3 class="meta-title">分类</h3>
               <div class="class-tags">
                 <span
                   v-for="cls in Object.values(photo.classifications)"
