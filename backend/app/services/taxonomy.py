@@ -6,6 +6,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
+from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -329,6 +330,49 @@ async def set_photo_classification(
         photo.campus = node.name
     elif facet_key == "photo_type":
         photo.category = LEGACY_PHOTO_TYPE_MAP.get(node.name, node.name)
+
+
+async def set_photo_classifications(
+    db: AsyncSession,
+    photo: Photo,
+    classifications: dict[str, int],
+) -> None:
+    """Batch set classifications for a photo: { facet_key: node_id }."""
+    for facet_key, node_id in classifications.items():
+        node = await get_node_by_id(db, node_id)
+        if node is None:
+            raise ValueError(f"Unknown node id: {node_id}")
+        await set_photo_classification(db, photo, facet_key, node)
+
+
+async def delete_photo_classification(
+    db: AsyncSession,
+    photo: Photo,
+    facet_key: str,
+) -> None:
+    """Remove a classification for a single facet from a photo."""
+    facet = await get_facet_by_key(db, facet_key)
+    if facet is None:
+        raise HTTPException(status_code=404, detail=f"Unknown facet: {facet_key}")
+
+    result = await db.execute(
+        select(PhotoClassification).where(
+            PhotoClassification.photo_id == photo.id,
+            PhotoClassification.facet_id == facet.id,
+        )
+    )
+    classification = result.scalar_one_or_none()
+    if classification is None:
+        return
+
+    await db.delete(classification)
+
+    if facet_key == "season":
+        photo.season = None
+    elif facet_key == "campus":
+        photo.campus = None
+    elif facet_key == "photo_type":
+        photo.category = None
 
 
 def build_node_path(node: TaxonomyNode) -> list[str]:

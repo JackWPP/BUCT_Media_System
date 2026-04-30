@@ -106,4 +106,14 @@ class TaxonomyValueResponse(BaseModel):
     path: list[str] = Field(default_factory=list)
 
 
+class PhotoClassificationUpdateSchema(BaseModel):
+    """Batch update photo classifications: { facet_key: node_id }"""
+    classifications: dict[str, int] = Field(
+        default_factory=dict,
+        description="Mapping of facet_key to node_id",
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+
 TaxonomyNodeResponse.model_rebuild()

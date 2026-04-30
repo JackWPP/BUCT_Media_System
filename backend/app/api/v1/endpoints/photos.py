@@ -30,6 +30,7 @@ from app.models.user import User
 from app.schemas.ai_analysis import AIAnalysisTaskCreate, AIAnalysisTaskResponse, AIApplyResponse
 from app.schemas.photo import PhotoListResponse, PhotoResponse, PhotoUpdate, PhotoUploadResponse
 from app.schemas.search import SearchInterpretRequest, SearchInterpretResponse
+from app.schemas.taxonomy import PhotoClassificationUpdateSchema
 from app.services.ai_tasks import (
     apply_ai_analysis_task,
     create_ai_analysis_task,
@@ -647,6 +648,52 @@ async def remove_photo_tag(
     if tag and tag.usage_count > 0:
         tag.usage_count -= 1
         await db.commit()
+    return await serialize_photo(db, await photo_crud.get_photo_with_tags(db, photo_id))
+
+
+@router.put("/{photo_id}/classifications", response_model=PhotoResponse)
+async def update_photo_classifications(
+    photo_id: str,
+    body: "PhotoClassificationUpdateSchema",
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Batch update photo classifications. Accepts { facet_key: node_id } mapping."""
+    photo = await photo_crud.get_photo_with_tags(db, photo_id)
+    if photo is None:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    if photo.uploader_id != current_user.id and not is_reviewer(current_user):
+        raise HTTPException(status_code=403, detail="Not authorized to update this photo")
+
+    from app.services.taxonomy import set_photo_classifications
+
+    try:
+        await set_photo_classifications(db, photo, body.classifications)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    await db.commit()
+    return await serialize_photo(db, await photo_crud.get_photo_with_tags(db, photo_id))
+
+
+@router.delete("/{photo_id}/classifications/{facet_key}", response_model=PhotoResponse)
+async def remove_photo_classification(
+    photo_id: str,
+    facet_key: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Remove a single classification from a photo by facet key."""
+    photo = await photo_crud.get_photo_with_tags(db, photo_id)
+    if photo is None:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    if photo.uploader_id != current_user.id and not is_reviewer(current_user):
+        raise HTTPException(status_code=403, detail="Not authorized to update this photo")
+
+    from app.services.taxonomy import delete_photo_classification
+
+    await delete_photo_classification(db, photo, facet_key)
+    await db.commit()
     return await serialize_photo(db, await photo_crud.get_photo_with_tags(db, photo_id))
 
 

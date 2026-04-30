@@ -85,7 +85,62 @@
                 </n-space>
               </div>
 
-              <div v-if="photo.classifications && Object.keys(photo.classifications).length">
+              <div v-if="photo && adminMode">
+                <n-text strong>受控分类</n-text>
+                <n-space style="margin-top: 8px;" wrap>
+                  <n-popover
+                    v-for="classification in Object.values(photo.classifications || {})"
+                    :key="classification.facet_key"
+                    trigger="click"
+                    placement="bottom"
+                  >
+                    <template #trigger>
+                      <n-tag type="success" size="small" closable @close="(e) => handleRemoveClassification(classification.facet_key, e)">
+                        {{ classification.facet_name }}: {{ classification.node_name }}
+                      </n-tag>
+                    </template>
+                    <n-select
+                      :value="classification.node_id"
+                      :options="getFacetNodeOptions(classification.facet_key)"
+                      style="width: 200px;"
+                      @update:value="(val: number) => handleChangeClassification(classification.facet_key, val)"
+                    />
+                  </n-popover>
+                  <n-button v-if="getUnclassifiedFacets().length" size="tiny" @click="showAddClassification = true">
+                    + 添加分类
+                  </n-button>
+                </n-space>
+                <!-- 添加分类弹出 -->
+                <n-modal v-model:show="showAddClassification" preset="dialog" title="添加受控分类">
+                  <n-form-item label="分类维度">
+                    <n-select
+                      v-model:value="addClassificationFacet"
+                      :options="getUnclassifiedFacets()"
+                      placeholder="选择分类维度"
+                      style="width: 200px;"
+                    />
+                  </n-form-item>
+                  <n-form-item v-if="addClassificationFacet" label="分类值">
+                    <n-select
+                      v-model:value="addClassificationNode"
+                      :options="getFacetNodeOptions(addClassificationFacet)"
+                      placeholder="选择分类值"
+                      style="width: 200px;"
+                    />
+                  </n-form-item>
+                  <template #action>
+                    <n-button @click="showAddClassification = false">取消</n-button>
+                    <n-button
+                      type="primary"
+                      :disabled="!addClassificationFacet || !addClassificationNode"
+                      @click="handleAddClassification"
+                    >
+                      确定
+                    </n-button>
+                  </template>
+                </n-modal>
+              </div>
+              <div v-else-if="photo && photo.classifications && Object.keys(photo.classifications).length">
                 <n-text strong>受控分类</n-text>
                 <n-space style="margin-top: 8px;" wrap>
                   <n-tag
@@ -235,6 +290,8 @@ import {
   createPhotoAIAnalysis,
   getPhotoAIAnalysis,
   ignorePhotoAIAnalysis,
+  updatePhotoClassifications,
+  removePhotoClassification,
   type AIAnalysisTask,
 } from '../../api/photo'
 import { incrementView } from '../../api/stats'
@@ -290,6 +347,10 @@ const formData = ref({
   campus: null as string | null,
   description: null as string | null,
 })
+
+const showAddClassification = ref(false)
+const addClassificationFacet = ref<string | null>(null)
+const addClassificationNode = ref<number | null>(null)
 
 const seasonOptions = SEASON_OPTIONS
 const categoryOptions = CATEGORY_OPTIONS
@@ -579,6 +640,72 @@ async function handleAddTag() {
     emit('updated')
   } catch (error: any) {
     message.error(error?.response?.data?.detail || '添加标签失败')
+  }
+}
+
+function getFacetNodeOptions(facetKey: string) {
+  const facet = taxonomyFacets.value.find((f) => f.key === facetKey)
+  if (!facet) return []
+  const flatten = (nodes: TaxonomyFacet['nodes']): Array<{ label: string; value: number }> =>
+    nodes.flatMap((node) => [
+      { label: node.name, value: node.id },
+      ...flatten(node.children || []),
+    ])
+  return flatten(facet.nodes)
+}
+
+function getUnclassifiedFacets() {
+  if (!photo.value) return []
+  const existingFacets = new Set(
+    Object.keys(photo.value.classifications || {}),
+  )
+  return taxonomyFacets.value
+    .filter((f) => f.is_active && !existingFacets.has(f.key))
+    .map((f) => ({ label: f.name, value: f.key }))
+}
+
+async function handleChangeClassification(facetKey: string, nodeId: number) {
+  if (!photo.value) return
+  try {
+    const updatedPhoto = await updatePhotoClassifications(photo.value.id, {
+      [facetKey]: nodeId,
+    })
+    photo.value = updatedPhoto as Photo
+    emit('updated')
+    message.success('分类已更新')
+  } catch (error: any) {
+    message.error(error?.response?.data?.detail || '更新分类失败')
+  }
+}
+
+async function handleRemoveClassification(facetKey: string, event: MouseEvent) {
+  // n-tag's @close emits a MouseEvent, avoid triggering popover
+  event.stopPropagation()
+  if (!photo.value) return
+  try {
+    const updatedPhoto = await removePhotoClassification(photo.value.id, facetKey)
+    photo.value = updatedPhoto as Photo
+    emit('updated')
+    message.success('分类已移除')
+  } catch (error: any) {
+    message.error(error?.response?.data?.detail || '移除分类失败')
+  }
+}
+
+async function handleAddClassification() {
+  if (!photo.value || !addClassificationFacet.value || !addClassificationNode.value) return
+  try {
+    const updatedPhoto = await updatePhotoClassifications(photo.value.id, {
+      [addClassificationFacet.value]: addClassificationNode.value,
+    })
+    photo.value = updatedPhoto as Photo
+    addClassificationFacet.value = null
+    addClassificationNode.value = null
+    showAddClassification.value = false
+    emit('updated')
+    message.success('分类已添加')
+  } catch (error: any) {
+    message.error(error?.response?.data?.detail || '添加分类失败')
   }
 }
 
