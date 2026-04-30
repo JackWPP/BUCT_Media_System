@@ -61,22 +61,17 @@ curl http://127.0.0.1/api/v1/admin/settings
 
 ```bash
 cd /opt/visual_buct/BUCT_Media_System
-git pull origin master
-
-# 后端
-cd backend
-.venv/bin/pip install -r requirements.txt -q
-.venv/bin/alembic upgrade head
-sudo systemctl restart visual-buct
-
-# 前端
-cd ../frontend
-npm ci && npm run build
-sudo rm -rf /home/wwwroot/visual_buct
-sudo mkdir -p /home/wwwroot/visual_buct
-sudo cp -r dist/* /home/wwwroot/visual_buct/
-sudo chown -R www-data:www-data /home/wwwroot/visual_buct
+bash deploy/deploy.sh all
 ```
+
+或分别部署：
+
+```bash
+bash deploy/deploy.sh backend     # 仅后端
+bash deploy/deploy.sh frontend    # 仅前端
+```
+
+前端构建在服务器上执行 (`npm run build`)，无需本地 Node 环境。
 
 ### Nginx
 
@@ -140,24 +135,15 @@ ALLOWED_ORIGINS='["http://121.195.148.85"]'
 
 **注意**: `SECRET_KEY` 变更会导致数据库中已加密的 AI Provider API Key 无法解密。
 
-## GitHub Actions CI/CD
+## 部署流程
 
-触发方式: push 到 `master` 分支或手动触发 (`workflow_dispatch`)
+服务器无法直接访问 GitHub（被墙），部署通过本机中转：
 
-流程:
-1. Checkout 代码 → 安装 Python 3.10 + Node.js 22
-2. 前端 `npm ci && npm run build`
-3. rsync 后端到服务器 `/opt/visual_buct/BUCT_Media_System/backend/`
-4. rsync 前端到服务器 `/home/wwwroot/visual_buct/`
-5. SSH 执行: 装依赖 → 迁移 → 重启服务
+1. 本机 `git push origin master`
+2. SSH 到服务器 `ssh yanp@121.195.148.85`
+3. 执行 `cd /opt/visual_buct/BUCT_Media_System && bash deploy/deploy.sh all`
 
-所需 GitHub Secrets:
-| Secret | 说明 |
-|--------|------|
-| `SSH_HOST` | 121.195.148.85 |
-| `SSH_USER` | yanp |
-| `SSH_PRIVATE_KEY` | SSH 私钥 |
-| `SUDO_PASS` | mt01@buct |
+详细 SOP 见 [`docs/SOP.md`](docs/SOP.md)。
 
 ## 故障排查
 
