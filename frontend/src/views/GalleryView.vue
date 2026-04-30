@@ -597,13 +597,7 @@ function applyInterpretation(interpretation: SearchInterpretationType) {
     if (meaningfulKeywords.length > 0) {
       filters.search = meaningfulKeywords.join(' ')
     } else {
-      const facetValues = Object.values(interpretation.facet_filters)
-      const remainingQuery = facetValues.reduce((q, val) => q.replace(val, ''), interpretation.original_query).trim()
-      if (remainingQuery && remainingQuery.length >= 2) {
-        filters.search = remainingQuery
-      } else if (facetValues.length === 0) {
-        filters.search = interpretation.original_query
-      }
+      filters.search = interpretation.original_query
     }
     photoStore.setFilters(filters)
   }
@@ -657,8 +651,12 @@ async function handleRemoveFacet(facetKey: string) {
     else if (key === 'gallery_year') filters.gallery_year = value
     else if (key === 'photo_type') filters.photo_type = value
   }
-  if (currentInterpretation.value.keywords.length > 0) {
-    filters.search = currentInterpretation.value.keywords.join(' ')
+  const genericWords = new Set(['照片', '图片', '摄影', '相片', '图', '的', '了', '是', '在', '和'])
+  const meaningfulKeywords = currentInterpretation.value.keywords.filter(kw => !genericWords.has(kw) && kw.length >= 2)
+  if (meaningfulKeywords.length > 0) {
+    filters.search = meaningfulKeywords.join(' ')
+  } else {
+    filters.search = currentInterpretation.value.original_query
   }
   photoStore.setFilters(filters)
   await syncQueryAndFetch()
@@ -673,10 +671,8 @@ async function handleRemoveKeyword(keyword: string) {
   }
   if (newKeywords.length > 0) {
     photoStore.setFilters({ search: newKeywords.join(' ') })
-  } else if (Object.keys(currentInterpretation.value.facet_filters).length === 0) {
-    photoStore.setFilters({ search: '' })
   } else {
-    photoStore.setFilters({ search: '' })
+    photoStore.setFilters({ search: currentInterpretation.value.original_query })
   }
   await syncQueryAndFetch()
 }
