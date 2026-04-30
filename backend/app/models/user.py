@@ -5,8 +5,8 @@
 预留 SSO/OAuth 字段，为对接学校统一身份认证（类似 Google OAuth）做准备。
 """
 import uuid
-from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime
+from datetime import datetime, timezone
+from sqlalchemy import Column, String, Boolean, DateTime, Integer
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -31,7 +31,15 @@ class User(Base):
     full_name = Column(String(100))
     role = Column(String(20), default="user", nullable=False)  # admin/auditor/dept_user/user
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    # ── 安全与审计字段 ──
+    last_login_at = Column(DateTime, nullable=True, comment="最后登录时间")
+    login_count = Column(Integer, default=0, nullable=False, comment="累计登录次数")
+    failed_login_attempts = Column(Integer, default=0, nullable=False, comment="连续登录失败次数")
+    locked_until = Column(DateTime, nullable=True, comment="账号锁定截止时间")
+    token_version = Column(Integer, default=1, nullable=False, comment="Token 版本号，改密码后递增使旧 Token 失效")
+    email_verified = Column(Boolean, default=False, nullable=False, comment="邮箱是否已验证")
 
     # ── SSO/OAuth 预留字段 ──
     auth_provider = Column(
@@ -52,6 +60,13 @@ class User(Base):
     def is_sso_user(self) -> bool:
         """判断是否为 SSO 登录用户"""
         return self.auth_provider != "local"
+
+    @property
+    def is_locked(self) -> bool:
+        """判断账号是否处于锁定状态"""
+        if self.locked_until is None:
+            return False
+        return self.locked_until > datetime.now(timezone.utc)
 
     def __repr__(self):
         return f"<User(student_id='{self.student_id}', email='{self.email}', role='{self.role}', provider='{self.auth_provider}')>"

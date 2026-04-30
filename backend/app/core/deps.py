@@ -45,6 +45,7 @@ async def _get_user_from_token(
     Resolve user from JWT token.
 
     Returns None for missing/invalid tokens or missing users.
+    同时校验 token_version，改密码后旧 Token 会失效。
     """
     if not token:
         return None
@@ -61,6 +62,14 @@ async def _get_user_from_token(
     user = await user_crud.get_user_by_student_id(db, student_id=student_id)
     if user is None:
         user = await user_crud.get_user_by_email(db, email=student_id)
+
+    if user is None:
+        return None
+
+    # 校验 token_version，防止密码修改后的旧 Token 仍可用
+    token_ver = payload.get("ver")
+    if token_ver is not None and token_ver != user.token_version:
+        return None
 
     return user
 

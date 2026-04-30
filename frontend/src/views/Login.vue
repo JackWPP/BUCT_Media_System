@@ -6,7 +6,7 @@
           <img src="/logo.png" alt="视觉北化" class="login-logo" />
         </div>
       </template>
-      
+
       <n-alert
         v-if="errorMessage"
         type="error"
@@ -15,7 +15,7 @@
         @close="errorMessage = ''"
         style="margin-bottom: 16px;"
       />
-      
+
       <n-tabs v-model:value="activeTab" type="line" animated>
         <n-tab-pane name="login" tab="登录">
           <n-form
@@ -28,33 +28,41 @@
               <n-input
                 v-model:value="loginForm.identifier"
                 placeholder="请输入学号或邮箱"
+                autocomplete="username"
                 @keydown.enter="handleLogin"
               />
             </n-form-item>
-            
+
             <n-form-item label="密码" path="password">
               <n-input
                 v-model:value="loginForm.password"
                 type="password"
                 show-password-on="click"
                 placeholder="请输入密码"
+                autocomplete="current-password"
                 @keydown.enter="handleLogin"
               />
             </n-form-item>
-            
+
+            <n-space justify="space-between" align="center" style="margin-bottom: 8px;">
+              <n-checkbox v-model:checked="rememberMe">
+                记住我
+              </n-checkbox>
+            </n-space>
+
             <n-button
               type="primary"
               block
               size="large"
               :loading="loading"
               @click="handleLogin"
-              style="margin-top: 16px;"
+              style="margin-top: 8px;"
             >
               {{ loading ? '登录中...' : '登录' }}
             </n-button>
           </n-form>
         </n-tab-pane>
-        
+
         <n-tab-pane name="register" tab="注册">
           <n-form
             ref="registerFormRef"
@@ -66,42 +74,47 @@
               <n-input
                 v-model:value="registerForm.student_id"
                 placeholder="请输入学号/工号（必填）"
+                autocomplete="off"
               />
             </n-form-item>
-            
+
             <n-form-item label="邮箱" path="email">
               <n-input
                 v-model:value="registerForm.email"
                 placeholder="请输入邮箱（可选）"
+                autocomplete="email"
               />
             </n-form-item>
-            
+
             <n-form-item label="姓名" path="full_name">
               <n-input
                 v-model:value="registerForm.full_name"
                 placeholder="请输入姓名（可选）"
+                autocomplete="name"
               />
             </n-form-item>
-            
+
             <n-form-item label="密码" path="password">
               <n-input
                 v-model:value="registerForm.password"
                 type="password"
                 show-password-on="click"
-                placeholder="请输入密码"
+                placeholder="请输入密码（至少8位，含字母和数字）"
+                autocomplete="new-password"
               />
             </n-form-item>
-            
+
             <n-form-item label="确认密码" path="confirmPassword">
               <n-input
                 v-model:value="registerForm.confirmPassword"
                 type="password"
                 show-password-on="click"
                 placeholder="请再次输入密码"
+                autocomplete="new-password"
                 @keydown.enter="handleRegister"
               />
             </n-form-item>
-            
+
             <n-button
               type="primary"
               block
@@ -115,9 +128,9 @@
           </n-form>
         </n-tab-pane>
       </n-tabs>
-      
+
       <n-divider>或</n-divider>
-      
+
       <n-button block tertiary @click="goToGallery">
         跳过登录，直接浏览
       </n-button>
@@ -144,6 +157,7 @@ const loading = ref(false)
 const registering = ref(false)
 const errorMessage = ref('')
 const activeTab = ref('login')
+const rememberMe = ref(true)
 
 const loginForm = ref({
   identifier: '',
@@ -168,13 +182,21 @@ const loginRules: FormRules = {
   ],
 }
 
+function validatePassword(_rule: any, value: string) {
+  if (!value) return new Error('请输入密码')
+  if (value.length < 8) return new Error('密码至少8位')
+  if (!/[A-Za-z]/.test(value)) return new Error('密码需包含字母')
+  if (!/[0-9]/.test(value)) return new Error('密码需包含数字')
+  return true
+}
+
 const registerRules: FormRules = {
   student_id: [
     { required: true, message: '请输入学号/工号', trigger: ['input', 'blur'] },
   ],
   password: [
     { required: true, message: '请输入密码', trigger: ['input', 'blur'] },
-    { min: 6, message: '密码至少6位', trigger: ['blur'] },
+    { validator: validatePassword, trigger: ['blur'] },
   ],
   confirmPassword: [
     { required: true, message: '请确认密码', trigger: ['input', 'blur'] },
@@ -192,7 +214,7 @@ const registerRules: FormRules = {
 
 async function handleLogin() {
   if (!loginFormRef.value) return
-  
+
   errorMessage.value = ''
 
   try {
@@ -200,9 +222,23 @@ async function handleLogin() {
     loading.value = true
 
     await authStore.login(loginForm.value.identifier, loginForm.value.password)
-    
+
+    // 记住我：未勾选时仅使用 sessionStorage
+    if (!rememberMe.value) {
+      const token = localStorage.getItem('auth_token')
+      const refresh = localStorage.getItem('refresh_token')
+      if (token) {
+        sessionStorage.setItem('auth_token', token)
+        localStorage.removeItem('auth_token')
+      }
+      if (refresh) {
+        sessionStorage.setItem('refresh_token', refresh)
+        localStorage.removeItem('refresh_token')
+      }
+    }
+
     message.success('登录成功')
-    
+
     // 跳转到原目标页面或首页
     const redirect = route.query.redirect as string || '/'
     setTimeout(() => {
@@ -223,7 +259,7 @@ async function handleLogin() {
 
 async function handleRegister() {
   if (!registerFormRef.value) return
-  
+
   errorMessage.value = ''
 
   try {
@@ -236,9 +272,9 @@ async function handleRegister() {
       full_name: registerForm.value.full_name || undefined,
       password: registerForm.value.password,
     })
-    
+
     message.success('注册成功，请登录')
-    
+
     // 切换到登录tab
     activeTab.value = 'login'
     loginForm.value.identifier = registerForm.value.student_id

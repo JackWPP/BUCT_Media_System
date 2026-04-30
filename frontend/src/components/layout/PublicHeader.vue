@@ -117,6 +117,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   search: [keyword: string, smart: boolean]
+  openChangePassword: []
 }>()
 
 const router = useRouter()
@@ -152,6 +153,7 @@ const userMenuOptions = computed(() => {
     })
   }
   options.push(
+    { label: '个人中心', key: 'profile' },
     { label: '修改密码', key: 'change-password' },
     {
       label: '退出登录',
@@ -169,8 +171,9 @@ function handleSearch() {
 function handleUserMenuSelect(key: string) {
   if (key === 'admin') router.push('/admin')
   else if (key === 'submissions') router.push('/my-submissions')
+  else if (key === 'profile') router.push('/profile')
   else if (key === 'change-password') {
-    // 通过事件通知父组件
+    emit('openChangePassword')
   }
   else if (key === 'logout') {
     dialog.warning({

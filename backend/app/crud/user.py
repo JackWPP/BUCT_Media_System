@@ -105,6 +105,30 @@ async def authenticate_user(db: AsyncSession, identifier: str, password: str) ->
     return user
 
 
+async def record_login_success(db: AsyncSession, user: User) -> None:
+    """
+    记录登录成功，更新最后登录时间和登录次数，重置失败计数。
+    """
+    from datetime import datetime, timezone
+    user.last_login_at = datetime.now(timezone.utc)
+    user.login_count = (user.login_count or 0) + 1
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    await db.commit()
+
+
+async def record_login_failure(db: AsyncSession, user: User) -> None:
+    """
+    记录登录失败，递增失败计数，达到阈值则锁定账号。
+    """
+    from datetime import datetime, timedelta, timezone
+    user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+    # 连续 5 次失败锁定 15 分钟
+    if user.failed_login_attempts >= 5:
+        user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
+    await db.commit()
+
+
 async def get_users(
     db: AsyncSession,
     skip: int = 0,
@@ -239,7 +263,8 @@ async def change_user_password(
     """
     用户自助修改密码
 
-    验证旧密码后更新为新密码。返回 True 表示成功，False 表示旧密码错误。
+    验证旧密码后更新为新密码，同时递增 token_version 使旧 Token 失效。
+    返回 True 表示成功，False 表示旧密码错误。
     """
     user = await get_user_by_id(db, user_id)
     if not user:
@@ -249,6 +274,7 @@ async def change_user_password(
         return False
 
     user.hashed_password = get_password_hash(new_password)
+    user.token_version = (user.token_version or 1) + 1
     await db.commit()
     return True
 
@@ -260,11 +286,14 @@ async def reset_user_password(
 ) -> bool:
     """
     管理员重置用户密码（无需旧密码）
+
+    同时递增 token_version 使旧 Token 失效。
     """
     user = await get_user_by_id(db, user_id)
     if not user:
         return False
 
     user.hashed_password = get_password_hash(new_password)
+    user.token_version = (user.token_version or 1) + 1
     await db.commit()
     return True

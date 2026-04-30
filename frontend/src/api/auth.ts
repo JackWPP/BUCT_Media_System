@@ -46,3 +46,14 @@ export function changePassword(old_password: string, new_password: string): Prom
     data: { old_password, new_password },
   })
 }
+
+/**
+ * 更新当前用户个人资料
+ */
+export function updateProfile(data: { email?: string; full_name?: string }): Promise<User> {
+  return request({
+    url: '/api/v1/user/profile',
+    method: 'put',
+    data,
+  })
+}

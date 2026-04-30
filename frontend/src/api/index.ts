@@ -56,7 +56,7 @@ function processQueue(error: any, token: string | null = null) {
 // 请求拦截器
 _axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('auth_token')
+    const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -83,7 +83,7 @@ _axiosInstance.interceptors.response.use(
       !originalRequest.url?.includes('/auth/refresh') &&
       !originalRequest.url?.includes('/auth/login')
     ) {
-      const refreshTokenStr = localStorage.getItem('refresh_token')
+      const refreshTokenStr = localStorage.getItem('refresh_token') || sessionStorage.getItem('refresh_token')
 
       if (refreshTokenStr) {
         if (isRefreshing) {
@@ -105,8 +105,14 @@ _axiosInstance.interceptors.response.use(
           })
 
           const { access_token, refresh_token } = res.data
-          localStorage.setItem('auth_token', access_token)
-          localStorage.setItem('refresh_token', refresh_token)
+          // 保持与原存储位置一致
+          if (localStorage.getItem('auth_token')) {
+            localStorage.setItem('auth_token', access_token)
+            localStorage.setItem('refresh_token', refresh_token)
+          } else {
+            sessionStorage.setItem('auth_token', access_token)
+            sessionStorage.setItem('refresh_token', refresh_token)
+          }
 
           processQueue(null, access_token)
 
@@ -116,6 +122,8 @@ _axiosInstance.interceptors.response.use(
           processQueue(refreshError, null)
           localStorage.removeItem('auth_token')
           localStorage.removeItem('refresh_token')
+          sessionStorage.removeItem('auth_token')
+          sessionStorage.removeItem('refresh_token')
           if (window.location.pathname !== '/login') {
             window.location.href = '/login'
           }
@@ -137,6 +145,8 @@ _axiosInstance.interceptors.response.use(
           errorMessage = '身份验证失败，请重新登录'
           localStorage.removeItem('auth_token')
           localStorage.removeItem('refresh_token')
+          sessionStorage.removeItem('auth_token')
+          sessionStorage.removeItem('refresh_token')
           if (window.location.pathname !== '/login') {
             setTimeout(() => {
               window.location.href = '/login'

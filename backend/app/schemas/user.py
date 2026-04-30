@@ -7,7 +7,19 @@ User Pydantic schemas
 from datetime import datetime
 from typing import Optional
 from enum import Enum
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
+
+
+def validate_password_strength(password: str) -> str:
+    if len(password) < 8:
+        raise ValueError("密码至少8位")
+    if not any(c.islower() for c in password):
+        raise ValueError("密码需包含小写字母")
+    if not any(c.isupper() for c in password):
+        raise ValueError("密码需包含大写字母")
+    if not any(c.isdigit() for c in password):
+        raise ValueError("密码需包含数字")
+    return password
 
 
 class RoleEnum(str, Enum):
@@ -36,6 +48,11 @@ class UserCreate(UserBase):
     """用户注册 schema (公开注册)"""
     password: str
 
+    @field_validator("password")
+    @classmethod
+    def check_password(cls, v: str) -> str:
+        return validate_password_strength(v)
+
 
 class UserCreateByAdmin(UserBase):
     """
@@ -46,6 +63,11 @@ class UserCreateByAdmin(UserBase):
     """
     password: str
     role: RoleEnum = RoleEnum.USER
+
+    @field_validator("password")
+    @classmethod
+    def check_password(cls, v: str) -> str:
+        return validate_password_strength(v)
 
 
 class UserUpdate(BaseModel):
@@ -82,6 +104,12 @@ class UserInDB(UserBase):
     role: str
     is_active: bool
     created_at: datetime
+    last_login_at: Optional[datetime] = None
+    login_count: int = 0
+    failed_login_attempts: int = 0
+    locked_until: Optional[datetime] = None
+    token_version: int = 1
+    email_verified: bool = False
 
     class Config:
         from_attributes = True
@@ -103,7 +131,17 @@ class PasswordChange(BaseModel):
     old_password: str
     new_password: str
 
+    @field_validator("new_password")
+    @classmethod
+    def check_password(cls, v: str) -> str:
+        return validate_password_strength(v)
+
 
 class AdminPasswordReset(BaseModel):
     """管理员重置用户密码"""
     new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def check_password(cls, v: str) -> str:
+        return validate_password_strength(v)

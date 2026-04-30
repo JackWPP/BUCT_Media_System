@@ -330,6 +330,13 @@ const editingPhotoId = ref<string | null>(null)
 
 const PILL_COLLAPSE_THRESHOLD = 8
 
+// 需要隐藏的标签（红框标注要删除的）
+const hiddenTags: Record<string, string[]> = {
+  campus: ['朝阳校区'],
+  photo_type: ['人像', '活动', '纪实'],
+  gallery_series: ['活动纪实'],
+}
+
 const sortOptions = [
   { label: '最新上传', value: 'created_at' },
   { label: '最热门', value: 'views' },
@@ -401,6 +408,8 @@ const masonryPageSizes = computed(() => {
 })
 
 function facetOptions(key: string): SelectOption[] {
+  let options: SelectOption[] = []
+
   // 优先从 taxonomy API 动态获取
   const facet = facetMap.value[key]
   if (facet && facet.nodes && facet.nodes.length > 0) {
@@ -409,32 +418,32 @@ function facetOptions(key: string): SelectOption[] {
         { label: node.name, value: node.name },
         ...flatten(node.children || []),
       ])
-    return flatten(facet.nodes)
+    options = flatten(facet.nodes)
+  } else {
+    // 降级：taxonomy 未返回时，使用与后端一致的硬编码选项
+    if (key === 'season') {
+      options = [
+        { label: '春季', value: '春季' },
+        { label: '夏季', value: '夏季' },
+        { label: '秋季', value: '秋季' },
+        { label: '冬季', value: '冬季' },
+      ]
+    }
+    if (key === 'campus') {
+      options = [
+        { label: '昌平校区', value: '昌平校区' },
+      ]
+    }
+    if (key === 'photo_type') {
+      options = [
+        { label: '风光', value: '风光' },
+      ]
+    }
   }
 
-  // 降级：taxonomy 未返回时，使用与后端一致的硬编码选项
-  if (key === 'season') {
-    return [
-      { label: '春季', value: '春季' },
-      { label: '夏季', value: '夏季' },
-      { label: '秋季', value: '秋季' },
-      { label: '冬季', value: '冬季' },
-    ]
-  }
-  if (key === 'campus') {
-    return [
-      { label: '昌平校区', value: '昌平校区' },
-      { label: '朝阳校区', value: '朝阳校区' },
-    ]
-  }
-  if (key === 'photo_type') {
-    return [
-      { label: '风光', value: '风光' },
-      { label: '纪实', value: '纪实' },
-    ]
-  }
-
-  return []
+  // 过滤掉需要隐藏的标签
+  const hidden = hiddenTags[key] || []
+  return options.filter((opt) => !hidden.includes(opt.value as string))
 }
 
 function shouldShowMore(key: string): boolean {

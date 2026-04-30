@@ -4,6 +4,7 @@
       :is-home="isHome"
       :search-keyword="searchKeyword"
       @search="handleHeaderSearch"
+      @open-change-password="showChangePassword = true"
     />
     <main class="public-main">
       <router-view v-slot="{ Component }">
@@ -12,6 +13,7 @@
         </transition>
       </router-view>
     </main>
+    <ChangePasswordDialog v-model:show="showChangePassword" />
   </div>
 </template>
 
@@ -19,12 +21,14 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PublicHeader from '../components/layout/PublicHeader.vue'
+import ChangePasswordDialog from '../components/common/ChangePasswordDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
 
 const isHome = computed(() => route.path === '/')
 const searchKeyword = ref('')
+const showChangePassword = ref(false)
 
 watch(() => route.query.search, (val) => {
   searchKeyword.value = typeof val === 'string' ? val : ''

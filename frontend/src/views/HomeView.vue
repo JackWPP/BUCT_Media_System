@@ -251,7 +251,7 @@ onMounted(() => {
 .hero-bg {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, #faf8f5 0%, #f5f0eb 50%, #faf8f5 100%);
+  background: linear-gradient(135deg, #003d7a 0%, #0056a6 50%, #004080 100%);
   z-index: 0;
 }
 
@@ -265,7 +265,7 @@ onMounted(() => {
 .circle-1 {
   width: 400px;
   height: 400px;
-  background: radial-gradient(circle, rgba(255, 182, 193, 0.6), transparent);
+  background: radial-gradient(circle, rgba(100, 180, 255, 0.25), transparent);
   top: -100px;
   left: 10%;
 }
@@ -273,7 +273,7 @@ onMounted(() => {
 .circle-2 {
   width: 350px;
   height: 350px;
-  background: radial-gradient(circle, rgba(173, 216, 230, 0.5), transparent);
+  background: radial-gradient(circle, rgba(0, 120, 220, 0.2), transparent);
   top: 20%;
   right: 15%;
 }
@@ -281,7 +281,7 @@ onMounted(() => {
 .circle-3 {
   width: 300px;
   height: 300px;
-  background: radial-gradient(circle, rgba(144, 238, 144, 0.4), transparent);
+  background: radial-gradient(circle, rgba(80, 160, 240, 0.15), transparent);
   bottom: 10%;
   left: 25%;
 }
@@ -289,7 +289,7 @@ onMounted(() => {
 .circle-4 {
   width: 280px;
   height: 280px;
-  background: radial-gradient(circle, rgba(255, 218, 185, 0.5), transparent);
+  background: radial-gradient(circle, rgba(0, 80, 160, 0.2), transparent);
   bottom: 20%;
   right: 20%;
 }
@@ -307,14 +307,14 @@ onMounted(() => {
 .hero-slogan {
   font-size: 42px;
   font-weight: 500;
-  color: #333;
+  color: #ffffff;
   margin-bottom: 12px;
   letter-spacing: 4px;
 }
 
 .hero-subtitle {
   font-size: 16px;
-  color: #999;
+  color: rgba(255, 255, 255, 0.8);
   margin-bottom: 40px;
   letter-spacing: 2px;
 }
@@ -338,7 +338,7 @@ onMounted(() => {
 }
 
 .home-smart-toggle .smart-label.smart-active {
-  color: #e60012;
+  color: #64b4ff;
   font-weight: 500;
 }
 
@@ -366,7 +366,7 @@ onMounted(() => {
 }
 
 .search-type:hover {
-  color: #e60012;
+  color: #0056a6;
 }
 
 .search-divider {
@@ -397,20 +397,20 @@ onMounted(() => {
 }
 
 .search-camera-btn:hover {
-  color: #e60012;
+  color: #0056a6;
 }
 
 .search-submit-btn {
   width: 52px;
   height: 52px;
   border-radius: 0;
-  background: #e60012 !important;
+  background: #0056a6 !important;
   border: none !important;
   flex-shrink: 0;
 }
 
 .search-submit-btn:hover {
-  background: #c4000f !important;
+  background: #004080 !important;
 }
 
 /* 热搜标签 */
@@ -424,7 +424,7 @@ onMounted(() => {
 
 .hot-label {
   font-size: 13px;
-  color: #999;
+  color: rgba(255, 255, 255, 0.7);
   margin-right: 4px;
 }
 
@@ -437,19 +437,19 @@ onMounted(() => {
 
 .hot-tag {
   font-size: 13px;
-  color: #666;
+  color: rgba(255, 255, 255, 0.85);
   cursor: pointer;
   transition: color 0.2s;
 }
 
 .hot-tag:hover {
-  color: #e60012;
+  color: #ffffff;
 }
 
 .hot-tag:not(:last-child)::after {
   content: '|';
   margin-left: 8px;
-  color: #ddd;
+  color: rgba(255, 255, 255, 0.4);
 }
 
 /* ===== 精选图片区域 ===== */

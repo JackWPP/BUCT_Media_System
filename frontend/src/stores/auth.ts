@@ -46,10 +46,15 @@ export const useAuthStore = defineStore('auth', () => {
     return user.value.role === role
   }
 
-  // 从 localStorage 初始化
+  // 从 localStorage / sessionStorage 初始化
   function initFromStorage() {
-    const storedToken = localStorage.getItem('auth_token')
-    const storedRefreshToken = localStorage.getItem('refresh_token')
+    let storedToken = localStorage.getItem('auth_token')
+    let storedRefreshToken = localStorage.getItem('refresh_token')
+    // 兼容未勾选"记住我"时存储在 sessionStorage 的情况
+    if (!storedToken) {
+      storedToken = sessionStorage.getItem('auth_token')
+      storedRefreshToken = sessionStorage.getItem('refresh_token')
+    }
     if (storedToken) {
       token.value = storedToken
       refreshTokenValue.value = storedRefreshToken
@@ -88,6 +93,8 @@ export const useAuthStore = defineStore('auth', () => {
     refreshTokenValue.value = null
     localStorage.removeItem('auth_token')
     localStorage.removeItem('refresh_token')
+    sessionStorage.removeItem('auth_token')
+    sessionStorage.removeItem('refresh_token')
   }
 
   // 获取当前用户信息

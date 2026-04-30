@@ -78,6 +78,9 @@ class Settings(BaseSettings):
     SSO_SCOPES: str = "openid profile email"
     SSO_AUTO_CREATE_USER: bool = True       # SSO 登录时自动创建本地用户
 
+    # 注册审批配置
+    REQUIRE_REGISTRATION_APPROVAL: bool = False  # 是否开启注册审批
+
     # CORS 配置
     ALLOWED_ORIGINS: list[str] = [
         "http://localhost:5173",
@@ -85,7 +88,7 @@ class Settings(BaseSettings):
         "http://localhost:5175",
         "http://localhost:3000"
     ]
-    
+
     class Config:
         env_file = ".env"
         case_sensitive = True
