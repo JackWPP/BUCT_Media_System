@@ -674,20 +674,26 @@ async function handleChangeClassification(facetKey: string, nodeId: number) {
     emit('updated')
     message.success('分类已更新')
   } catch (error: any) {
-    message.error(error?.response?.data?.detail || '更新分类失败')
+    const detail = error?.response?.data?.detail || error?.message || ''
+    message.error(detail || '更新分类失败')
   }
 }
 
 async function handleRemoveClassification(facetKey: string, event?: MouseEvent) {
   event?.stopPropagation()
-  if (!photo.value) return
+  if (!photo.value) {
+    message.error('照片数据未加载')
+    return
+  }
   try {
     const updatedPhoto = await removePhotoClassification(photo.value.id, facetKey)
     photo.value = updatedPhoto as Photo
     emit('updated')
     message.success('分类已移除')
   } catch (error: any) {
-    message.error(error?.response?.data?.detail || '移除分类失败')
+    const detail = error?.response?.data?.detail || error?.message || JSON.stringify(error)
+    console.error('Remove classification failed:', error, detail)
+    message.error(`移除分类失败: ${detail}`)
   }
 }
 
@@ -704,7 +710,8 @@ async function handleAddClassification() {
     emit('updated')
     message.success('分类已添加')
   } catch (error: any) {
-    message.error(error?.response?.data?.detail || '添加分类失败')
+    const detail = error?.response?.data?.detail || error?.message || ''
+    message.error(detail || '添加分类失败')
   }
 }
 
