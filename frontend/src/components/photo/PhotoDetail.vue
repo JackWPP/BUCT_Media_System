@@ -678,9 +678,8 @@ async function handleChangeClassification(facetKey: string, nodeId: number) {
   }
 }
 
-async function handleRemoveClassification(facetKey: string, event: MouseEvent) {
-  // n-tag's @close emits a MouseEvent, avoid triggering popover
-  event.stopPropagation()
+async function handleRemoveClassification(facetKey: string, event?: MouseEvent) {
+  event?.stopPropagation()
   if (!photo.value) return
   try {
     const updatedPhoto = await removePhotoClassification(photo.value.id, facetKey)
