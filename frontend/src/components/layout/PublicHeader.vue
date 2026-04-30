@@ -232,7 +232,7 @@ function handleUserMenuSelect(key: string) {
 }
 
 .logo-image {
-  height: 36px;
+  height: 42px;
   width: auto;
   display: block;
 }
@@ -311,7 +311,7 @@ function handleUserMenuSelect(key: string) {
   }
 
   .logo-image {
-    height: 28px;
+    height: 34px;
   }
 
   .action-text {
