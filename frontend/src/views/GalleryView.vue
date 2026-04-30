@@ -242,6 +242,18 @@
                     </span>
                   </div>
                 </div>
+                <n-button
+                  v-if="authStore.isAuditor"
+                  class="photo-edit-btn"
+                  circle
+                  size="tiny"
+                  :color="'rgba(255,255,255,0.9)'"
+                  @click.stop="openEditModal(photo)"
+                >
+                  <template #icon>
+                    <n-icon :component="CreateOutline" />
+                  </template>
+                </n-button>
               </div>
             </div>
           </template>
@@ -261,6 +273,15 @@
         @update:page-size="handlePageSizeChange"
       />
     </div>
+
+    <!-- 管理员编辑模态框 -->
+    <PhotoDetail
+      v-model:show="showEditModal"
+      :photo-id="editingPhotoId"
+      admin-mode
+      @updated="syncQueryAndFetch"
+      @deleted="syncQueryAndFetch"
+    />
   </div>
 </template>
 
@@ -274,6 +295,7 @@ import {
   SearchOutline,
   PricetagsOutline,
   OptionsOutline,
+  CreateOutline,
 } from '@vicons/ionicons5'
 import { useDebounceFn } from '@vueuse/core'
 import type { SelectOption } from 'naive-ui'
@@ -283,11 +305,14 @@ import { getPublicTaxonomy, type TaxonomyFacet } from '../api/taxonomy'
 import type { Photo, PhotoFilters, SearchInterpretation as SearchInterpretationType } from '../types/photo'
 import { interpretSearch } from '../api/photo'
 import SearchInterpretation from '../components/search/SearchInterpretation.vue'
+import PhotoDetail from '../components/photo/PhotoDetail.vue'
 import { getPhotoUrl } from '../utils/format'
+import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
 const route = useRoute()
 const photoStore = usePhotoStore()
+const authStore = useAuthStore()
 
 const taxonomyFacets = ref<TaxonomyFacet[]>([])
 const taxonomyLoading = ref(false)
@@ -300,6 +325,8 @@ const currentInterpretation = ref<SearchInterpretationType | null>(null)
 const searchKeyword = ref('')
 const filterMode = ref<'pills' | 'compact'>('pills')
 const expandedGroups = reactive<Record<string, boolean>>({})
+const showEditModal = ref(false)
+const editingPhotoId = ref<string | null>(null)
 
 const PILL_COLLAPSE_THRESHOLD = 8
 
@@ -516,6 +543,11 @@ async function handleClearFilters() {
 
 function handlePhotoClick(photo: Photo) {
   router.push(`/photo/${photo.id}`)
+}
+
+function openEditModal(photo: Photo) {
+  editingPhotoId.value = photo.id
+  showEditModal.value = true
 }
 
 function handleSmartToggle(enabled: boolean) {
@@ -917,6 +949,22 @@ onMounted(async () => {
   padding: 2px 8px;
   border-radius: 10px;
   backdrop-filter: blur(4px);
+}
+
+.photo-edit-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: all 0.3s ease;
+  pointer-events: auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.photo-card-hover:hover .photo-edit-btn {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* 分页 */
