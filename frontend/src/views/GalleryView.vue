@@ -604,6 +604,16 @@ const handleSearchInput = useDebounceFn(async (value: string) => {
       const meaningfulKeywords = result.keywords.filter(kw => !genericWords.has(kw) && kw.length >= 2)
       if (meaningfulKeywords.length > 0) {
         filters.search = meaningfulKeywords.join(' ')
+      } else {
+        // 当AI解析出facet_filters但没有剩余关键词时，
+        // 将原始搜索词作为兜底搜索条件保留（排除已匹配到的facet词避免重复）
+        const facetValues = Object.values(result.facet_filters)
+        const remainingQuery = facetValues.reduce((q, val) => q.replace(val, ''), value.trim()).trim()
+        if (remainingQuery && remainingQuery.length >= 2) {
+          filters.search = remainingQuery
+        } else if (facetValues.length === 0) {
+          filters.search = value.trim()
+        }
       }
       photoStore.setFilters(filters)
     } else {

@@ -180,7 +180,7 @@ async def list_public_photos(
         gallery_series=gallery_series,
         gallery_year=gallery_year,
         photo_type=photo_type,
-        search=search if not interpretation else None,
+        search=search,
         tag=tag,
         exclude_categories=["Portrait"] if should_filter_portrait else None,
         sort_by=sort_by,

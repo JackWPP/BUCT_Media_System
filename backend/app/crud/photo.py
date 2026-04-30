@@ -131,7 +131,8 @@ async def get_photos(
         query, count_query = await _apply_interpretation_filters(
             query, count_query, interpretation
         )
-    elif search:
+
+    if search:
         search_pattern = f"%{search}%"
         tag_photo_subquery = (
             select(PhotoTag.photo_id)
