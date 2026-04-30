@@ -110,7 +110,7 @@ async def record_login_success(db: AsyncSession, user: User) -> None:
     记录登录成功，更新最后登录时间和登录次数，重置失败计数。
     """
     from datetime import datetime, timezone
-    user.last_login_at = datetime.now(timezone.utc)
+    user.last_login_at = datetime.now(timezone.utc).replace(tzinfo=None)
     user.login_count = (user.login_count or 0) + 1
     user.failed_login_attempts = 0
     user.locked_until = None
@@ -125,7 +125,7 @@ async def record_login_failure(db: AsyncSession, user: User) -> None:
     user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
     # 连续 5 次失败锁定 15 分钟
     if user.failed_login_attempts >= 5:
-        user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
+        user.locked_until = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=15)
     await db.commit()
 
 

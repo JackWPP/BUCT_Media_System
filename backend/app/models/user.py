@@ -31,7 +31,7 @@ class User(Base):
     full_name = Column(String(100))
     role = Column(String(20), default="user", nullable=False)  # admin/auditor/dept_user/user
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), nullable=False)
 
     # ── 安全与审计字段 ──
     last_login_at = Column(DateTime, nullable=True, comment="最后登录时间")
@@ -66,7 +66,7 @@ class User(Base):
         """判断账号是否处于锁定状态"""
         if self.locked_until is None:
             return False
-        return self.locked_until > datetime.now(timezone.utc)
+        return self.locked_until > datetime.now(timezone.utc).replace(tzinfo=None)
 
     def __repr__(self):
         return f"<User(student_id='{self.student_id}', email='{self.email}', role='{self.role}', provider='{self.auth_provider}')>"
