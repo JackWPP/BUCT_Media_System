@@ -98,11 +98,11 @@ export function updatePhotoTags(id: string, tagNames: string[]): Promise<Photo> 
 }
 
 export function updatePhotoClassifications(id: string, classifications: Record<string, number>): Promise<Photo> {
-  return request({ url: `/api/v1/photos/${id}/classifications`, method: 'put', data: { classifications } })
+  return request({ url: `/api/v1/photos/${id}/classifications`, method: 'post', data: { classifications } })
 }
 
 export function removePhotoClassification(id: string, facetKey: string): Promise<Photo> {
-  return request({ url: `/api/v1/photos/${id}/classifications/${facetKey}`, method: 'delete' })
+  return request({ url: `/api/v1/photos/${id}/classifications/${facetKey}/remove`, method: 'post' })
 }
 
 export function approvePhoto(id: string): Promise<Photo> {

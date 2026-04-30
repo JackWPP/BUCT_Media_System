@@ -697,6 +697,28 @@ async def remove_photo_classification(
     return await serialize_photo(db, await photo_crud.get_photo_with_tags(db, photo_id))
 
 
+@router.post("/{photo_id}/classifications", response_model=PhotoResponse)
+async def update_photo_classifications_post(
+    photo_id: str,
+    body: "PhotoClassificationUpdateSchema",
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """POST alternative for updating photo classifications (workaround for proxy filtering)."""
+    return await update_photo_classifications(photo_id, body, db, current_user)
+
+
+@router.post("/{photo_id}/classifications/{facet_key}/remove", response_model=PhotoResponse)
+async def remove_photo_classification_post(
+    photo_id: str,
+    facet_key: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """POST alternative for removing a photo classification (workaround for proxy filtering)."""
+    return await remove_photo_classification(photo_id, facet_key, db, current_user)
+
+
 @router.post("/{photo_id}/ai-analysis", response_model=AIAnalysisTaskResponse, status_code=status.HTTP_202_ACCEPTED)
 async def create_photo_ai_analysis(
     photo_id: str,
