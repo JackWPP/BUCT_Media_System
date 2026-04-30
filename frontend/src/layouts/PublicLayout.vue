@@ -3,6 +3,7 @@
     <PublicHeader
       :is-home="isHome"
       :search-keyword="searchKeyword"
+      :hide-search="hideHeaderSearch"
       @search="handleHeaderSearch"
       @open-change-password="showChangePassword = true"
     />
@@ -27,6 +28,7 @@ const route = useRoute()
 const router = useRouter()
 
 const isHome = computed(() => route.path === '/')
+const hideHeaderSearch = computed(() => route.path === '/gallery')
 const searchKeyword = ref('')
 const showChangePassword = ref(false)
 

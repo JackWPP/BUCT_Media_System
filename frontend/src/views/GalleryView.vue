@@ -559,14 +559,54 @@ function openEditModal(photo: Photo) {
   showEditModal.value = true
 }
 
-function handleSmartToggle(enabled: boolean) {
+async function handleSmartToggle(enabled: boolean) {
   smartSearchEnabled.value = enabled
   localStorage.setItem('smart_search_enabled', enabled ? 'true' : 'false')
+  if (!enabled) {
+    currentInterpretation.value = null
+    if (searchKeyword.value.trim()) {
+      photoStore.setFilters({ search: searchKeyword.value.trim() })
+      await syncQueryAndFetch()
+    }
+  } else if (searchKeyword.value.trim()) {
+    // Re-trigger interpretation with current search text
+    await handleSearchInput(searchKeyword.value)
+  }
 }
 
 async function handleCompactFilterChange(key: keyof PhotoFilters) {
   photoStore.setPage(1)
   await syncQueryAndFetch()
+}
+
+function applyInterpretation(interpretation: SearchInterpretationType) {
+  currentInterpretation.value = interpretation
+
+  if (interpretation.facet_filters && Object.keys(interpretation.facet_filters).length > 0) {
+    const filters: Partial<PhotoFilters> = {}
+    for (const [facetKey, nodeValue] of Object.entries(interpretation.facet_filters)) {
+      if (facetKey === 'season') filters.season = nodeValue
+      else if (facetKey === 'campus') filters.campus = nodeValue
+      else if (facetKey === 'landmark') filters.building = nodeValue
+      else if (facetKey === 'gallery_series') filters.gallery_series = nodeValue
+      else if (facetKey === 'gallery_year') filters.gallery_year = nodeValue
+      else if (facetKey === 'photo_type') filters.photo_type = nodeValue
+    }
+    const genericWords = new Set(['照片', '图片', '摄影', '相片', '图', '的', '了', '是', '在', '和'])
+    const meaningfulKeywords = interpretation.keywords.filter(kw => !genericWords.has(kw) && kw.length >= 2)
+    if (meaningfulKeywords.length > 0) {
+      filters.search = meaningfulKeywords.join(' ')
+    } else {
+      const facetValues = Object.values(interpretation.facet_filters)
+      const remainingQuery = facetValues.reduce((q, val) => q.replace(val, ''), interpretation.original_query).trim()
+      if (remainingQuery && remainingQuery.length >= 2) {
+        filters.search = remainingQuery
+      } else if (facetValues.length === 0) {
+        filters.search = interpretation.original_query
+      }
+    }
+    photoStore.setFilters(filters)
+  }
 }
 
 const handleSearchInput = useDebounceFn(async (value: string) => {
@@ -588,38 +628,7 @@ const handleSearchInput = useDebounceFn(async (value: string) => {
   isInterpreting.value = true
   try {
     const result = await interpretSearch(value.trim())
-    currentInterpretation.value = result
-
-    if (result.facet_filters && Object.keys(result.facet_filters).length > 0) {
-      const filters: Partial<PhotoFilters> = {}
-      for (const [facetKey, nodeValue] of Object.entries(result.facet_filters)) {
-        if (facetKey === 'season') filters.season = nodeValue
-        else if (facetKey === 'campus') filters.campus = nodeValue
-        else if (facetKey === 'landmark') filters.building = nodeValue
-        else if (facetKey === 'gallery_series') filters.gallery_series = nodeValue
-        else if (facetKey === 'gallery_year') filters.gallery_year = nodeValue
-        else if (facetKey === 'photo_type') filters.photo_type = nodeValue
-      }
-      const genericWords = new Set(['照片', '图片', '摄影', '相片', '图', '的', '了', '是', '在', '和'])
-      const meaningfulKeywords = result.keywords.filter(kw => !genericWords.has(kw) && kw.length >= 2)
-      if (meaningfulKeywords.length > 0) {
-        filters.search = meaningfulKeywords.join(' ')
-      } else {
-        // 当AI解析出facet_filters但没有剩余关键词时，
-        // 将原始搜索词作为兜底搜索条件保留（排除已匹配到的facet词避免重复）
-        const facetValues = Object.values(result.facet_filters)
-        const remainingQuery = facetValues.reduce((q, val) => q.replace(val, ''), value.trim()).trim()
-        if (remainingQuery && remainingQuery.length >= 2) {
-          filters.search = remainingQuery
-        } else if (facetValues.length === 0) {
-          filters.search = value.trim()
-        }
-      }
-      photoStore.setFilters(filters)
-    } else {
-      photoStore.setFilters({ search: value })
-    }
-
+    applyInterpretation(result)
     await syncQueryAndFetch()
   } catch {
     currentInterpretation.value = null
@@ -695,6 +704,10 @@ watch(
     if (syncingRoute.value) return
     applyRouteQuery()
     await photoStore.fetchPublicPhotos()
+    // Display interpretation when navigating to gallery with search (e.g., browser back/forward)
+    if (photoStore.searchInterpretation && smartSearchEnabled.value) {
+      applyInterpretation(photoStore.searchInterpretation)
+    }
   },
   { deep: true },
 )
@@ -714,6 +727,11 @@ onMounted(async () => {
 
   applyRouteQuery()
   await Promise.all([photoStore.fetchPublicPhotos(), loadTaxonomy()])
+
+  // Display interpretation from initial fetch (e.g., navigated from hero/header with smart search)
+  if (photoStore.searchInterpretation && smartSearchEnabled.value) {
+    applyInterpretation(photoStore.searchInterpretation)
+  }
 })
 </script>
 

@@ -3,7 +3,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Photo, PhotoFilters, PhotoListParams } from '../types/photo'
+import type { Photo, PhotoFilters, PhotoListParams, SearchInterpretation } from '../types/photo'
 import * as photoApi from '../api/photo'
 
 export const usePhotoStore = defineStore('photo', () => {
@@ -13,6 +13,7 @@ export const usePhotoStore = defineStore('photo', () => {
   const pageSize = ref(30)
   const loading = ref(false)
   const selectedPhoto = ref<Photo | null>(null)
+  const searchInterpretation = ref<SearchInterpretation | null>(null)
   const filters = ref<PhotoFilters>({
     season: null,
     category: null,
@@ -78,6 +79,7 @@ export const usePhotoStore = defineStore('photo', () => {
       const response = await photoApi.getPublicPhotos(buildPublicQueryParams(params))
       photos.value = response.items
       total.value = response.total
+      searchInterpretation.value = response.search_interpretation ?? null
       return response
     } finally {
       loading.value = false
@@ -145,6 +147,7 @@ export const usePhotoStore = defineStore('photo', () => {
     pageSize,
     loading,
     selectedPhoto,
+    searchInterpretation,
     filters,
     fetchPhotos,
     fetchPublicPhotos,

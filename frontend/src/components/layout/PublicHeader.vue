@@ -14,7 +14,7 @@
 
       <!-- 搜索框 - 仅在非首页或滚动后显示 -->
       <div
-        v-if="!isHome || isScrolled"
+        v-if="!hideSearch && (!isHome || isScrolled)"
         class="header-search-mini"
       >
         <n-input
@@ -108,11 +108,13 @@ import { useAuthStore } from '../../stores/auth'
 interface Props {
   isHome?: boolean
   searchKeyword?: string
+  hideSearch?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isHome: false,
   searchKeyword: '',
+  hideSearch: false,
 })
 
 const emit = defineEmits<{
