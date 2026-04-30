@@ -16,9 +16,6 @@
         <div class="hero-top-light"></div>
       </div>
       <div class="hero-content" :style="{ opacity: heroOpacity, transform: heroTranslate }">
-        <div class="hero-logo">
-          <img src="/logo.png" alt="视觉北化" class="hero-logo-img" />
-        </div>
         <h1 class="hero-slogan">视觉之美  触动世界</h1>
         <p class="hero-subtitle">探索北化校园精彩瞬间</p>
 
@@ -254,7 +251,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 80px 24px 48px;
+  padding: 120px 24px 48px;
   overflow: hidden;
 }
 
@@ -368,16 +365,6 @@ onMounted(() => {
   width: 100%;
   transition: opacity 0.15s linear;
   will-change: opacity, transform;
-}
-
-.hero-logo {
-  margin-bottom: 16px;
-}
-
-.hero-logo-img {
-  height: 56px;
-  width: auto;
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2));
 }
 
 .hero-slogan {

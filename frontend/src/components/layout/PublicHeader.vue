@@ -198,7 +198,7 @@ function handleUserMenuSelect(key: string) {
   left: 0;
   right: 0;
   z-index: 1000;
-  height: 56px;
+  height: 80px;
   transition: all 0.3s ease;
 }
 
@@ -232,7 +232,7 @@ function handleUserMenuSelect(key: string) {
 }
 
 .logo-image {
-  height: 42px;
+  height: 120px;
   width: auto;
   display: block;
 }
@@ -311,7 +311,7 @@ function handleUserMenuSelect(key: string) {
   }
 
   .logo-image {
-    height: 34px;
+    height: 80px;
   }
 
   .action-text {
