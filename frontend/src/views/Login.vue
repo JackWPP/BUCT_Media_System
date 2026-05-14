@@ -185,7 +185,8 @@ const loginRules: FormRules = {
 function validatePassword(_rule: any, value: string) {
   if (!value) return new Error('请输入密码')
   if (value.length < 8) return new Error('密码至少8位')
-  if (!/[A-Za-z]/.test(value)) return new Error('密码需包含字母')
+  if (!/[a-z]/.test(value)) return new Error('密码需包含小写字母')
+  if (!/[A-Z]/.test(value)) return new Error('密码需包含大写字母')
   if (!/[0-9]/.test(value)) return new Error('密码需包含数字')
   return true
 }
