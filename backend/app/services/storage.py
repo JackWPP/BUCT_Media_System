@@ -273,10 +273,13 @@ class S3StorageBackend(StorageBackend):
     ) -> Response:
         try:
             from fastapi.responses import StreamingResponse
+            from urllib.parse import quote
             response = self.client.get_object(Bucket=self.bucket, Key=file_path)
             headers = {}
             if download_name:
-                headers["Content-Disposition"] = f'attachment; filename="{download_name}"'
+                # RFC 5987: use filename*=UTF-8'' for non-ASCII filenames
+                encoded_name = quote(download_name)
+                headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{encoded_name}"
             return StreamingResponse(
                 response["Body"],
                 media_type=response.get("ContentType", "image/jpeg"),
