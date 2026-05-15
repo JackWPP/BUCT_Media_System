@@ -28,7 +28,7 @@ const route = useRoute()
 const router = useRouter()
 
 const isHome = computed(() => route.path === '/')
-const hideHeaderSearch = computed(() => route.path === '/gallery')
+const hideHeaderSearch = computed(() => false)
 const searchKeyword = ref('')
 const showChangePassword = ref(false)
 

@@ -287,7 +287,7 @@ function handleUserMenuSelect(key: string) {
 }
 
 .logo-image {
-  height: 120px;
+  height: 60px;
   width: auto;
   display: block;
 }
@@ -397,10 +397,15 @@ function handleUserMenuSelect(key: string) {
 @media (max-width: 768px) {
   .header-container {
     padding: 0 12px;
+    gap: 8px;
+  }
+
+  .public-header {
+    height: 56px;
   }
 
   .logo-image {
-    height: 80px;
+    height: 48px;
   }
 
   .action-text {
@@ -409,6 +414,11 @@ function handleUserMenuSelect(key: string) {
 
   .header-search-mini {
     max-width: 200px;
+    min-width: 0;
+  }
+
+  .header-search-mini :deep(.n-input) {
+    font-size: 13px;
   }
 }
 

@@ -7,11 +7,11 @@
           <span v-if="photoStore.filters.search" class="search-term">
             "{{ photoStore.filters.search }}"
           </span>
-          <span class="count-text">共 <strong>{{ photoStore.total.toLocaleString() }}</strong> 张</span>
         </div>
 
         <div class="toolbar-actions">
-          <div class="smart-search-toggle">
+          <!-- 智能搜索开关已隐藏 -->
+          <div class="smart-search-toggle" style="display:none;">
             <n-switch
               v-model:value="smartSearchEnabled"
               size="small"
@@ -86,16 +86,6 @@
                 <n-icon :component="PricetagsOutline" />
               </template>
               标签
-            </n-button>
-            <n-button
-              :type="filterMode === 'compact' ? 'primary' : 'default'"
-              ghost
-              @click="filterMode = 'compact'"
-            >
-              <template #icon>
-                <n-icon :component="OptionsOutline" />
-              </template>
-              下拉
             </n-button>
           </n-button-group>
           <n-button
