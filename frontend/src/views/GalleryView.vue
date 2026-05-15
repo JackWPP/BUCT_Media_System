@@ -222,7 +222,7 @@
           :columns-config="masonryColumnsConfig"
         >
           <template #default="{ item: photo }">
-            <div class="photo-card-hover" @click="handlePhotoClick(photo)">
+            <div class="photo-card-hover" :class="{ 'photo-card-portrait': photo.height > photo.width }" @click="handlePhotoClick(photo)">
               <img
                 :src="getImageUrl(photo)"
                 :alt="photo.filename"
@@ -261,17 +261,13 @@
       </n-spin>
     </div>
 
-    <!-- 分页 -->
-    <div v-if="photoStore.total > photoStore.pageSize" class="gallery-pagination">
-      <n-pagination
-        v-model:page="photoStore.currentPage"
-        :item-count="photoStore.total"
-        :page-size="photoStore.pageSize"
-        show-size-picker
-        :page-sizes="masonryPageSizes"
-        @update:page="handlePageChange"
-        @update:page-size="handlePageSizeChange"
-      />
+    <!-- 无限滚动加载更多 -->
+    <div ref="loadMoreSentinel" class="load-more-sentinel" v-if="photoStore.hasMore">
+      <n-spin size="small" />
+      <span class="load-more-text">加载更多…</span>
+    </div>
+    <div v-else-if="photoStore.photos.length > 0" class="load-more-end">
+      — 已加载全部 {{ photoStore.total }} 张 —
     </div>
 
     <!-- 管理员编辑模态框 -->
@@ -286,7 +282,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   CloseOutline,
@@ -391,7 +387,7 @@ const masonryColumnsConfig = computed(() => {
   if (viewMode.value === 'small') {
     return { base: 2, sm: 3, lg: 4, xl: 5, '2xl': 6 }
   }
-  return { base: 1, sm: 2, lg: 3, xl: 4, '2xl': 5 }
+  return { base: 2, sm: 2, lg: 3, xl: 4, '2xl': 5 }
 })
 
 // 获取当前屏幕下的最大列数，用于计算每页数量
@@ -403,8 +399,9 @@ const maxColumnCount = computed(() => {
 // 分页选项：确保每页数量是列数的倍数，让瀑布流底部更平整
 const masonryPageSizes = computed(() => {
   const cols = maxColumnCount.value
-  // 生成 5倍、10倍、15倍 列数的选项
-  return [cols * 5, cols * 10, cols * 15]
+  // 默认至少30张或列数×8（取较大值），确保首屏填满
+  const defaultSize = Math.max(30, cols * 8)
+  return [defaultSize, cols * 15, cols * 25]
 })
 
 function facetOptions(key: string): SelectOption[] {
@@ -498,6 +495,8 @@ async function syncQueryAndFetch() {
   await nextTick()
   await photoStore.fetchPublicPhotos()
   syncingRoute.value = false
+  await nextTick()
+  setupInfiniteScroll()
 }
 
 function applyRouteQuery() {
@@ -712,6 +711,27 @@ watch(filterMode, (mode) => {
   localStorage.setItem('gallery_filter_mode', mode)
 })
 
+const loadMoreSentinel = ref<HTMLElement | null>(null)
+let scrollObserver: IntersectionObserver | null = null
+
+function setupInfiniteScroll() {
+  if (scrollObserver) scrollObserver.disconnect()
+  scrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting && photoStore.hasMore && !photoStore.loading) {
+        photoStore.loadMorePublicPhotos()
+      }
+    },
+    { rootMargin: '300px' },
+  )
+  // nextTick 确保 sentinel 已渲染
+  nextTick(() => {
+    if (loadMoreSentinel.value) {
+      scrollObserver!.observe(loadMoreSentinel.value)
+    }
+  })
+}
+
 onMounted(async () => {
   const saved = localStorage.getItem('smart_search_enabled')
   smartSearchEnabled.value = saved !== 'false'
@@ -724,9 +744,17 @@ onMounted(async () => {
   applyRouteQuery()
   await Promise.all([photoStore.fetchPublicPhotos(), loadTaxonomy()])
 
-  // Display interpretation from initial fetch (e.g., navigated from hero/header with smart search)
   if (photoStore.searchInterpretation && smartSearchEnabled.value) {
     applyInterpretation(photoStore.searchInterpretation)
+  }
+
+  setupInfiniteScroll()
+})
+
+onUnmounted(() => {
+  if (scrollObserver) {
+    scrollObserver.disconnect()
+    scrollObserver = null
   }
 })
 </script>
@@ -919,11 +947,17 @@ onMounted(async () => {
   overflow: hidden;
   border-radius: 8px;
   background: #f5f5f5;
+  aspect-ratio: 3 / 2;
+}
+
+.photo-card-hover.photo-card-portrait {
+  aspect-ratio: 2 / 3;
 }
 
 .masonry-img {
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
   display: block;
   transition: transform 0.3s ease;
 }
@@ -1010,7 +1044,7 @@ onMounted(async () => {
 /* 响应式 */
 @media (max-width: 768px) {
   .gallery-view {
-    padding: 64px 12px 32px;
+    padding: 64px 8px 32px;
   }
 
   .toolbar-main {
@@ -1036,4 +1070,21 @@ onMounted(async () => {
     width: calc(50% - 3px) !important;
   }
 }
+.load-more-sentinel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 0;
+  color: #999;
+  font-size: 14px;
+}
+
+.load-more-end {
+  text-align: center;
+  padding: 32px 0;
+  color: #bbb;
+  font-size: 13px;
+}
+
 </style>

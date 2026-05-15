@@ -75,7 +75,42 @@
             登录
           </n-button>
         </template>
+
+        <!-- 手机端搜索按钮 -->
+        <n-button
+          class="mobile-search-btn"
+          quaternary
+          circle
+          size="small"
+          @click="openMobileSearch"
+        >
+          <template #icon>
+            <n-icon :component="SearchOutline" />
+          </template>
+        </n-button>
       </div>
+
+      <!-- 手机端全屏搜索层 -->
+      <Transition name="mobile-search-slide">
+        <div v-if="showMobileSearch" class="mobile-search-overlay">
+          <div class="mobile-search-bar">
+            <n-input
+              ref="mobileSearchInput"
+              v-model:value="localKeyword"
+              placeholder="搜索照片、描述或标签"
+              clearable
+              size="large"
+              autofocus
+              @keyup.enter="handleMobileSearch"
+            >
+              <template #prefix>
+                <n-icon :component="SearchOutline" />
+              </template>
+            </n-input>
+            <n-button quaternary @click="closeMobileSearch">取消</n-button>
+          </div>
+        </div>
+      </Transition>
     </div>
   </header>
 </template>
@@ -85,6 +120,7 @@ import { computed, h, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NIcon, useDialog, useMessage } from 'naive-ui'
 import {
+  CloseOutline,
   CloudUploadOutline,
   LogOutOutline,
   PersonOutline,
@@ -121,6 +157,7 @@ const { y: scrollY } = useWindowScroll()
 const isScrolled = computed(() => scrollY.value > 60)
 const localKeyword = ref(props.searchKeyword)
 const smartSearchEnabled = ref(false)
+const showMobileSearch = ref(false)
 
 onMounted(() => {
   const saved = localStorage.getItem('smart_search_enabled')
@@ -132,6 +169,22 @@ const route = useRoute()
 function handleSmartToggle(enabled: boolean) {
   smartSearchEnabled.value = enabled
   localStorage.setItem('smart_search_enabled', enabled ? 'true' : 'false')
+}
+
+function openMobileSearch() {
+  showMobileSearch.value = true
+  localKeyword.value = props.searchKeyword
+}
+
+function closeMobileSearch() {
+  showMobileSearch.value = false
+}
+
+function handleMobileSearch() {
+  if (localKeyword.value.trim()) {
+    emit('search', localKeyword.value.trim(), smartSearchEnabled.value)
+    showMobileSearch.value = false
+  }
 }
 
 function handleLogoClick() {
@@ -307,6 +360,40 @@ function handleUserMenuSelect(key: string) {
   border-color: #c4000f !important;
 }
 
+/* 手机端搜索按钮 - 默认隐藏 */
+.mobile-search-btn {
+  display: none;
+}
+
+/* 手机端全屏搜索层 */
+.mobile-search-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: #fff;
+  padding: 8px 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+}
+
+.mobile-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mobile-search-slide-enter-active,
+.mobile-search-slide-leave-active {
+  transition: all 0.2s ease;
+}
+
+.mobile-search-slide-enter-from,
+.mobile-search-slide-leave-to {
+  transform: translateY(-100%);
+  opacity: 0;
+}
+
 @media (max-width: 768px) {
   .header-container {
     padding: 0 12px;
@@ -328,6 +415,10 @@ function handleUserMenuSelect(key: string) {
 @media (max-width: 480px) {
   .header-search-mini {
     display: none;
+  }
+
+  .mobile-search-btn {
+    display: flex;
   }
 }
 </style>

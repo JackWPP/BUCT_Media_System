@@ -31,6 +31,8 @@ const props = defineProps<{
   cols?: number
   // Responsive columns config
   columnsConfig?: ColumnsConfig
+  // Optional function to get height/width ratio per item (default: 2/3 for landscape 3:2)
+  getItemRatio?: (item: any) => number
 }>()
 
 const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
@@ -96,16 +98,9 @@ const columns = computed(() => {
     // 将图片添加到该列
     res[minIndex].push(item)
 
-    // 更新列高度
-    // 使用更合理的默认宽高比 3:4 (1.33) 竖图更常见
-    // 同时限制极端比例，避免某列过高/过低
-    let aspectRatio = 1.0
-    if (item.width && item.height) {
-      const rawRatio = item.height / item.width
-      // 限制比例在 0.5 (2:1 宽图) 到 2.0 (1:2 高图) 之间
-      aspectRatio = Math.max(0.5, Math.min(2.0, rawRatio))
-    }
-    colHeights[minIndex] += aspectRatio
+    // 根据图片方向计算高度系数（横屏3:2=2/3，竖屏2:3=3/2）
+    const ratio = props.getItemRatio ? props.getItemRatio(item) : 2 / 3
+    colHeights[minIndex] += ratio
   })
 
   return res

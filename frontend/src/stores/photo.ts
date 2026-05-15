@@ -2,7 +2,7 @@
  * Photo state store.
  */
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { Photo, PhotoFilters, PhotoListParams, SearchInterpretation } from '../types/photo'
 import * as photoApi from '../api/photo'
 
@@ -86,6 +86,26 @@ export const usePhotoStore = defineStore('photo', () => {
     }
   }
 
+  // 追加加载（无限滚动用）
+  async function loadMorePublicPhotos() {
+    if (loading.value) return null
+    const skip = photos.value.length
+    if (skip >= total.value) return null
+    loading.value = true
+    try {
+      const queryParams = buildPublicQueryParams()
+      queryParams.skip = skip
+      const response = await photoApi.getPublicPhotos(queryParams)
+      photos.value = [...photos.value, ...response.items]
+      total.value = response.total
+      return response
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const hasMore = computed(() => photos.value.length < total.value)
+
   async function fetchPublicPhotoDetail(id: string) {
     const photo = await photoApi.getPublicPhotoById(id)
     selectedPhoto.value = photo
@@ -155,6 +175,8 @@ export const usePhotoStore = defineStore('photo', () => {
     fetchPublicPhotoDetail,
     updatePhoto,
     deletePhoto,
+    hasMore,
+    loadMorePublicPhotos,
     setFilters,
     clearFilters,
     setPage,

@@ -60,9 +60,9 @@
         <div v-if="photos.length === 0 && !loading" class="empty-featured">
           <n-empty description="暂无精选图片" />
         </div>
-        <MasonryLayout v-else :items="photos" :gap="16">
+        <MasonryLayout v-else :items="photos" :gap="16" :columns-config="homeColumnsConfig" :get-item-ratio="getItemRatio">
           <template #default="{ item: photo }">
-            <div class="photo-card-hover" @click="handlePhotoClick(photo)">
+            <div class="photo-card-hover" :class="{ 'photo-card-portrait': photo.height > photo.width }" @click="handlePhotoClick(photo)">
               <img
                 :src="getImageUrl(photo)"
                 :alt="photo.filename"
@@ -108,6 +108,14 @@ const router = useRouter()
 const { y: scrollY } = useWindowScroll()
 
 const searchKeyword = ref('')
+// 根据图片方向返回高度/宽度比
+const getItemRatio = (photo: any) => {
+  return photo.height > photo.width ? 3 / 2 : 2 / 3
+}
+
+// 首页瀑布流列数配置：手机端 2 列
+const homeColumnsConfig = { base: 2, sm: 2, lg: 3, xl: 4, '2xl': 4 }
+
 const photos = ref<Photo[]>([])
 const loading = ref(false)
 const hotTags = ref<string[]>(['春天', '天空', '风景', '校园', '建筑', '人物', '运动', '实验室'])
@@ -501,7 +509,7 @@ onMounted(() => {
   }
 
   .featured-section {
-    padding: 32px 16px 48px;
+    padding: 24px 8px 48px;
   }
 
   .section-title {

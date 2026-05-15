@@ -56,6 +56,10 @@
             @mousemove="handleMouseMove"
             @mouseup="handleMouseUp"
             @mouseleave="handleMouseUp"
+            @touchstart.passive="handleTouchStart"
+            @touchmove.passive="handleTouchMove"
+            @touchend="handleTouchEnd"
+            @dblclick="toggleZoom"
           >
             <transition name="fade-img" mode="out-in">
               <img
@@ -72,7 +76,7 @@
             </transition>
             <!-- 缩放提示 -->
             <div v-if="zoomMode" class="zoom-hint">
-              {{ (scale * 100).toFixed(0) }}% · 滚轮缩放 · 拖拽平移 · 点击退出
+              {{ (scale * 100).toFixed(0) }}% · {{ isTouchDevice ? '双指缩放 · 单指拖动 · 双击退出' : '滚轮缩放 · 拖拽平移 · 点击退出' }}
             </div>
           </div>
 
@@ -397,7 +401,9 @@ function handleClose() {
   router.push('/gallery')
 }
 
-function toggleZoom() {
+function toggleZoom(event?: MouseEvent) {
+  // 触摸设备用双击，不响应单击
+  if (event && isTouchDevice.value) return
   if (zoomMode.value) {
     zoomMode.value = false
     scale.value = 1
@@ -439,6 +445,107 @@ function handleMouseMove(event: MouseEvent) {
 
 function handleMouseUp() {
   isDragging.value = false
+}
+
+// ===== 触摸手势支持 =====
+const isTouchDevice = ref(false)
+const touchStartDistance = ref(0)
+const touchStartScale = ref(1)
+const touchStartX = ref(0)
+const touchStartY = ref(0)
+const touchStartTranslateX = ref(0)
+const touchStartTranslateY = ref(0)
+const lastTapTime = ref(0)
+
+function getTouchDistance(t1: Touch, t2: Touch) {
+  return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY)
+}
+
+function handleTouchStart(event: TouchEvent) {
+  isTouchDevice.value = true
+  const touches = event.touches
+
+  if (touches.length === 2) {
+    // 双指开始：记录初始距离和缩放
+    touchStartDistance.value = getTouchDistance(touches[0], touches[1])
+    touchStartScale.value = scale.value
+    if (!zoomMode.value) {
+      zoomMode.value = true
+      scale.value = 1.5
+      touchStartScale.value = 1.5
+    }
+  } else if (touches.length === 1) {
+    // 单指开始
+    if (zoomMode.value) {
+      // 缩放模式下：拖拽
+      isDragging.value = true
+      dragStartX.value = touches[0].clientX
+      dragStartY.value = touches[0].clientY
+      dragStartTranslateX.value = translateX.value
+      dragStartTranslateY.value = translateY.value
+    } else {
+      // 非缩放模式：记录滑动起点
+      touchStartX.value = touches[0].clientX
+      touchStartY.value = touches[0].clientY
+      touchStartTranslateX.value = translateX.value
+      touchStartTranslateY.value = translateY.value
+    }
+  }
+}
+
+function handleTouchMove(event: TouchEvent) {
+  const touches = event.touches
+
+  if (touches.length === 2) {
+    // 双指缩放
+    const currentDistance = getTouchDistance(touches[0], touches[1])
+    const ratio = currentDistance / touchStartDistance.value
+    scale.value = Math.max(1, Math.min(5, touchStartScale.value * ratio))
+  } else if (touches.length === 1 && zoomMode.value && isDragging.value) {
+    // 缩放模式下单指拖拽
+    const dx = touches[0].clientX - dragStartX.value
+    const dy = touches[0].clientY - dragStartY.value
+    translateX.value = dragStartTranslateX.value + dx
+    translateY.value = dragStartTranslateY.value + dy
+  }
+}
+
+function handleTouchEnd(event: TouchEvent) {
+  if (event.touches.length === 0) {
+    isDragging.value = false
+
+    if (!zoomMode.value) {
+      // 非缩放模式下检测左右滑动
+      const dx = touchStartX.value - (event.changedTouches[0]?.clientX ?? 0)
+      const dy = touchStartY.value - (event.changedTouches[0]?.clientY ?? 0)
+
+      // 水平滑动 > 50px 且大于垂直滑动
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        if (dx > 0 && hasNext.value) {
+          goNext()
+        } else if (dx < 0 && hasPrev.value) {
+          goPrev()
+        }
+      }
+    }
+
+    // 缩放倍率 ≤1 时退出缩放
+    if (zoomMode.value && scale.value <= 1.05) {
+      zoomMode.value = false
+      scale.value = 1
+      translateX.value = 0
+      translateY.value = 0
+    }
+  }
+}
+
+// 双击切换缩放
+function handleDoubleClick() {
+  const now = Date.now()
+  if (now - lastTapTime.value < 300) {
+    toggleZoom()
+  }
+  lastTapTime.value = now
 }
 
 function goPrev() {

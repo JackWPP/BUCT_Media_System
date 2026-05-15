@@ -196,12 +196,17 @@ img {
   overflow: hidden;
   border-radius: 4px;
   cursor: pointer;
+  aspect-ratio: 3 / 2;
+}
+
+.photo-card-hover.photo-card-portrait {
+  aspect-ratio: 2 / 3;
 }
 
 .photo-card-hover img {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
   object-fit: cover;
   transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }

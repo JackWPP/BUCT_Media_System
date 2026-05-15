@@ -16,42 +16,77 @@ def create_thumbnail(
     image_path: str,
     thumb_path: str,
     max_width: int = 800,
-    quality: int = 90
+    quality: int = 80,
+    max_size_bytes: int = 1024 * 1024,  # 1MB
 ) -> tuple[str, int, int]:
     """
-    Create thumbnail from image
-    
+    Create thumbnail with center crop, capped at max_size_bytes.
+    Landscape → 3:2 crop, Portrait → 2:3 crop, Square → 3:2 crop.
+
     Args:
         image_path: Path to original image
         thumb_path: Path to save thumbnail
         max_width: Maximum width of thumbnail
-        quality: JPEG quality (1-100)
-        
+        quality: Initial JPEG quality (1-100)
+        max_size_bytes: Maximum file size
+
     Returns:
         tuple: (thumb_path, thumb_width, thumb_height)
     """
+
     with Image.open(image_path) as img:
-        # Convert to RGB if necessary
         if img.mode in ('RGBA', 'P'):
             img = img.convert('RGB')
-        
-        # Calculate new dimensions
-        width, height = img.size
-        if width > max_width:
-            ratio = max_width / width
-            new_width = max_width
-            new_height = int(height * ratio)
+
+        w, h = img.size
+
+        # Determine crop ratio based on orientation
+        if h > w:
+            # Portrait → 2:3 (width:height)
+            target_ratio = 2 / 3
         else:
-            new_width = width
-            new_height = height
-        
-        # Resize image
-        img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-        
-        # Save thumbnail
-        img_resized.save(thumb_path, 'JPEG', quality=quality, optimize=True)
-        
-        return thumb_path, new_width, new_height
+            # Landscape or square → 3:2 (width:height)
+            target_ratio = 3 / 2
+
+        # Center crop to target ratio
+        current_ratio = w / h
+        if current_ratio > target_ratio:
+            # Wider than target → crop sides
+            new_w = int(h * target_ratio)
+            left = (w - new_w) // 2
+            img = img.crop((left, 0, left + new_w, h))
+        elif current_ratio < target_ratio:
+            # Taller than target → crop top/bottom
+            new_h = int(w / target_ratio)
+            top = (h - new_h) // 2
+            img = img.crop((0, top, w, top + new_h))
+
+        # Resize: landscape → max_width on width, portrait → max_width on height
+        crop_w, crop_h = img.size
+        if crop_h > crop_w:
+            # Portrait: constrain height to max_width (so cards are same height)
+            if crop_h > max_width:
+                ratio = max_width / crop_h
+                new_h = max_width
+                new_w = int(crop_w * ratio)
+                img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        else:
+            # Landscape: constrain width to max_width
+            if crop_w > max_width:
+                ratio = max_width / crop_w
+                new_w = max_width
+                new_h = int(crop_h * ratio)
+                img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+        # Save with quality fallback to hit size target
+        for q in (quality, 70, 60, 50):
+            img.save(thumb_path, 'JPEG', quality=q, optimize=True)
+            size = os.path.getsize(thumb_path)
+            if size <= max_size_bytes:
+                break
+
+        final_w, final_h = img.size
+        return thumb_path, final_w, final_h
 
 
 def create_compressed(
