@@ -60,7 +60,7 @@ export function getImageUrl(path: string | null, baseUrl?: string): string {
   return `${base}${path.startsWith('/') ? '' : '/'}${path}`
 }
 
-export function getPhotoUrl(photoId: string, type: 'original' | 'thumbnail' = 'original'): string {
+export function getPhotoUrl(photoId: string, type: 'original' | 'thumbnail' | 'compressed' = 'original'): string {
   // In production, use empty base (relative path) since Nginx handles /api proxy
   // In development, use full localhost URL
   const base = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')

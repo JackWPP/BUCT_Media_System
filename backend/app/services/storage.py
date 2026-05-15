@@ -30,6 +30,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency in local m
 class PersistedMedia:
     original_path: str
     thumb_path: Optional[str]
+    compressed_path: Optional[str]
     file_size: Optional[int]
 
 
@@ -45,8 +46,10 @@ def ensure_upload_dirs() -> tuple[str, str]:
     upload_dir = Path(settings.UPLOAD_DIR)
     originals_dir = upload_dir / "originals"
     thumbnails_dir = upload_dir / "thumbnails"
+    compressed_dir = upload_dir / "compressed"
     originals_dir.mkdir(parents=True, exist_ok=True)
     thumbnails_dir.mkdir(parents=True, exist_ok=True)
+    compressed_dir.mkdir(parents=True, exist_ok=True)
     return str(originals_dir), str(thumbnails_dir)
 
 
@@ -78,6 +81,7 @@ class StorageBackend:
         photo_uuid: str,
         staged_original_path: str,
         staged_thumbnail_path: Optional[str],
+        staged_compressed_path: Optional[str] = None,
     ) -> PersistedMedia:
         raise NotImplementedError
 
@@ -103,8 +107,10 @@ class LocalStorageBackend(StorageBackend):
         upload_dir = Path(settings.UPLOAD_DIR)
         self.originals_dir = upload_dir / "originals"
         self.thumbnails_dir = upload_dir / "thumbnails"
+        self.compressed_dir = upload_dir / "compressed"
         self.originals_dir.mkdir(parents=True, exist_ok=True)
         self.thumbnails_dir.mkdir(parents=True, exist_ok=True)
+        self.compressed_dir.mkdir(parents=True, exist_ok=True)
 
     def _normalize(self, path: str) -> str:
         clean = path.replace("\\", "/")
@@ -123,6 +129,7 @@ class LocalStorageBackend(StorageBackend):
         photo_uuid: str,
         staged_original_path: str,
         staged_thumbnail_path: Optional[str],
+        staged_compressed_path: Optional[str] = None,
     ) -> PersistedMedia:
         extension = Path(staged_original_path).suffix.lower()
         original_relative = f"originals/{photo_uuid}{extension}"
@@ -137,9 +144,17 @@ class LocalStorageBackend(StorageBackend):
             thumb_target.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(staged_thumbnail_path, thumb_target)
 
+        compressed_relative = None
+        if staged_compressed_path and os.path.exists(staged_compressed_path):
+            compressed_relative = f"compressed/{photo_uuid}_compressed.jpg"
+            compressed_target = Path(settings.UPLOAD_DIR) / compressed_relative
+            compressed_target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(staged_compressed_path, compressed_target)
+
         return PersistedMedia(
             original_path=original_relative,
             thumb_path=thumb_relative,
+            compressed_path=compressed_relative,
             file_size=original_target.stat().st_size if original_target.exists() else None,
         )
 
@@ -235,6 +250,7 @@ class S3StorageBackend(StorageBackend):
         photo_uuid: str,
         staged_original_path: str,
         staged_thumbnail_path: Optional[str],
+        staged_compressed_path: Optional[str] = None,
     ) -> PersistedMedia:
         extension = Path(staged_original_path).suffix.lower()
         original_key = f"originals/{photo_uuid}{extension}"
@@ -254,8 +270,16 @@ class S3StorageBackend(StorageBackend):
             except Exception:
                 self._mc_pipe(staged_thumbnail_path, thumb_key)
 
+        compressed_key = None
+        if staged_compressed_path and os.path.exists(staged_compressed_path):
+            compressed_key = f"compressed/{photo_uuid}_compressed.jpg"
+            try:
+                self.client.upload_file(staged_compressed_path, self.bucket, compressed_key)
+            except Exception:
+                self._mc_pipe(staged_compressed_path, compressed_key)
+
         size = os.path.getsize(staged_original_path) if os.path.exists(staged_original_path) else None
-        return PersistedMedia(original_path=original_key, thumb_path=thumb_key, file_size=size)
+        return PersistedMedia(original_path=original_key, thumb_path=thumb_key, compressed_path=compressed_key, file_size=size)
 
     def delete_file(self, file_path: Optional[str]) -> bool:
         if not file_path:

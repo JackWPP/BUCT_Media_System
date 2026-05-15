@@ -40,6 +40,7 @@ class PhotoInDB(PhotoBase):
     original_path: str
     processed_path: Optional[str] = None
     thumb_path: Optional[str] = None
+    compressed_path: Optional[str] = None
     width: Optional[int] = None
     height: Optional[int] = None
     file_size: Optional[int] = None
@@ -67,7 +68,7 @@ class PhotoResponse(PhotoInDB):
     
     model_config = ConfigDict(from_attributes=True)
 
-    @field_validator('original_path', 'thumb_path', 'processed_path', mode='before')
+    @field_validator('original_path', 'thumb_path', 'processed_path', 'compressed_path', mode='before')
     @classmethod
     def normalize_path(cls, v: Optional[str]) -> Optional[str]:
         if v and isinstance(v, str):
@@ -94,6 +95,7 @@ class PhotoUploadResponse(BaseModel):
     filename: str
     original_path: str
     thumb_path: Optional[str] = None
+    compressed_path: Optional[str] = None
     width: Optional[int] = None
     height: Optional[int] = None
     status: str

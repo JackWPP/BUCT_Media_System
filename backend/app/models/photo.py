@@ -18,6 +18,7 @@ class Photo(Base):
     original_path = Column(Text)
     processed_path = Column(Text)
     thumb_path = Column(Text)
+    compressed_path = Column(Text)  # Compressed version (≤5MB)
     width = Column(Integer)
     height = Column(Integer)
     file_size = Column(Integer)  # File size in bytes

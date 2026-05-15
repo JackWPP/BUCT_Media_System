@@ -65,7 +65,7 @@
                 class="stage-image"
                 :class="{ 'image-loaded': imageLoaded }"
                 :style="zoomStyle"
-                @load="imageLoaded = true"
+                @load="handleMainImageLoad"
                 @error="handleImageError"
                 @click="toggleZoom"
               />
@@ -100,6 +100,17 @@
                   <n-icon :component="DownloadOutline" />
                 </template>
                 下载
+              </n-button>
+              <n-button
+                tertiary
+                size="small"
+                :loading="loadingOriginal"
+                @click="loadOriginal"
+              >
+                <template #icon>
+                  <n-icon :component="showOriginal ? ExpandOutline : ExpandOutline" />
+                </template>
+                {{ showOriginal ? '查看压缩图' : '查看原图' }}
               </n-button>
               <n-button tertiary size="small" @click="shareImage">
                 <template #icon>
@@ -249,6 +260,7 @@ import {
   ChevronForwardOutline,
   CloseOutline,
   DownloadOutline,
+  ExpandOutline,
   HeartOutline,
   PersonCircleOutline,
   ShareSocialOutline,
@@ -269,6 +281,8 @@ const loading = ref(false)
 const photo = ref<Photo | null>(null)
 const relatedPhotos = ref<Photo[]>([])
 const imageLoaded = ref(false)
+const showOriginal = ref(false)
+const loadingOriginal = ref(false)
 
 // 独立维护上下文图片列表，不依赖 photoStore（避免与 HomeView 缓存冲突）
 const contextPhotos = ref<Photo[]>([])
@@ -310,7 +324,24 @@ const allTags = computed(() => {
 })
 
 function getImageUrl(currentPhoto: Photo) {
-  return getPhotoUrl(currentPhoto.id, 'original')
+  return showOriginal.value
+    ? getPhotoUrl(currentPhoto.id, 'original')
+    : getPhotoUrl(currentPhoto.id, 'compressed')
+}
+
+function loadOriginal() {
+  if (showOriginal.value) {
+    showOriginal.value = false
+    return
+  }
+  loadingOriginal.value = true
+  showOriginal.value = true
+  // imageLoaded will be set to true on img @load
+}
+
+function handleMainImageLoad() {
+  imageLoaded.value = true
+  loadingOriginal.value = false
 }
 
 function getThumbnailUrl(currentPhoto: Photo) {
@@ -325,7 +356,7 @@ function handleImageError(event: Event) {
     return
   }
   img.setAttribute('data-tried', 'true')
-  img.src = src.replace('/image/original', '/image/thumbnail')
+  img.src = src.replace('/image/original', '/image/thumbnail').replace('/image/compressed', '/image/thumbnail')
 }
 
 function formatFileSize(bytes: number | null): string {
@@ -478,6 +509,8 @@ async function loadContextPhotos() {
 async function loadPhotoDetail(id: string) {
   loading.value = true
   imageLoaded.value = false
+  showOriginal.value = false
+  loadingOriginal.value = false
   photo.value = null
   try {
     // 先确保上下文图片列表已加载

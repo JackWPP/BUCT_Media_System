@@ -22,28 +22,13 @@
         <!-- 搜索框 -->
         <div class="hero-search">
           <div class="search-box">
-            <div class="search-type">
-              <span>图片</span>
-              <n-icon :component="ChevronDownOutline" size="14" />
-            </div>
-            <div class="search-divider"></div>
             <input
               v-model="searchKeyword"
               type="text"
               class="search-input"
-              :placeholder="smartSearchEnabled ? '试试自然语言搜索：秋天的图书馆、春天的樱花...' : '输入关键词搜索照片...'"
+              placeholder="输入关键词搜索照片..."
               @keyup.enter="handleSearch"
             />
-            <n-button
-              class="search-camera-btn"
-              quaternary
-              circle
-              @click="handleSearch"
-            >
-              <template #icon>
-                <n-icon :component="CameraOutline" size="20" />
-              </template>
-            </n-button>
             <n-button
               class="search-submit-btn"
               type="primary"
@@ -54,32 +39,8 @@
               </template>
             </n-button>
           </div>
-          <div class="home-smart-toggle">
-            <n-switch
-              v-model:value="smartSearchEnabled"
-              size="small"
-              @update:value="handleSmartToggle"
-            />
-            <n-text depth="3" class="smart-label" :class="{ 'smart-active': smartSearchEnabled }">
-              {{ smartSearchEnabled ? '✨ 智能搜索' : '普通搜索' }}
-            </n-text>
-          </div>
         </div>
 
-        <!-- 热搜推荐 -->
-        <div class="hot-tags">
-          <span class="hot-label">图片热搜推荐</span>
-          <div class="hot-tags-list">
-            <span
-              v-for="tag in hotTags"
-              :key="tag"
-              class="hot-tag"
-              @click="handleTagClick(tag)"
-            >
-              {{ tag }}
-            </span>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -134,8 +95,6 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useWindowScroll } from '@vueuse/core'
 import {
-  CameraOutline,
-  ChevronDownOutline,
   ChevronForwardOutline,
   SearchOutline,
 } from '@vicons/ionicons5'
@@ -152,7 +111,7 @@ const searchKeyword = ref('')
 const photos = ref<Photo[]>([])
 const loading = ref(false)
 const hotTags = ref<string[]>(['春天', '天空', '风景', '校园', '建筑', '人物', '运动', '实验室'])
-const smartSearchEnabled = ref(true)
+const smartSearchEnabled = ref(false)
 
 // Hero 区域滚动动效
 const heroOpacity = computed(() => {
@@ -183,7 +142,6 @@ function handleSearch() {
   const query: Record<string, string> = {}
   if (searchKeyword.value.trim()) {
     query.search = searchKeyword.value.trim()
-    if (smartSearchEnabled.value) query.smart = 'true'
   }
   if (Object.keys(query).length > 0) {
     router.push({ path: '/gallery', query })
@@ -194,7 +152,6 @@ function handleSearch() {
 
 function handleTagClick(tag: string) {
   const query: Record<string, string> = { search: tag }
-  if (smartSearchEnabled.value) query.smart = 'true'
   router.push({ path: '/gallery', query })
 }
 
@@ -417,29 +374,6 @@ onMounted(() => {
   border: 1px solid #eee;
 }
 
-.search-type {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 16px;
-  font-size: 14px;
-  color: #666;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.search-type:hover {
-  color: #0056a6;
-}
-
-.search-divider {
-  width: 1px;
-  height: 24px;
-  background: #e8e8e8;
-  flex-shrink: 0;
-}
-
 .search-input {
   flex: 1;
   border: none;
@@ -453,15 +387,6 @@ onMounted(() => {
 
 .search-input::placeholder {
   color: #bbb;
-}
-
-.search-camera-btn {
-  flex-shrink: 0;
-  color: #999;
-}
-
-.search-camera-btn:hover {
-  color: #0056a6;
 }
 
 .search-submit-btn {
@@ -558,11 +483,6 @@ onMounted(() => {
 
   .search-box {
     height: 46px;
-  }
-
-  .search-type {
-    padding: 0 10px;
-    font-size: 13px;
   }
 
   .search-input {

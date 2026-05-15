@@ -257,6 +257,22 @@ async def get_photo_thumbnail(
     return get_storage().build_media_response(path)
 
 
+@router.get("/{photo_id}/image/compressed")
+async def get_photo_compressed(
+    photo_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user_for_media),
+    portrait_visibility: str = Depends(get_portrait_visibility),
+):
+    photo = await photo_crud.get_photo(db, photo_id)
+    if photo is None:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    await _assert_photo_access(db, photo, current_user, portrait_visibility)
+    # Fall back to original if no compressed version exists
+    path = photo.compressed_path or photo.original_path
+    return get_storage().build_media_response(path)
+
+
 @router.get("/{photo_id}/download")
 async def download_photo(
     photo_id: str,
@@ -301,7 +317,8 @@ async def upload_photo(
             output_dir=str(Path(staged_original_path).parent),
         )
         staged_thumb_path = processing_result.get("thumb_path")
-        stored_media = get_storage().persist_photo_files(photo_uuid, staged_original_path, staged_thumb_path)
+        staged_compressed_path = processing_result.get("compressed_path")
+        stored_media = get_storage().persist_photo_files(photo_uuid, staged_original_path, staged_thumb_path, staged_compressed_path)
 
         processing_status = "pending" if enable_ai and runtime_settings.ai_enabled else "manual"
         photo = await photo_crud.create_photo(
@@ -311,6 +328,7 @@ async def upload_photo(
                 "filename": original_filename,
                 "original_path": stored_media.original_path,
                 "thumb_path": stored_media.thumb_path,
+                "compressed_path": stored_media.compressed_path,
                 "width": processing_result.get("width"),
                 "height": processing_result.get("height"),
                 "file_size": stored_media.file_size,

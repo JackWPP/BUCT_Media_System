@@ -1,6 +1,7 @@
 """
-Image processing service for thumbnails and EXIF extraction
+Image processing service for thumbnails, compression, and EXIF extraction
 """
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -51,6 +52,58 @@ def create_thumbnail(
         img_resized.save(thumb_path, 'JPEG', quality=quality, optimize=True)
         
         return thumb_path, new_width, new_height
+
+
+def create_compressed(
+    image_path: str,
+    compressed_path: str,
+    max_size_bytes: int = 5 * 1024 * 1024,  # 5MB
+) -> tuple[str, int, int, int]:
+    """
+    Create a compressed version of the image capped at max_size_bytes.
+
+    Strategy:
+    1. Keep original dimensions, lower JPEG quality from 85 down to 60
+    2. If still too large, progressively reduce long edge by 10%
+    3. Never go below quality=50 or long edge 1600px
+
+    Returns:
+        tuple: (compressed_path, width, height, file_size_bytes)
+    """
+    with Image.open(image_path) as img:
+        if img.mode in ('RGBA', 'P'):
+            img = img.convert('RGB')
+
+        orig_w, orig_h = img.size
+        w, h = orig_w, orig_h
+
+        # Phase 1: lower quality at original dimensions
+        for quality in (85, 75, 65, 60):
+            img.save(compressed_path, 'JPEG', quality=quality, optimize=True)
+            size = os.path.getsize(compressed_path)
+            if size <= max_size_bytes:
+                return compressed_path, w, h, size
+
+        # Phase 2: reduce dimensions
+        for scale in (0.9, 0.8, 0.7, 0.6, 0.5):
+            new_w = max(int(orig_w * scale), 1600)
+            new_h = max(int(orig_h * scale), int(1600 * orig_h / orig_w))
+            if new_w >= w and new_h >= h:
+                continue  # already tried this size or larger
+            w, h = new_w, new_h
+            img_resized = img.resize((w, h), Image.Resampling.LANCZOS)
+            img_resized.save(compressed_path, 'JPEG', quality=60, optimize=True)
+            size = os.path.getsize(compressed_path)
+            if size <= max_size_bytes:
+                return compressed_path, w, h, size
+
+        # Last resort: force to 1600px long edge, quality 50
+        ratio = 1600 / max(orig_w, orig_h)
+        w, h = int(orig_w * ratio), int(orig_h * ratio)
+        img_resized = img.resize((w, h), Image.Resampling.LANCZOS)
+        img_resized.save(compressed_path, 'JPEG', quality=50, optimize=True)
+        size = os.path.getsize(compressed_path)
+        return compressed_path, w, h, size
 
 
 def get_image_dimensions(image_path: str) -> tuple[int, int]:
@@ -159,6 +212,7 @@ def process_uploaded_image(
         'width': None,
         'height': None,
         'thumb_path': None,
+        'compressed_path': None,
         'exif_data': {},
         'captured_at': None
     }
@@ -186,6 +240,14 @@ def process_uploaded_image(
         
         create_thumbnail(original_path, thumb_path)
         results['thumb_path'] = thumb_path
+
+        # Create compressed version (skip if original is already ≤ 5MB)
+        original_size = os.path.getsize(original_path)
+        if original_size > 5 * 1024 * 1024:
+            compressed_filename = f"{photo_uuid}_compressed.jpg"
+            compressed_path = str(thumbnails_dir / compressed_filename)
+            create_compressed(original_path, compressed_path)
+            results['compressed_path'] = compressed_path
         
     except Exception as e:
         # Log error but don't fail

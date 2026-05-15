@@ -8,7 +8,7 @@
   >
     <div class="header-container">
       <!-- Logo -->
-      <div class="header-logo" @click="router.push('/')">
+      <div class="header-logo" @click="handleLogoClick">
         <img src="/logo.png" alt="视觉北化" class="logo-image" />
       </div>
 
@@ -19,7 +19,7 @@
       >
         <n-input
           v-model:value="localKeyword"
-          :placeholder="smartSearchEnabled ? '试试自然语言搜索...' : '搜索照片、描述或标签'"
+          placeholder="搜索照片、描述或标签"
           clearable
           size="small"
           @keyup.enter="handleSearch"
@@ -38,16 +38,6 @@
             </n-button>
           </template>
         </n-input>
-        <div class="header-smart-toggle">
-          <n-switch
-            v-model:value="smartSearchEnabled"
-            size="small"
-            @update:value="handleSmartToggle"
-          />
-          <n-text depth="3" class="smart-label" :class="{ 'smart-active': smartSearchEnabled }">
-            {{ smartSearchEnabled ? '✨ 智能' : '普通' }}
-          </n-text>
-        </div>
       </div>
 
       <!-- 右侧操作区 -->
@@ -92,7 +82,7 @@
 
 <script setup lang="ts">
 import { computed, h, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { NIcon, useDialog, useMessage } from 'naive-ui'
 import {
   CloudUploadOutline,
@@ -130,16 +120,26 @@ const { y: scrollY } = useWindowScroll()
 
 const isScrolled = computed(() => scrollY.value > 60)
 const localKeyword = ref(props.searchKeyword)
-const smartSearchEnabled = ref(true)
+const smartSearchEnabled = ref(false)
 
 onMounted(() => {
   const saved = localStorage.getItem('smart_search_enabled')
   smartSearchEnabled.value = saved !== 'false'
 })
 
+const route = useRoute()
+
 function handleSmartToggle(enabled: boolean) {
   smartSearchEnabled.value = enabled
   localStorage.setItem('smart_search_enabled', enabled ? 'true' : 'false')
+}
+
+function handleLogoClick() {
+  if (route.path === '/') {
+    router.push('/gallery')
+  } else {
+    router.push('/')
+  }
 }
 
 const userMenuOptions = computed(() => {
