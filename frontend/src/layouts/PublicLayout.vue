@@ -59,5 +59,12 @@ function handleHeaderSearch(keyword: string, smart: boolean) {
 
 .public-main {
   flex: 1;
+  padding-top: 80px;
+}
+
+@media (max-width: 768px) {
+  .public-main {
+    padding-top: 56px;
+  }
 }
 </style>
