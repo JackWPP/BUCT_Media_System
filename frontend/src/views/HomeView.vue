@@ -48,7 +48,6 @@
     <section class="featured-section">
       <div class="section-header">
         <h2 class="section-title">精选图片</h2>
-        <span class="section-subtitle">2024 第七届摄影大赛 · 风光类</span>
         <n-button text type="primary" @click="router.push('/gallery')">
           查看更多
           <template #icon>
@@ -63,12 +62,11 @@
         </div>
         <MasonryLayout v-else :items="photos" :gap="16" :columns-config="homeColumnsConfig" :get-item-ratio="getItemRatio">
           <template #default="{ item: photo }">
-            <div class="photo-card-hover" @click="handlePhotoClick(photo)">
+            <div class="photo-card-hover" :class="{ 'photo-card-portrait': photo.height > photo.width }" @click="handlePhotoClick(photo)">
               <img
                 :src="getImageUrl(photo)"
                 :alt="photo.filename"
                 loading="lazy"
-                @load="(e) => handleImageLoad(e, photo)"
                 @error="(e) => handleImageError(e, photo)"
               />
               <div class="photo-overlay">
@@ -110,12 +108,9 @@ const router = useRouter()
 const { y: scrollY } = useWindowScroll()
 
 const searchKeyword = ref('')
-// 根据图片方向返回高度/宽度比
+// 根据图片方向返回高度/宽度比（与 CSS aspect-ratio 对齐）
 const getItemRatio = (photo: any) => {
-  if (photo.width && photo.height) {
-    return photo.height / photo.width
-  }
-  return photo._displayRatio || 2 / 3
+  return photo.height > photo.width ? 3 / 2 : 2 / 3
 }
 
 // 首页瀑布流列数配置：手机端 2 列
@@ -151,13 +146,6 @@ function handleImageError(event: Event, photo: Photo) {
   img.src = getPhotoUrl(photo.id, 'thumbnail')
 }
 
-function handleImageLoad(event: Event, photo: Photo) {
-  const img = event.target as HTMLImageElement
-  if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-    ;(photo as Photo & { _displayRatio?: number })._displayRatio = img.naturalHeight / img.naturalWidth
-  }
-}
-
 function handleSearch() {
   const query: Record<string, string> = {}
   if (searchKeyword.value.trim()) {
@@ -190,7 +178,7 @@ async function loadPhotos() {
     const response = await getPublicPhotos({
       limit: 12,
       sort_by: 'created_at',
-      gallery_year: '2024年第七届获奖作品',
+      gallery_year: '2025年第八届获奖作品',
       photo_type: '风光类',
     })
     photos.value = response.items.slice(0, 12)
@@ -474,14 +462,6 @@ onMounted(() => {
   padding: 48px 24px 64px;
 }
 
-.featured-section :deep(.photo-card-hover) {
-  aspect-ratio: auto;
-}
-
-.featured-section :deep(.photo-card-hover img) {
-  height: auto;
-}
-
 .section-header {
   display: flex;
   justify-content: space-between;
@@ -493,12 +473,6 @@ onMounted(() => {
   font-size: 22px;
   font-weight: 600;
   color: #333;
-}
-
-.section-subtitle {
-  font-size: 14px;
-  color: #999;
-  margin-left: 12px;
 }
 
 .empty-featured {
