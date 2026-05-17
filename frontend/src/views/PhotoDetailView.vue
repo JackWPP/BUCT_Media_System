@@ -61,15 +61,24 @@
             @touchend="handleTouchEnd"
             @dblclick="toggleZoom"
           >
-            <transition name="fade-img" mode="out-in">
+            <!-- 缩略图：快速显示，作为底图 -->
+            <img
+              v-if="photo"
+              :key="'thumb-' + photo.id"
+              :src="getThumbnailUrl(photo)"
+              :alt="photo.filename"
+              class="stage-image stage-thumb"
+              @load="handleThumbLoad"
+            />
+            <!-- 高清图：后台加载完成后替换 -->
+            <transition name="fade-img">
               <img
-                :key="photo?.id || 'empty'"
-                :src="getImageUrl(photo)"
+                v-if="photo && hdReady"
+                :key="'hd-' + photo.id"
+                :src="hdSrc"
                 :alt="photo.filename"
-                class="stage-image"
-                :class="{ 'image-loaded': imageLoaded }"
+                class="stage-image image-loaded"
                 :style="zoomStyle"
-                @load="handleMainImageLoad"
                 @error="handleImageError"
                 @click="toggleZoom"
               />
@@ -284,9 +293,10 @@ const photoStore = usePhotoStore()
 const loading = ref(false)
 const photo = ref<Photo | null>(null)
 const relatedPhotos = ref<Photo[]>([])
-const imageLoaded = ref(false)
 const showOriginal = ref(false)
 const loadingOriginal = ref(false)
+const hdReady = ref(false)
+const hdSrc = ref('')
 
 // 独立维护上下文图片列表，不依赖 photoStore（避免与 HomeView 缓存冲突）
 const contextPhotos = ref<Photo[]>([])
@@ -336,20 +346,41 @@ function getImageUrl(currentPhoto: Photo) {
 function loadOriginal() {
   if (showOriginal.value) {
     showOriginal.value = false
+    hdReady.value = false
+    // 重新加载压缩图
+    if (photo.value) preloadHd(photo.value, 'compressed')
     return
   }
   loadingOriginal.value = true
   showOriginal.value = true
-  // imageLoaded will be set to true on img @load
+  hdReady.value = false
+  if (photo.value) preloadHd(photo.value, 'original')
 }
 
-function handleMainImageLoad() {
-  imageLoaded.value = true
+function handleThumbLoad() {
+  // 缩略图加载完成，立即显示，同时开始加载高清图
   loadingOriginal.value = false
 }
 
 function getThumbnailUrl(currentPhoto: Photo) {
   return getPhotoUrl(currentPhoto.id, 'thumbnail')
+}
+
+// 渐进加载：预加载高清图，完成后替换缩略图
+function preloadHd(currentPhoto: Photo, type: 'compressed' | 'original' = 'compressed') {
+  hdReady.value = false
+  const url = getPhotoUrl(currentPhoto.id, type)
+  const img = new window.Image()
+  img.onload = () => {
+    hdSrc.value = url
+    hdReady.value = true
+    loadingOriginal.value = false
+  }
+  img.onerror = () => {
+    // 高清图加载失败，缩略图仍在显示，不额外处理
+    loadingOriginal.value = false
+  }
+  img.src = url
 }
 
 function handleImageError(event: Event) {
@@ -615,7 +646,8 @@ async function loadContextPhotos() {
 
 async function loadPhotoDetail(id: string) {
   loading.value = true
-  imageLoaded.value = false
+  hdReady.value = false
+  hdSrc.value = ''
   showOriginal.value = false
   loadingOriginal.value = false
   photo.value = null
@@ -632,6 +664,8 @@ async function loadPhotoDetail(id: string) {
       .filter((p) => p.id !== id)
       .slice(0, 8)
     preloadAdjacent()
+    // 开始渐进加载高清图
+    preloadHd(photo.value, 'compressed')
   } catch (error: any) {
     message.error(error?.response?.data?.detail || '加载照片详情失败')
     photo.value = null
@@ -768,16 +802,22 @@ watch(
   max-height: 100%;
   object-fit: contain;
   display: block;
-  opacity: 0;
-  transition: opacity 0.35s ease;
 }
 
-.stage-image.image-loaded {
+/* 缩略图：始终可见，作为底层 */
+.stage-thumb {
   opacity: 1;
+  position: absolute;
+  z-index: 1;
+  filter: blur(0);
+  transition: filter 0.3s ease;
 }
 
-.stage-image.image-loaded ~ .zoom-hint {
-  opacity: 0;
+/* 高清图：覆盖在缩略图上 */
+.stage-image.image-loaded {
+  position: relative;
+  z-index: 2;
+  opacity: 1;
 }
 
 .image-stage.zoom-mode .stage-image {
