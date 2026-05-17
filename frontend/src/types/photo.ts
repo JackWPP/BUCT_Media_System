@@ -77,7 +77,9 @@ export interface PhotoListParams {
   building?: string
   gallery_series?: string
   gallery_year?: string
+  award_level?: string
   photo_type?: string
+  documentary_topic?: string
   search?: string
   tag?: string
   sort_by?: string
@@ -100,7 +102,9 @@ export interface PhotoFilters {
   building?: string | null
   gallery_series?: string | null
   gallery_year?: string | null
+  award_level?: string | null
   photo_type?: string | null
+  documentary_topic?: string | null
   status?: string | null
   search?: string
   tag?: string | null

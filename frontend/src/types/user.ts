@@ -6,10 +6,11 @@
  * 用户角色类型
  * - admin: 超级管理员，拥有所有权限
  * - auditor: 审核员，可审核照片和编辑标签，不包含系统管理能力
+ * - tagger: 学生标注员，只能处理分配给自己的标注任务
  * - dept_user: 部门用户，预留扩展
  * - user: 普通用户
  */
-export type UserRole = 'admin' | 'auditor' | 'dept_user' | 'user'
+export type UserRole = 'admin' | 'auditor' | 'tagger' | 'dept_user' | 'user'
 
 export interface User {
   id: string

@@ -69,7 +69,9 @@ async def get_photos(
     building: Optional[str] = None,
     gallery_series: Optional[str] = None,
     gallery_year: Optional[str] = None,
+    award_level: Optional[str] = None,
     photo_type: Optional[str] = None,
+    documentary_topic: Optional[str] = None,
     interpretation: Optional["SearchInterpretation"] = None,
 ) -> tuple[List[Photo], int]:
     query = select(Photo)
@@ -90,6 +92,8 @@ async def get_photos(
             .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
             .where(
                 TaxonomyFacet.key == "season",
+                TaxonomyFacet.is_active.is_(True),
+                TaxonomyNode.is_active.is_(True),
                 TaxonomyNode.name == season,
             )
         )
@@ -107,6 +111,8 @@ async def get_photos(
             .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
             .where(
                 TaxonomyFacet.key == "campus",
+                TaxonomyFacet.is_active.is_(True),
+                TaxonomyNode.is_active.is_(True),
                 TaxonomyNode.name == campus,
             )
         )
@@ -166,7 +172,9 @@ async def get_photos(
         "landmark": building,
         "gallery_series": gallery_series,
         "gallery_year": gallery_year,
+        "award_level": award_level,
         "photo_type": photo_type,
+        "documentary_topic": documentary_topic,
     }
     for facet_key, facet_value in facet_filters.items():
         if not facet_value:
@@ -180,6 +188,8 @@ async def get_photos(
             .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
             .where(
                 TaxonomyFacet.key == facet_key,
+                TaxonomyFacet.is_active.is_(True),
+                TaxonomyNode.is_active.is_(True),
                 or_(
                     TaxonomyNode.name == facet_value,
                     TaxonomyNode.key == normalized_key,
@@ -274,6 +284,8 @@ def _build_facet_classification_filter(interpretation: "SearchInterpretation"):
             .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
             .where(
                 TaxonomyFacet.key == facet_key,
+                TaxonomyFacet.is_active.is_(True),
+                TaxonomyNode.is_active.is_(True),
                 or_(
                     TaxonomyNode.name == node_name,
                     TaxonomyNode.key == normalized_key,
@@ -299,13 +311,23 @@ def _build_keyword_filter(keywords: list[str]):
         node_sub = (
             select(PhotoClassification.photo_id)
             .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
-            .where(TaxonomyNode.name.ilike(pattern))
+            .join(TaxonomyFacet, TaxonomyFacet.id == PhotoClassification.facet_id)
+            .where(
+                TaxonomyFacet.is_active.is_(True),
+                TaxonomyNode.is_active.is_(True),
+                TaxonomyNode.name.ilike(pattern),
+            )
         )
         alias_sub = (
             select(PhotoClassification.photo_id)
             .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
+            .join(TaxonomyFacet, TaxonomyFacet.id == PhotoClassification.facet_id)
             .join(TaxonomyAlias, TaxonomyAlias.node_id == TaxonomyNode.id)
-            .where(TaxonomyAlias.alias.ilike(pattern))
+            .where(
+                TaxonomyFacet.is_active.is_(True),
+                TaxonomyNode.is_active.is_(True),
+                TaxonomyAlias.alias.ilike(pattern),
+            )
         )
         keyword_filters.append(
             or_(
@@ -331,13 +353,23 @@ def _build_text_search_filter(search: str):
     taxonomy_node_subquery = (
         select(PhotoClassification.photo_id)
         .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
-        .where(TaxonomyNode.name.ilike(search_pattern))
+        .join(TaxonomyFacet, TaxonomyFacet.id == PhotoClassification.facet_id)
+        .where(
+            TaxonomyFacet.is_active.is_(True),
+            TaxonomyNode.is_active.is_(True),
+            TaxonomyNode.name.ilike(search_pattern),
+        )
     )
     taxonomy_alias_subquery = (
         select(PhotoClassification.photo_id)
         .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
+        .join(TaxonomyFacet, TaxonomyFacet.id == PhotoClassification.facet_id)
         .join(TaxonomyAlias, TaxonomyAlias.node_id == TaxonomyNode.id)
-        .where(TaxonomyAlias.alias.ilike(search_pattern))
+        .where(
+            TaxonomyFacet.is_active.is_(True),
+            TaxonomyNode.is_active.is_(True),
+            TaxonomyAlias.alias.ilike(search_pattern),
+        )
     )
     return or_(
         Photo.filename.ilike(search_pattern),

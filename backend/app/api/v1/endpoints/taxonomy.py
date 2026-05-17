@@ -19,6 +19,7 @@ from app.schemas.taxonomy import (
     TaxonomyNodeUpdate,
 )
 from app.services.taxonomy import (
+    TAXONOMY_GUIDE,
     build_node_tree,
     ensure_default_taxonomy,
     get_facet_by_id,
@@ -69,6 +70,15 @@ async def list_public_taxonomy(
     return [_serialize_facet(facet) for facet in facets]
 
 
+@router.get("/public/guide")
+async def get_public_taxonomy_guide(
+    db: AsyncSession = Depends(get_db),
+):
+    await ensure_default_taxonomy(db)
+    await db.commit()
+    return TAXONOMY_GUIDE
+
+
 @router.get("/facets", response_model=list[TaxonomyFacetResponse])
 async def list_taxonomy_facets(
     db: AsyncSession = Depends(get_db),
@@ -76,7 +86,7 @@ async def list_taxonomy_facets(
 ):
     await ensure_default_taxonomy(db)
     await db.commit()
-    facets = await get_facets(db, active_only=False)
+    facets = await get_facets(db, active_only=True)
     return [_serialize_facet(facet) for facet in facets]
 
 
@@ -98,6 +108,7 @@ async def get_taxonomy_insights(
         .join(TaxonomyNode, TaxonomyNode.facet_id == TaxonomyFacet.id)
         .join(TaxonomyNode.photo_classifications)
         .join(Photo)
+        .where(TaxonomyFacet.is_active.is_(True), TaxonomyNode.is_active.is_(True))
         .group_by(TaxonomyFacet.key, TaxonomyFacet.name, TaxonomyNode.name)
         .order_by(TaxonomyFacet.sort_order.asc(), func.count(Photo.id).desc(), TaxonomyNode.sort_order.asc())
     )

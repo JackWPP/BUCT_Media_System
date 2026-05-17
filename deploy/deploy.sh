@@ -20,6 +20,9 @@ deploy_backend() {
     log "Running database migrations..."
     .venv/bin/alembic upgrade head
 
+    log "Reconciling 2026 taxonomy..."
+    .venv/bin/python scripts/migrate_taxonomy_2026.py --apply
+
     log "Restarting service..."
     echo "$SUDO_PASS" | sudo -S systemctl restart visual-buct
 

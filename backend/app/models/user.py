@@ -18,7 +18,7 @@ class User(Base):
     Attributes:
         student_id: 学号/工号，作为核心身份标识，唯一且有索引
         email: 邮箱，保留作为备用登录方式
-        role: 角色 (admin/auditor/dept_user/user)
+        role: 角色 (admin/auditor/tagger/dept_user/user)
         auth_provider: 认证来源 (local/university_sso)，用于区分本地注册和 SSO 登录
         sso_id: SSO 系统中的唯一标识符，对接学校认证时填入
     """
@@ -29,7 +29,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=True, index=True, comment="邮箱，可选")
     hashed_password = Column(String(255), nullable=True, comment="本地密码，SSO 用户可为空")
     full_name = Column(String(100))
-    role = Column(String(20), default="user", nullable=False)  # admin/auditor/dept_user/user
+    role = Column(String(20), default="user", nullable=False)  # admin/auditor/tagger/dept_user/user
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), nullable=False)
 

@@ -5,6 +5,7 @@ API v1 版本路由聚合，注册所有端点模块。
 """
 from fastapi import APIRouter
 from app.api.v1.endpoints import auth, photos, tags, import_photos, stats, taxonomy, notifications, profile, favorites
+from app.api.v1.endpoints import tagging_tasks
 from app.api.v1.endpoints import admin_users, admin_config, admin_permissions, admin_audit
 
 api_router = APIRouter()
@@ -14,6 +15,7 @@ api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(photos.router, prefix="/photos", tags=["Photos"])
 api_router.include_router(tags.router, prefix="/tags", tags=["Tags"])
 api_router.include_router(taxonomy.router, prefix="/taxonomy", tags=["Taxonomy"])
+api_router.include_router(tagging_tasks.router, prefix="/tagging-tasks", tags=["Tagging Tasks"])
 api_router.include_router(import_photos.router, prefix="/photos", tags=["Import"])
 api_router.include_router(stats.router, prefix="/stats", tags=["Statistics"])
 api_router.include_router(notifications.router, prefix="/user", tags=["Notifications"])

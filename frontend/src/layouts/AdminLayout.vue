@@ -54,6 +54,7 @@ import {
   ImagesOutline,
   PeopleOutline,
   PricetagsOutline,
+  PricetagOutline,
   ServerOutline,
   SettingsOutline,
 } from '@vicons/ionicons5'
@@ -75,6 +76,7 @@ const roleLabel = computed(() => {
   const roleMap: Record<string, string> = {
     admin: '管理员',
     auditor: '审核员',
+    tagger: '标注员',
     dept_user: '部门用户',
     user: '普通用户',
   }
@@ -85,6 +87,7 @@ const roleTagType = computed(() => {
   const typeMap: Record<string, 'success' | 'warning' | 'info' | 'default'> = {
     admin: 'success',
     auditor: 'warning',
+    tagger: 'info',
     dept_user: 'info',
     user: 'default',
   }
@@ -100,6 +103,7 @@ const baseMenuOptions: MenuOption[] = [
   { label: '照片审核', key: 'PhotoReview', icon: renderMenuIcon(CheckmarkCircleOutline) },
   { label: '自由标签', key: 'TagManagement', icon: renderMenuIcon(PricetagsOutline) },
   { label: '分类治理', key: 'TaxonomyManagement', icon: renderMenuIcon(GitNetworkOutline) },
+  { label: '标注任务', key: 'TaggingTaskManagement', icon: renderMenuIcon(PricetagOutline) },
 ]
 
 const adminOnlyMenuOptions: MenuOption[] = [

@@ -2,11 +2,12 @@
 CRUD operations for Tag
 """
 from typing import Optional, List
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.tag import Tag
+from app.models.tag import Tag, TagAlias
 from app.schemas.tag import TagCreate, TagUpdate
+from app.services.tag_normalization import normalize_tag_name, resolve_tag_by_name_or_alias
 
 
 async def create_tag(
@@ -25,7 +26,7 @@ async def create_tag(
     """
     # Convert name to lowercase for consistency
     db_tag = Tag(
-        name=tag.name.lower(),
+        name=normalize_tag_name(tag.name),
         category=tag.category,
         color=tag.color or _generate_random_color()
     )
@@ -64,7 +65,7 @@ async def get_tag_by_name(db: AsyncSession, name: str) -> Optional[Tag]:
         Tag object or None
     """
     result = await db.execute(
-        select(Tag).where(Tag.name == name.lower())
+        select(Tag).where(Tag.name == normalize_tag_name(name))
     )
     return result.scalar_one_or_none()
 
@@ -94,7 +95,7 @@ async def get_tags(
     
     # Apply filters
     if search:
-        search_pattern = f"%{search.lower()}%"
+        search_pattern = f"%{normalize_tag_name(search)}%"
         search_filter = Tag.name.ilike(search_pattern)
         query = query.where(search_filter)
         count_query = count_query.where(search_filter)
@@ -160,7 +161,7 @@ async def update_tag(
     
     # Convert name to lowercase if provided
     if 'name' in update_data:
-        update_data['name'] = update_data['name'].lower()
+        update_data['name'] = normalize_tag_name(update_data['name'])
     
     for field, value in update_data.items():
         setattr(tag, field, value)
@@ -199,14 +200,14 @@ async def get_or_create_tag(
         Tag object (existing or newly created)
     """
     # Try to find existing tag
-    tag = await get_tag_by_name(db, name)
+    tag = await resolve_tag_by_name_or_alias(db, name)
     
     if tag:
         return tag
     
     # Create new tag if not found
     new_tag = Tag(
-        name=name.lower(),
+        name=normalize_tag_name(name),
         category=category,
         color=_generate_random_color()
     )
@@ -214,6 +215,41 @@ async def get_or_create_tag(
     await db.commit()
     await db.refresh(new_tag)
     return new_tag
+
+
+async def get_tag_suggestions(
+    db: AsyncSession,
+    query: str,
+    limit: int = 12,
+) -> list[dict]:
+    clean = normalize_tag_name(query)
+    if not clean:
+        return []
+    pattern = f"%{clean}%"
+    rows = await db.execute(
+        select(Tag, TagAlias.alias)
+        .outerjoin(TagAlias)
+        .where((Tag.name.ilike(pattern)) | (TagAlias.alias.ilike(pattern)))
+        .order_by(Tag.usage_count.desc(), Tag.name.asc())
+        .limit(limit)
+    )
+    seen: set[int] = set()
+    suggestions: list[dict] = []
+    for tag, alias in rows.all():
+        if tag.id in seen:
+            continue
+        seen.add(tag.id)
+        suggestions.append(
+            {
+                "id": tag.id,
+                "name": tag.name,
+                "category": tag.category,
+                "color": tag.color,
+                "usage_count": tag.usage_count,
+                "matched_alias": alias if alias and clean in alias.lower() and alias != tag.name else None,
+            }
+        )
+    return suggestions
 
 
 def _generate_random_color() -> str:

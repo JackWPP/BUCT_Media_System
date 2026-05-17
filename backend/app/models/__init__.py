@@ -3,7 +3,8 @@
 """
 from app.models.user import User
 from app.models.photo import Photo
-from app.models.tag import Tag, PhotoTag
+from app.models.tag import Tag, PhotoTag, TagAlias
+from app.models.tagging_task import TaggingTask, TaggingTaskItem
 from app.models.task import Task, TaskPhoto
 from app.models.system_config import SystemConfig, ConfigKeys, PortraitVisibility
 from app.models.permission import ResourcePermission, ResourceType, PermissionType
@@ -19,6 +20,9 @@ __all__ = [
     "Photo",
     "Tag",
     "PhotoTag",
+    "TagAlias",
+    "TaggingTask",
+    "TaggingTaskItem",
     "Task",
     "TaskPhoto",
     "SystemConfig",

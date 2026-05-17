@@ -145,6 +145,23 @@ async def get_current_auditor_user(
     return current_user
 
 
+async def get_current_tagger_user(
+    current_user: User = Depends(get_current_active_user)
+) -> User:
+    """
+    Get current tagger, auditor, or admin user.
+
+    Taggers can only access their assigned tagging tasks. Auditors/admins use
+    the same endpoints for review and troubleshooting.
+    """
+    if current_user.role not in ("admin", "auditor", "tagger"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions. Tagger, Auditor, or Admin role required."
+        )
+    return current_user
+
+
 async def get_optional_current_user(
     token: Optional[str] = Depends(oauth2_scheme_optional),
     db: AsyncSession = Depends(get_db)

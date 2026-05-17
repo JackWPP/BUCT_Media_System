@@ -30,6 +30,10 @@ export const useAuthStore = defineStore('auth', () => {
     user.value?.role === 'admin' || user.value?.role === 'auditor'
   )
 
+  const isTagger = computed(() =>
+    user.value?.role === 'admin' || user.value?.role === 'auditor' || user.value?.role === 'tagger'
+  )
+
   /**
    * 是否有审核权限（管理员或审核员）
    */
@@ -134,6 +138,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated,
     isAdmin,
     isAuditor,
+    isTagger,
     canReview,
     hasRole,
     initFromStorage,

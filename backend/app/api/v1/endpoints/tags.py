@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_db, get_current_user, get_current_auditor_user
 from app.models.user import User
-from app.schemas.tag import TagCreate, TagUpdate, TagResponse, TagListResponse
+from app.schemas.tag import TagCreate, TagUpdate, TagResponse, TagListResponse, TagSuggestion
 from app.crud import tag as tag_crud
 
 
@@ -94,6 +94,18 @@ async def get_popular_tags(
     tags = await tag_crud.get_popular_tags(db, limit=limit)
     
     return [TagResponse.model_validate(tag) for tag in tags]
+
+
+@router.get("/suggestions", response_model=list[TagSuggestion])
+async def get_tag_suggestions(
+    q: str,
+    limit: int = 12,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Suggest existing canonical tags and aliases for tag entry."""
+    limit = min(limit, 30)
+    return await tag_crud.get_tag_suggestions(db, q, limit=limit)
 
 
 @router.post("", response_model=TagResponse, status_code=status.HTTP_201_CREATED)

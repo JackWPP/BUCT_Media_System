@@ -14,6 +14,10 @@ export interface Tag {
   created_at: string
 }
 
+export interface TagSuggestion extends Tag {
+  matched_alias?: string | null
+}
+
 /** 标签列表响应 */
 export interface TagListResponse {
   total: number
@@ -63,6 +67,10 @@ export function getPublicTags(params?: {
  */
 export function getPopularTags(limit = 20) {
   return request.get<Tag[]>('/api/v1/tags/popular', { params: { limit } })
+}
+
+export function getTagSuggestions(q: string, limit = 12) {
+  return request.get<TagSuggestion[]>('/api/v1/tags/suggestions', { params: { q, limit } })
 }
 
 /**

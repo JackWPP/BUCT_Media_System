@@ -207,6 +207,9 @@ const userMenuOptions = computed(() => {
       icon: () => h(NIcon, null, { default: () => h(SettingsOutline) }),
     })
   }
+  if (authStore.isTagger) {
+    options.push({ label: '标注工作台', key: 'tagging' })
+  }
   options.push(
     { label: '个人中心', key: 'profile' },
     { label: '修改密码', key: 'change-password' },
@@ -225,6 +228,7 @@ function handleSearch() {
 
 function handleUserMenuSelect(key: string) {
   if (key === 'admin') router.push('/admin')
+  else if (key === 'tagging') router.push('/tagging')
   else if (key === 'submissions') router.push('/my-submissions')
   else if (key === 'profile') router.push('/profile')
   else if (key === 'change-password') {

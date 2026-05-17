@@ -21,7 +21,9 @@ export const usePhotoStore = defineStore('photo', () => {
     building: null,
     gallery_series: null,
     gallery_year: null,
+    award_level: null,
     photo_type: null,
+    documentary_topic: null,
     status: null,
     search: '',
     tag: null,
@@ -41,7 +43,9 @@ export const usePhotoStore = defineStore('photo', () => {
     if (filters.value.building) queryParams.building = filters.value.building
     if (filters.value.gallery_series) queryParams.gallery_series = filters.value.gallery_series
     if (filters.value.gallery_year) queryParams.gallery_year = filters.value.gallery_year
+    if (filters.value.award_level) queryParams.award_level = filters.value.award_level
     if (filters.value.photo_type) queryParams.photo_type = filters.value.photo_type
+    if (filters.value.documentary_topic) queryParams.documentary_topic = filters.value.documentary_topic
     if (filters.value.status) queryParams.status = filters.value.status
     if (filters.value.search) queryParams.search = filters.value.search
     if (filters.value.tag) queryParams.tag = filters.value.tag
@@ -146,7 +150,9 @@ export const usePhotoStore = defineStore('photo', () => {
       building: null,
       gallery_series: null,
       gallery_year: null,
+      award_level: null,
       photo_type: null,
+      documentary_topic: null,
       status: null,
       search: '',
       tag: null,

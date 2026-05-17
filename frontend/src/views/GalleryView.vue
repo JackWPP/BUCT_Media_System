@@ -44,7 +44,7 @@
           <n-select
             v-model:value="photoStore.filters.sortBy"
             size="small"
-            style="width: 110px;"
+            class="sort-select"
             :options="sortOptions"
             @update:value="handleSortChange"
           />
@@ -107,9 +107,10 @@
           <div v-if="filterMode === 'pills'" class="filter-pills">
             <!-- 动态渲染有数据的筛选组 -->
             <div
-              v-for="facetKey in visibleFacetKeys"
+              v-for="facetKey in guideVisibleFacetKeys"
               :key="facetKey"
               class="filter-group"
+              :class="{ 'filter-group-child': !primaryFacetKeys.includes(facetKey) }"
             >
               <span class="filter-label">{{ facetLabelMap[facetKey] }}</span>
               <div class="pills-row">
@@ -118,7 +119,7 @@
                   :key="opt.value"
                   class="tag-pill"
                   :class="{ active: photoStore.filters[facetKey] === opt.value }"
-                  @click="toggleFilter(facetKey, opt.value as string)"
+                  @click="toggleFilter(facetKey as keyof PhotoFilters, opt.value as string)"
                 >
                   {{ opt.label }}
                 </span>
@@ -155,7 +156,7 @@
           <div v-else class="filter-compact">
             <div class="compact-selects">
               <n-select
-                v-for="facetKey in visibleFacetKeys"
+                v-for="facetKey in guideVisibleFacetKeys"
                 :key="facetKey"
                 v-model:value="photoStore.filters[facetKey]"
                 :placeholder="facetLabelMap[facetKey]"
@@ -287,7 +288,7 @@ import { useDebounceFn } from '@vueuse/core'
 import type { SelectOption } from 'naive-ui'
 import MasonryLayout from '../components/common/MasonryLayout.vue'
 import { usePhotoStore } from '../stores/photo'
-import { getPublicTaxonomy, type TaxonomyFacet } from '../api/taxonomy'
+import { getPublicTaxonomy, getPublicTaxonomyGuide, type TaxonomyFacet, type TaxonomyGuide } from '../api/taxonomy'
 import type { Photo, PhotoFilters, SearchInterpretation as SearchInterpretationType } from '../types/photo'
 import { interpretSearch } from '../api/photo'
 import SearchInterpretation from '../components/search/SearchInterpretation.vue'
@@ -301,6 +302,7 @@ const photoStore = usePhotoStore()
 const authStore = useAuthStore()
 
 const taxonomyFacets = ref<TaxonomyFacet[]>([])
+const taxonomyGuide = ref<TaxonomyGuide | null>(null)
 const taxonomyLoading = ref(false)
 const taxonomyError = ref(false)
 const syncingRoute = ref(false)
@@ -317,11 +319,7 @@ const editingPhotoId = ref<string | null>(null)
 const PILL_COLLAPSE_THRESHOLD = 8
 
 // 需要隐藏的标签（红框标注要删除的）
-const hiddenTags: Record<string, string[]> = {
-  campus: ['朝阳校区'],
-  photo_type: ['人像', '活动', '纪实'],
-  gallery_series: ['活动纪实'],
-}
+const hiddenTags: Record<string, string[]> = {}
 
 const sortOptions = [
   { label: '最新上传', value: 'created_at' },
@@ -335,7 +333,9 @@ const facetLabelMap: Record<string, string> = {
   building: '楼宇',
   gallery_series: '专题',
   gallery_year: '年份',
+  award_level: '奖项',
   photo_type: '照片类型',
+  documentary_topic: '纪实主题',
   tag: '标签',
 }
 
@@ -345,7 +345,21 @@ const facetMap = computed(() =>
 
 // 静态筛选字段（始终显示，不需要 taxonomy 数据）
 // 所有筛选字段统一从 taxonomy API 动态获取
-const dynamicFacetKeys = ['season', 'campus', 'photo_type', 'building', 'gallery_series', 'gallery_year', 'tag']
+const dynamicFacetKeys = ['gallery_series', 'campus', 'photo_type', 'building', 'gallery_year', 'award_level', 'season', 'documentary_topic', 'tag']
+
+const primaryFacetKeys = computed(() => taxonomyGuide.value?.primary || ['gallery_series', 'campus', 'photo_type'])
+
+const dependentFacetKeys = computed(() => {
+  const keys: string[] = []
+  const dependencies = taxonomyGuide.value?.dependencies || {}
+  Object.entries(dependencies).forEach(([parentKey, byValue]) => {
+    const selected = photoStore.filters[parentKey as keyof PhotoFilters]
+    if (!selected) return
+    const children = byValue[selected as string] || []
+    children.forEach((key) => keys.push(key === 'landmark' ? 'building' : key))
+  })
+  return keys
+})
 
 const visibleFacetKeys = computed(() => {
   const visible: string[] = []
@@ -359,10 +373,15 @@ const visibleFacetKeys = computed(() => {
 
 const hasAnyFacets = computed(() => visibleFacetKeys.value.length > 0)
 
+const guideVisibleFacetKeys = computed(() => {
+  const keys = [...primaryFacetKeys.value, ...dependentFacetKeys.value, 'tag']
+  return [...new Set(keys)].filter((key) => visibleFacetKeys.value.includes(key))
+})
+
 const activeFilters = computed(() => {
   const filters = photoStore.filters
   const chips: Array<{ key: keyof PhotoFilters; label: string; value: string }> = []
-  ;(['season', 'campus', 'building', 'gallery_series', 'gallery_year', 'photo_type', 'tag'] as const).forEach((key) => {
+  ;(['season', 'campus', 'building', 'gallery_series', 'gallery_year', 'award_level', 'photo_type', 'documentary_topic', 'tag'] as const).forEach((key) => {
     const value = filters[key]
     if (value) {
       chips.push({ key, label: facetLabelMap[key], value })
@@ -398,7 +417,8 @@ function facetOptions(key: string): SelectOption[] {
   let options: SelectOption[] = []
 
   // 优先从 taxonomy API 动态获取
-  const facet = facetMap.value[key]
+  const taxonomyKey = key === 'building' ? 'landmark' : key
+  const facet = facetMap.value[taxonomyKey]
   if (facet && facet.nodes && facet.nodes.length > 0) {
     const flatten = (nodes: TaxonomyFacet['nodes']): SelectOption[] =>
       nodes.flatMap((node) => [
@@ -464,7 +484,7 @@ function handleImageError(event: Event, photo: Photo) {
 function buildQuery() {
   const query: Record<string, string> = {}
   const filters = photoStore.filters
-  ;(['season', 'campus', 'building', 'gallery_series', 'gallery_year', 'photo_type', 'tag'] as const).forEach((key) => {
+  ;(['season', 'campus', 'building', 'gallery_series', 'gallery_year', 'award_level', 'photo_type', 'documentary_topic', 'tag'] as const).forEach((key) => {
     const value = filters[key]
     if (value) query[key] = value
   })
@@ -497,7 +517,9 @@ function applyRouteQuery() {
   photoStore.filters.building = typeof query.building === 'string' ? query.building : null
   photoStore.filters.gallery_series = typeof query.gallery_series === 'string' ? query.gallery_series : null
   photoStore.filters.gallery_year = typeof query.gallery_year === 'string' ? query.gallery_year : null
+  photoStore.filters.award_level = typeof query.award_level === 'string' ? query.award_level : null
   photoStore.filters.photo_type = typeof query.photo_type === 'string' ? query.photo_type : null
+  photoStore.filters.documentary_topic = typeof query.documentary_topic === 'string' ? query.documentary_topic : null
   photoStore.filters.tag = typeof query.tag === 'string' ? query.tag : null
   photoStore.filters.search = typeof query.search === 'string' ? query.search : ''
   photoStore.filters.sortBy = typeof query.sort_by === 'string' ? query.sort_by : 'created_at'
@@ -579,7 +601,9 @@ function applyInterpretation(interpretation: SearchInterpretationType) {
       else if (facetKey === 'landmark') filters.building = nodeValue
       else if (facetKey === 'gallery_series') filters.gallery_series = nodeValue
       else if (facetKey === 'gallery_year') filters.gallery_year = nodeValue
+      else if (facetKey === 'award_level') filters.award_level = nodeValue
       else if (facetKey === 'photo_type') filters.photo_type = nodeValue
+      else if (facetKey === 'documentary_topic') filters.documentary_topic = nodeValue
     }
     const genericWords = new Set(['照片', '图片', '摄影', '相片', '图', '的', '了', '是', '在', '和'])
     const meaningfulKeywords = interpretation.keywords.filter(kw => !genericWords.has(kw) && kw.length >= 2)
@@ -638,7 +662,9 @@ async function handleRemoveFacet(facetKey: string) {
     else if (key === 'landmark') filters.building = value
     else if (key === 'gallery_series') filters.gallery_series = value
     else if (key === 'gallery_year') filters.gallery_year = value
+    else if (key === 'award_level') filters.award_level = value
     else if (key === 'photo_type') filters.photo_type = value
+    else if (key === 'documentary_topic') filters.documentary_topic = value
   }
   const genericWords = new Set(['照片', '图片', '摄影', '相片', '图', '的', '了', '是', '在', '和'])
   const meaningfulKeywords = currentInterpretation.value.keywords.filter(kw => !genericWords.has(kw) && kw.length >= 2)
@@ -674,7 +700,9 @@ async function loadTaxonomy() {
   taxonomyLoading.value = true
   taxonomyError.value = false
   try {
-    taxonomyFacets.value = await getPublicTaxonomy()
+    const [facets, guide] = await Promise.all([getPublicTaxonomy(), getPublicTaxonomyGuide()])
+    taxonomyFacets.value = facets
+    taxonomyGuide.value = guide
   } catch (error) {
     console.error('加载分类失败:', error)
     taxonomyError.value = true
@@ -765,7 +793,9 @@ onUnmounted(() => {
 .toolbar-main {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
   margin-bottom: 14px;
 }
 
@@ -773,6 +803,9 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  min-height: 32px;
+  flex: 1 1 240px;
   font-size: 14px;
   color: #666;
 }
@@ -790,7 +823,22 @@ onUnmounted(() => {
 .toolbar-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.toolbar-actions :deep(.n-button-group) {
+  flex: 0 0 auto;
+}
+
+.sort-select {
+  width: 128px;
+  min-width: 112px;
+  flex: 0 0 128px;
 }
 
 /* 筛选区域 */
@@ -833,6 +881,11 @@ onUnmounted(() => {
   display: flex;
   align-items: flex-start;
   gap: 10px;
+}
+
+.filter-group-child {
+  padding-left: 18px;
+  border-left: 2px solid #e5e7eb;
 }
 
 .filter-label {
@@ -1041,6 +1094,20 @@ onUnmounted(() => {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
+  }
+
+  .result-count {
+    display: none;
+  }
+
+  .toolbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .sort-select {
+    width: min(160px, calc(100vw - 132px));
+    flex-basis: min(160px, calc(100vw - 132px));
   }
 
   .filter-group {

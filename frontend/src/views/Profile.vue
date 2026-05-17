@@ -107,6 +107,7 @@ const roleLabel = computed(() => {
   const map: Record<string, string> = {
     admin: '超级管理员',
     auditor: '审核员',
+    tagger: '标注员',
     dept_user: '部门用户',
     user: '普通用户',
   }
@@ -117,6 +118,7 @@ const roleTagType = computed(() => {
   const map: Record<string, 'success' | 'warning' | 'info' | 'default'> = {
     admin: 'success',
     auditor: 'warning',
+    tagger: 'info',
     dept_user: 'info',
     user: 'default',
   }

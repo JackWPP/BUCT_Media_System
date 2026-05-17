@@ -23,10 +23,20 @@ from app.services.taxonomy import resolve_taxonomy_node, set_photo_classificatio
 
 # Mapping from English category values (stored in Photo.category) to Chinese taxonomy values
 _CATEGORY_TO_PHOTO_TYPE = {
-    "Landscape": "风光",
-    "Documentary": "纪实",
-    "Portrait": "人像",
-    "Activity": "活动",
+    "Landscape": "风光类",
+    "Documentary": "纪实类",
+    "Activity": "纪实类",
+}
+
+_CONTEST_YEAR_MAP = {
+    "2018": "2018年第一届获奖作品",
+    "2019": "2019年第二届获奖作品",
+    "2020": "2020年第三届获奖作品",
+    "2021": "2021年第四届获奖作品",
+    "2022": "2022年第五届获奖作品",
+    "2023": "2023年第六届获奖作品",
+    "2024": "2024年第七届获奖作品",
+    "2025": "2025年第八届获奖作品",
 }
 
 
@@ -77,13 +87,13 @@ def _build_photo_context(photo: Photo) -> dict[str, Any]:
     # Detect photography contest photos from description
     desc = photo.description or ""
     if "摄影大赛" in desc:
-        context["gallery_series"] = "摄影大赛"
+        context["gallery_series"] = "昌平校区摄影大赛"
         # All contest photos are from 昌平校区
         context["campus"] = "昌平校区"
         # Try to extract year from description (e.g., "2018年昌平校区摄影大赛1ST")
         m = re.search(r"(\d{4})年", desc)
-        if m:
-            context["gallery_year"] = m.group(1)
+        if m and m.group(1) in _CONTEST_YEAR_MAP:
+            context["gallery_year"] = _CONTEST_YEAR_MAP[m.group(1)]
 
     return context
 

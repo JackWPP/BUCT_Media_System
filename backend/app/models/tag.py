@@ -20,6 +20,7 @@ class Tag(Base):
 
     # 关系
     photo_tags = relationship("PhotoTag", back_populates="tag", cascade="all, delete-orphan")
+    aliases = relationship("TagAlias", back_populates="tag", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Tag(name='{self.name}', usage_count={self.usage_count})>"
@@ -39,3 +40,18 @@ class PhotoTag(Base):
 
     def __repr__(self):
         return f"<PhotoTag(photo_id={self.photo_id}, tag_id={self.tag_id})>"
+
+
+class TagAlias(Base):
+    """标签别名表，用于把自由标签归一到主标签。"""
+    __tablename__ = "tag_aliases"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tag_id = Column(Integer, ForeignKey("tags.id"), nullable=False, index=True)
+    alias = Column(String(100), unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    tag = relationship("Tag", back_populates="aliases")
+
+    def __repr__(self):
+        return f"<TagAlias(alias='{self.alias}', tag_id={self.tag_id})>"

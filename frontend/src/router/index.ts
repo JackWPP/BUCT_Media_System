@@ -53,6 +53,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/tagging',
+    name: 'TaggingWorkspace',
+    component: () => import('../views/TaggingWorkspace.vue'),
+    meta: { requiresAuth: true, requiresTagger: true },
+  },
+  {
     path: '/admin',
     component: () => import('../layouts/AdminLayout.vue'),
     meta: { requiresAuth: true, requiresAuditor: true },
@@ -80,6 +86,12 @@ const routes: RouteRecordRaw[] = [
         path: 'taxonomy',
         name: 'TaxonomyManagement',
         component: () => import('../views/admin/TaxonomyManagement.vue'),
+        meta: { requiresAuth: true, requiresAuditor: true },
+      },
+      {
+        path: 'tagging-tasks',
+        name: 'TaggingTaskManagement',
+        component: () => import('../views/admin/TaggingTaskManagement.vue'),
         meta: { requiresAuth: true, requiresAuditor: true },
       },
       {
@@ -131,6 +143,7 @@ router.beforeEach((to, _from, next) => {
   const requiresAuth = to.meta.requiresAuth !== false
   const requiresAdmin = to.meta.requiresAdmin === true
   const requiresAuditor = to.meta.requiresAuditor === true
+  const requiresTagger = to.meta.requiresTagger === true
 
   if (requiresAuth && !authStore.isAuthenticated) {
     next({ path: '/login', query: { redirect: to.fullPath } })
@@ -141,6 +154,10 @@ router.beforeEach((to, _from, next) => {
     return
   }
   if (requiresAuditor && !authStore.isAuditor) {
+    next('/')
+    return
+  }
+  if (requiresTagger && !authStore.isTagger) {
     next('/')
     return
   }

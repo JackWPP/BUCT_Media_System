@@ -54,6 +54,12 @@ export interface TaxonomyInsightsResponse {
   facet_counts: TaxonomyFacetInsight[]
 }
 
+export interface TaxonomyGuide {
+  primary: string[]
+  dependencies: Record<string, Record<string, string[]>>
+  legacy_query_aliases: Record<string, string>
+}
+
 export interface TaxonomyFacetCreate {
   key: string
   name: string
@@ -76,6 +82,10 @@ export interface TaxonomyNodeCreate {
 
 export function getPublicTaxonomy() {
   return request.get<TaxonomyFacet[]>('/api/v1/taxonomy/public')
+}
+
+export function getPublicTaxonomyGuide() {
+  return request.get<TaxonomyGuide>('/api/v1/taxonomy/public/guide')
 }
 
 export function getTaxonomyFacets() {

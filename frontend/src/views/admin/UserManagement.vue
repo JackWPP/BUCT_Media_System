@@ -257,6 +257,7 @@ const permissionForm = reactive<PermissionGrantRequest>({
 const roleOptions = [
   { label: '超级管理员', value: 'admin' },
   { label: '审核员', value: 'auditor' },
+  { label: '标注员', value: 'tagger' },
   { label: '部门用户', value: 'dept_user' },
   { label: '普通用户', value: 'user' },
 ]
@@ -271,6 +272,7 @@ const createRules = {
 const roleTagMap: Record<UserRole, { label: string; type: 'success' | 'warning' | 'info' | 'default' }> = {
   admin: { label: '超级管理员', type: 'success' },
   auditor: { label: '审核员', type: 'warning' },
+  tagger: { label: '标注员', type: 'info' },
   dept_user: { label: '部门用户', type: 'info' },
   user: { label: '普通用户', type: 'default' },
 }

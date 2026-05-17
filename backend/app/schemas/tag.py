@@ -41,6 +41,15 @@ class TagResponse(TagInDB):
     pass
 
 
+class TagSuggestion(BaseModel):
+    id: int
+    name: str
+    category: Optional[str] = None
+    color: Optional[str] = None
+    usage_count: int
+    matched_alias: Optional[str] = None
+
+
 class TagListResponse(BaseModel):
     """Tag list response"""
     total: int

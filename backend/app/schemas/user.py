@@ -28,11 +28,13 @@ class RoleEnum(str, Enum):
     
     - admin: 超级管理员，拥有所有权限
     - auditor: 审核员，可审核照片和编辑标签
+    - tagger: 学生标注员，只能处理分配给自己的标注任务
     - dept_user: 部门用户，预留扩展
     - user: 普通用户
     """
     ADMIN = "admin"
     AUDITOR = "auditor"
+    TAGGER = "tagger"
     DEPT_USER = "dept_user"
     USER = "user"
 
