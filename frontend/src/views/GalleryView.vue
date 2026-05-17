@@ -211,6 +211,7 @@
           :items="photoStore.photos"
           :gap="gridGap"
           :columns-config="masonryColumnsConfig"
+          :get-item-ratio="getItemRatio"
         >
           <template #default="{ item: photo }">
             <div class="photo-card-hover" :class="{ 'photo-card-portrait': photo.height > photo.width }" @click="handlePhotoClick(photo)">
@@ -398,6 +399,11 @@ const masonryColumnsConfig = computed(() => {
   }
   return { base: 2, sm: 2, lg: 3, xl: 4, '2xl': 5 }
 })
+
+// 根据图片方向返回高度/宽度比（竖屏 3/2，横屏 2/3）
+const getItemRatio = (photo: any) => {
+  return photo.height > photo.width ? 3 / 2 : 2 / 3
+}
 
 // 获取当前屏幕下的最大列数，用于计算每页数量
 const maxColumnCount = computed(() => {
