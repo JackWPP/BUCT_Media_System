@@ -172,16 +172,29 @@ function handlePhotoClick(photo: Photo) {
   router.push(`/photo/${photo.id}`)
 }
 
+// 奖项等级排序权重（数字越小越靠前）
+const AWARD_ORDER: Record<string, number> = {
+  '特等奖': 1,
+  '一等奖': 2,
+  '二等奖': 3,
+  '优秀奖': 4,
+}
+
+function getAwardOrder(photo: Photo): number {
+  const award = photo.classifications?.award_level?.node_name
+  return award ? (AWARD_ORDER[award] ?? 99) : 99
+}
+
 async function loadPhotos() {
   loading.value = true
   try {
     const response = await getPublicPhotos({
-      limit: 12,
-      sort_by: 'created_at',
+      limit: 100,
       gallery_year: '2025年第八届获奖作品',
       photo_type: '风光类',
     })
-    photos.value = response.items.slice(0, 12)
+    // 按奖项等级排序：特等奖 → 一等奖 → 二等奖 → 优秀奖 → 无奖项
+    photos.value = response.items.sort((a, b) => getAwardOrder(a) - getAwardOrder(b))
   } catch (error) {
     console.error('加载图片失败:', error)
   } finally {
