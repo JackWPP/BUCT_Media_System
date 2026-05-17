@@ -259,10 +259,13 @@ function handleUserMenuSelect(key: string) {
   z-index: 1000;
   height: 80px;
   transition: all 0.3s ease;
+  background: transparent;
 }
 
 .header-home {
   background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .header-scrolled {
@@ -327,6 +330,18 @@ function handleUserMenuSelect(key: string) {
   border-radius: 20px;
 }
 
+.header-home .header-search-mini :deep(.n-input) {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  backdrop-filter: blur(10px);
+}
+
+.header-home .header-search-mini :deep(.n-input__input-el),
+.header-home .header-search-mini :deep(.n-input__placeholder),
+.header-home .header-search-mini :deep(.n-input__prefix) {
+  color: rgba(255, 255, 255, 0.82);
+}
+
 .header-search-mini :deep(.n-input__border) {
   border: none;
 }
@@ -357,6 +372,12 @@ function handleUserMenuSelect(key: string) {
 .login-btn {
   background: #e60012 !important;
   border-color: #e60012 !important;
+}
+
+.header-home .login-btn {
+  background: rgba(230, 0, 18, 0.92) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
 }
 
 .login-btn:hover {

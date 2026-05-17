@@ -62,11 +62,12 @@
         </div>
         <MasonryLayout v-else :items="photos" :gap="16" :columns-config="homeColumnsConfig" :get-item-ratio="getItemRatio">
           <template #default="{ item: photo }">
-            <div class="photo-card-hover" :class="{ 'photo-card-portrait': photo.height > photo.width }" @click="handlePhotoClick(photo)">
+            <div class="photo-card-hover" @click="handlePhotoClick(photo)">
               <img
                 :src="getImageUrl(photo)"
                 :alt="photo.filename"
                 loading="lazy"
+                @load="(e) => handleImageLoad(e, photo)"
                 @error="(e) => handleImageError(e, photo)"
               />
               <div class="photo-overlay">
@@ -110,7 +111,10 @@ const { y: scrollY } = useWindowScroll()
 const searchKeyword = ref('')
 // 根据图片方向返回高度/宽度比
 const getItemRatio = (photo: any) => {
-  return photo.height > photo.width ? 3 / 2 : 2 / 3
+  if (photo.width && photo.height) {
+    return photo.height / photo.width
+  }
+  return photo._displayRatio || 2 / 3
 }
 
 // 首页瀑布流列数配置：手机端 2 列
@@ -144,6 +148,13 @@ function handleImageError(event: Event, photo: Photo) {
   }
   img.setAttribute('data-tried', 'true')
   img.src = getPhotoUrl(photo.id, 'thumbnail')
+}
+
+function handleImageLoad(event: Event, photo: Photo) {
+  const img = event.target as HTMLImageElement
+  if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+    ;(photo as Photo & { _displayRatio?: number })._displayRatio = img.naturalHeight / img.naturalWidth
+  }
 }
 
 function handleSearch() {
@@ -207,6 +218,7 @@ onMounted(() => {
 <style scoped>
 .home-view {
   min-height: 100vh;
+  margin-top: -80px;
 }
 
 /* ===== Hero 区域 ===== */
@@ -216,7 +228,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 120px 24px 48px;
+  padding: 160px 24px 48px;
   overflow: hidden;
 }
 
@@ -456,6 +468,14 @@ onMounted(() => {
   padding: 48px 24px 64px;
 }
 
+.featured-section :deep(.photo-card-hover) {
+  aspect-ratio: auto;
+}
+
+.featured-section :deep(.photo-card-hover img) {
+  height: auto;
+}
+
 .section-header {
   display: flex;
   justify-content: space-between;
@@ -477,7 +497,7 @@ onMounted(() => {
 @media (max-width: 768px) {
   .hero-section {
     min-height: 400px;
-    padding: 72px 16px 32px;
+    padding: 112px 16px 32px;
   }
 
   .hero-slogan {

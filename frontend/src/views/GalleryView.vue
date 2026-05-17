@@ -51,45 +51,10 @@
         </div>
       </div>
 
-      <!-- 搜索输入框 -->
-      <div class="gallery-search-box">
-        <n-input
-          v-model:value="searchKeyword"
-          :placeholder="smartSearchEnabled ? '试试自然语言搜索：秋天的图书馆、春天的樱花...' : '输入关键词搜索照片...'"
-          clearable
-          class="gallery-search-input"
-          :class="{ 'search-interpreting': isInterpreting }"
-          @update:value="handleSearchInput"
-        >
-          <template #prefix>
-            <n-icon :component="SearchOutline" />
-          </template>
-        </n-input>
-        <div v-if="isInterpreting" class="interpreting-dots">
-          <span class="dot"></span>
-          <span class="dot"></span>
-          <span class="dot"></span>
-        </div>
-      </div>
-
       <!-- 筛选区域 -->
       <div v-if="hasAnyFacets || activeFilters.length" class="filter-area">
-        <!-- 筛选头部：模式切换 + 清空按钮 -->
-        <div class="filter-header">
-          <n-button-group size="small">
-            <n-button
-              :type="filterMode === 'pills' ? 'primary' : 'default'"
-              ghost
-              @click="filterMode = 'pills'"
-            >
-              <template #icon>
-                <n-icon :component="PricetagsOutline" />
-              </template>
-              标签
-            </n-button>
-          </n-button-group>
+        <div v-if="activeFilters.length" class="filter-header">
           <n-button
-            v-if="activeFilters.length"
             text
             size="tiny"
             type="error"
@@ -214,12 +179,13 @@
           :get-item-ratio="getItemRatio"
         >
           <template #default="{ item: photo }">
-            <div class="photo-card-hover" :class="{ 'photo-card-portrait': photo.height > photo.width }" @click="handlePhotoClick(photo)">
+            <div class="photo-card-hover" @click="handlePhotoClick(photo)">
               <img
                 :src="getImageUrl(photo)"
                 :alt="photo.filename"
                 loading="lazy"
                 class="masonry-img"
+                @load="(e) => handleImageLoad(e, photo)"
                 @error="(e) => handleImageError(e, photo)"
               />
               <div class="photo-overlay">
@@ -280,9 +246,6 @@ import {
   CloseOutline,
   GridOutline,
   AppsOutline,
-  SearchOutline,
-  PricetagsOutline,
-  OptionsOutline,
   CreateOutline,
 } from '@vicons/ionicons5'
 import { useDebounceFn } from '@vueuse/core'
@@ -400,9 +363,12 @@ const masonryColumnsConfig = computed(() => {
   return { base: 2, sm: 2, lg: 3, xl: 4, '2xl': 5 }
 })
 
-// 根据图片方向返回高度/宽度比（竖屏 3/2，横屏 2/3）
+// 根据图片方向返回高度/宽度比。缺少尺寸时用原图加载后的比例回填，避免本地元数据缺失时全部显示为横屏。
 const getItemRatio = (photo: any) => {
-  return photo.height > photo.width ? 3 / 2 : 2 / 3
+  if (photo.width && photo.height) {
+    return photo.height / photo.width
+  }
+  return photo._displayRatio || 2 / 3
 }
 
 // 获取当前屏幕下的最大列数，用于计算每页数量
@@ -485,6 +451,13 @@ function handleImageError(event: Event, photo: Photo) {
   }
   img.setAttribute('data-tried', 'true')
   img.src = getPhotoUrl(photo.id, 'thumbnail')
+}
+
+function handleImageLoad(event: Event, photo: Photo) {
+  const img = event.target as HTMLImageElement
+  if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+    ;(photo as Photo & { _displayRatio?: number })._displayRatio = img.naturalHeight / img.naturalWidth
+  }
 }
 
 function buildQuery() {
@@ -854,7 +827,7 @@ onUnmounted(() => {
 
 .filter-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   margin-bottom: 10px;
 }
@@ -933,53 +906,6 @@ onUnmounted(() => {
   margin: 8px 0;
 }
 
-.gallery-search-box {
-  margin: 12px 0;
-  position: relative;
-}
-
-.gallery-search-input {
-  width: 100%;
-}
-
-.search-interpreting :deep(.n-input__border) {
-  border-color: rgba(230, 0, 18, 0.4) !important;
-  animation: search-pulse-border 1.5s ease-in-out infinite;
-}
-
-@keyframes search-pulse-border {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(230, 0, 18, 0.2); }
-  50% { box-shadow: 0 0 0 3px rgba(230, 0, 18, 0.1); }
-}
-
-.interpreting-dots {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  padding: 4px 0 0 4px;
-}
-
-.interpreting-dots .dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #e60012;
-  animation: dot-bounce 1.2s ease-in-out infinite;
-}
-
-.interpreting-dots .dot:nth-child(2) {
-  animation-delay: 0.15s;
-}
-
-.interpreting-dots .dot:nth-child(3) {
-  animation-delay: 0.3s;
-}
-
-@keyframes dot-bounce {
-  0%, 60%, 100% { transform: translateY(0); opacity: 0.3; }
-  30% { transform: translateY(-4px); opacity: 1; }
-}
-
 /* 图片网格 */
 .gallery-grid {
   min-height: 400px;
@@ -996,16 +922,11 @@ onUnmounted(() => {
   overflow: hidden;
   border-radius: 8px;
   background: #f5f5f5;
-  aspect-ratio: 3 / 2;
-}
-
-.photo-card-hover.photo-card-portrait {
-  aspect-ratio: 2 / 3;
 }
 
 .masonry-img {
   width: 100%;
-  height: 100%;
+  height: auto;
   object-fit: cover;
   display: block;
   transition: transform 0.3s ease;
