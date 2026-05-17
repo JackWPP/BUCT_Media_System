@@ -48,6 +48,7 @@
     <section class="featured-section">
       <div class="section-header">
         <h2 class="section-title">精选图片</h2>
+        <span class="section-subtitle">2024 第七届摄影大赛 · 风光类</span>
         <n-button text type="primary" @click="router.push('/gallery')">
           查看更多
           <template #icon>
@@ -186,7 +187,12 @@ function handlePhotoClick(photo: Photo) {
 async function loadPhotos() {
   loading.value = true
   try {
-    const response = await getPublicPhotos({ limit: 12, sort_by: 'created_at' })
+    const response = await getPublicPhotos({
+      limit: 12,
+      sort_by: 'created_at',
+      gallery_year: '2024年第七届获奖作品',
+      photo_type: '风光类',
+    })
     photos.value = response.items.slice(0, 12)
   } catch (error) {
     console.error('加载图片失败:', error)
@@ -487,6 +493,12 @@ onMounted(() => {
   font-size: 22px;
   font-weight: 600;
   color: #333;
+}
+
+.section-subtitle {
+  font-size: 14px;
+  color: #999;
+  margin-left: 12px;
 }
 
 .empty-featured {
