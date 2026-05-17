@@ -179,7 +179,7 @@
           :get-item-ratio="getItemRatio"
         >
           <template #default="{ item: photo }">
-            <div class="photo-card-hover" @click="handlePhotoClick(photo)">
+            <div class="photo-card-hover" :class="{ 'photo-card-portrait': photo.height > photo.width }" @click="handlePhotoClick(photo)">
               <img
                 :src="getImageUrl(photo)"
                 :alt="photo.filename"
@@ -922,11 +922,16 @@ onUnmounted(() => {
   overflow: hidden;
   border-radius: 8px;
   background: #f5f5f5;
+  aspect-ratio: 3 / 2;
+}
+
+.photo-card-hover.photo-card-portrait {
+  aspect-ratio: 2 / 3;
 }
 
 .masonry-img {
   width: 100%;
-  height: auto;
+  height: 100%;
   object-fit: cover;
   display: block;
   transition: transform 0.3s ease;
