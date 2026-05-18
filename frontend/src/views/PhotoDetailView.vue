@@ -61,28 +61,17 @@
             @touchend="handleTouchEnd"
             @dblclick="toggleZoom"
           >
-            <!-- 缩略图：快速显示，作为底图 -->
+            <!-- 图片：直接加载，无需等待 @load 事件 -->
             <img
               v-if="photo"
-              :key="'thumb-' + photo.id"
-              :src="getThumbnailUrl(photo)"
+              :key="photo.id + '-' + imageKey"
+              :src="currentImageUrl"
               :alt="photo.filename"
-              class="stage-image stage-thumb"
-              @load="handleThumbLoad"
+              class="stage-image"
+              :style="zoomStyle"
+              @error="handleImageError"
+              @click="toggleZoom"
             />
-            <!-- 高清图：后台加载完成后替换 -->
-            <transition name="fade-img">
-              <img
-                v-if="photo && hdReady"
-                :key="'hd-' + photo.id"
-                :src="hdSrc"
-                :alt="photo.filename"
-                class="stage-image image-loaded"
-                :style="zoomStyle"
-                @error="handleImageError"
-                @click="toggleZoom"
-              />
-            </transition>
             <!-- 缩放提示 -->
             <div v-if="zoomMode" class="zoom-hint">
               {{ (scale * 100).toFixed(0) }}% · {{ isTouchDevice ? '双指缩放 · 单指拖动 · 双击退出' : '滚轮缩放 · 拖拽平移 · 点击退出' }}
@@ -295,8 +284,14 @@ const photo = ref<Photo | null>(null)
 const relatedPhotos = ref<Photo[]>([])
 const showOriginal = ref(false)
 const loadingOriginal = ref(false)
-const hdReady = ref(false)
-const hdSrc = ref('')
+const imageKey = ref(0)
+
+// 当前显示的图片 URL（直接绑定到 img src，不依赖 @load 事件）
+const currentImageUrl = computed(() => {
+  if (!photo.value) return ''
+  const type = showOriginal.value ? 'original' : 'compressed'
+  return getPhotoUrl(photo.value.id, type)
+})
 
 // 独立维护上下文图片列表，不依赖 photoStore（避免与 HomeView 缓存冲突）
 const contextPhotos = ref<Photo[]>([])
@@ -337,28 +332,9 @@ const allTags = computed(() => {
   return Array.from(tags)
 })
 
-function getImageUrl(currentPhoto: Photo) {
-  return showOriginal.value
-    ? getPhotoUrl(currentPhoto.id, 'original')
-    : getPhotoUrl(currentPhoto.id, 'compressed')
-}
-
 function loadOriginal() {
-  if (showOriginal.value) {
-    showOriginal.value = false
-    hdReady.value = false
-    // 重新加载压缩图
-    if (photo.value) preloadHd(photo.value, 'compressed')
-    return
-  }
-  loadingOriginal.value = true
-  showOriginal.value = true
-  hdReady.value = false
-  if (photo.value) preloadHd(photo.value, 'original')
-}
-
-function handleThumbLoad() {
-  // 缩略图加载完成，立即显示，同时开始加载高清图
+  showOriginal.value = !showOriginal.value
+  imageKey.value++  // 强制重新加载图片
   loadingOriginal.value = false
 }
 
@@ -366,32 +342,16 @@ function getThumbnailUrl(currentPhoto: Photo) {
   return getPhotoUrl(currentPhoto.id, 'thumbnail')
 }
 
-// 渐进加载：预加载高清图，完成后替换缩略图
-function preloadHd(currentPhoto: Photo, type: 'compressed' | 'original' = 'compressed') {
-  hdReady.value = false
-  const url = getPhotoUrl(currentPhoto.id, type)
-  const img = new window.Image()
-  img.onload = () => {
-    hdSrc.value = url
-    hdReady.value = true
-    loadingOriginal.value = false
-  }
-  img.onerror = () => {
-    // 高清图加载失败，缩略图仍在显示，不额外处理
-    loadingOriginal.value = false
-  }
-  img.src = url
-}
-
 function handleImageError(event: Event) {
   const img = event.target as HTMLImageElement
-  const src = img.src
   if (img.getAttribute('data-tried') === 'true') {
+    // 已经尝试过回退，显示占位图
     img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
     return
   }
   img.setAttribute('data-tried', 'true')
-  img.src = src.replace('/image/original', '/image/thumbnail').replace('/image/compressed', '/image/thumbnail')
+  // 压缩图/原图加载失败，回退到缩略图
+  img.src = getPhotoUrl(photo.value!.id, 'thumbnail')
 }
 
 function formatFileSize(bytes: number | null): string {
@@ -616,16 +576,16 @@ async function shareImage() {
 }
 
 function preloadAdjacent() {
-  // 预加载前后图片
+  // 预加载前后图片的压缩版本
   if (!contextPhotos.value.length) return
   const idx = currentIndex.value
   if (idx > 0) {
     const prevImg = new Image()
-    prevImg.src = getImageUrl(contextPhotos.value[idx - 1])
+    prevImg.src = getPhotoUrl(contextPhotos.value[idx - 1].id, 'compressed')
   }
   if (idx < contextPhotos.value.length - 1) {
     const nextImg = new Image()
-    nextImg.src = getImageUrl(contextPhotos.value[idx + 1])
+    nextImg.src = getPhotoUrl(contextPhotos.value[idx + 1].id, 'compressed')
   }
 }
 
@@ -646,10 +606,9 @@ async function loadContextPhotos() {
 
 async function loadPhotoDetail(id: string) {
   loading.value = true
-  hdReady.value = false
-  hdSrc.value = ''
   showOriginal.value = false
   loadingOriginal.value = false
+  imageKey.value = 0
   photo.value = null
   try {
     // 先确保上下文图片列表已加载
@@ -664,8 +623,6 @@ async function loadPhotoDetail(id: string) {
       .filter((p) => p.id !== id)
       .slice(0, 8)
     preloadAdjacent()
-    // 开始渐进加载高清图
-    preloadHd(photo.value, 'compressed')
   } catch (error: any) {
     message.error(error?.response?.data?.detail || '加载照片详情失败')
     photo.value = null
@@ -713,7 +670,7 @@ watch(
 <style scoped>
 .photo-detail-view {
   min-height: 100vh;
-  padding-top: 56px;
+  /* padding-top 由 PublicLayout 的 .public-main 提供，不重复设置 */
   background: #fff;
 }
 
@@ -804,22 +761,6 @@ watch(
   display: block;
 }
 
-/* 缩略图：始终可见，作为底层 */
-.stage-thumb {
-  opacity: 1;
-  position: absolute;
-  z-index: 1;
-  filter: blur(0);
-  transition: filter 0.3s ease;
-}
-
-/* 高清图：覆盖在缩略图上 */
-.stage-image.image-loaded {
-  position: relative;
-  z-index: 2;
-  opacity: 1;
-}
-
 .image-stage.zoom-mode .stage-image {
   max-width: none;
   max-height: none;
@@ -839,17 +780,6 @@ watch(
   pointer-events: none;
   white-space: nowrap;
   transition: opacity 0.3s;
-}
-
-/* 图片切换淡入淡出动画 */
-.fade-img-enter-active,
-.fade-img-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.fade-img-enter-from,
-.fade-img-leave-to {
-  opacity: 0;
 }
 
 /* 左右切换大箭头 */
