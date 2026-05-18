@@ -61,17 +61,26 @@
             @touchend="handleTouchEnd"
             @dblclick="toggleZoom"
           >
-            <!-- 图片：直接加载，无需等待 @load 事件 -->
+            <!-- 渐进式图片加载：缩略图底图 + 高清图叠加 -->
             <img
               v-if="photo"
-              :key="photo.id + '-' + imageKey"
-              :src="currentImageUrl"
+              :key="'thumb-' + photo.id + '-' + imageKey"
+              :src="getPhotoUrl(photo.id, showOriginal ? 'thumbnail' : 'thumbnail')"
               :alt="photo.filename"
-              class="stage-image"
+              class="stage-image stage-thumb"
               :style="zoomStyle"
-              @error="handleImageError"
-              @click="toggleZoom"
             />
+            <transition name="fade-img">
+              <img
+                v-if="photo && hdReady"
+                :key="'hd-' + photo.id + '-' + imageKey"
+                :src="hdSrc"
+                :alt="photo.filename"
+                class="stage-image stage-hd"
+                :style="zoomStyle"
+                @error="handleHdError"
+              />
+            </transition>
             <!-- 缩放提示 -->
             <div v-if="zoomMode" class="zoom-hint">
               {{ (scale * 100).toFixed(0) }}% · {{ isTouchDevice ? '双指缩放 · 单指拖动 · 双击退出' : '滚轮缩放 · 拖拽平移 · 点击退出' }}
@@ -286,12 +295,24 @@ const showOriginal = ref(false)
 const loadingOriginal = ref(false)
 const imageKey = ref(0)
 
-// 当前显示的图片 URL（直接绑定到 img src，不依赖 @load 事件）
-const currentImageUrl = computed(() => {
-  if (!photo.value) return ''
+// 渐进式加载：缩略图立即显示，高清图后台预加载
+const hdReady = ref(false)
+const hdSrc = ref('')
+
+function preloadHd() {
+  if (!photo.value) return
+  hdReady.value = false
   const type = showOriginal.value ? 'original' : 'compressed'
-  return getPhotoUrl(photo.value.id, type)
-})
+  const url = getPhotoUrl(photo.value.id, type)
+  hdSrc.value = url
+  const img = new Image()
+  img.onload = () => { hdReady.value = true }
+  img.onerror = () => {
+    // 高清图加载失败，尝试回退到缩略图（不覆盖，缩略图已在底层）
+    console.warn('HD image load failed, thumbnail still visible')
+  }
+  img.src = url
+}
 
 // 独立维护上下文图片列表，不依赖 photoStore（避免与 HomeView 缓存冲突）
 const contextPhotos = ref<Photo[]>([])
@@ -334,24 +355,19 @@ const allTags = computed(() => {
 
 function loadOriginal() {
   showOriginal.value = !showOriginal.value
-  imageKey.value++  // 强制重新加载图片
+  imageKey.value++  // 强制重新加载
   loadingOriginal.value = false
+  preloadHd()  // 重新预加载高清图
 }
 
 function getThumbnailUrl(currentPhoto: Photo) {
   return getPhotoUrl(currentPhoto.id, 'thumbnail')
 }
 
-function handleImageError(event: Event) {
-  const img = event.target as HTMLImageElement
-  if (img.getAttribute('data-tried') === 'true') {
-    // 已经尝试过回退，显示占位图
-    img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
-    return
-  }
-  img.setAttribute('data-tried', 'true')
-  // 压缩图/原图加载失败，回退到缩略图
-  img.src = getPhotoUrl(photo.value!.id, 'thumbnail')
+function handleHdError(event: Event) {
+  // 高清图加载失败，缩略图仍在底层显示，无需额外处理
+  console.warn('HD image error')
+  hdReady.value = false
 }
 
 function formatFileSize(bytes: number | null): string {
@@ -610,6 +626,7 @@ async function loadPhotoDetail(id: string) {
   loadingOriginal.value = false
   imageKey.value = 0
   photo.value = null
+  hdReady.value = false  // 重置高清图状态
   try {
     // 先确保上下文图片列表已加载
     if (contextPhotos.value.length === 0) {
@@ -623,6 +640,7 @@ async function loadPhotoDetail(id: string) {
       .filter((p) => p.id !== id)
       .slice(0, 8)
     preloadAdjacent()
+    preloadHd()  // 后台预加载高清图
   } catch (error: any) {
     message.error(error?.response?.data?.detail || '加载照片详情失败')
     photo.value = null
@@ -759,6 +777,36 @@ watch(
   max-height: 100%;
   object-fit: contain;
   display: block;
+}
+
+/* 缩略图底层 */
+.stage-thumb {
+  position: relative;
+  z-index: 1;
+  filter: blur(0);
+  transition: filter 0.3s ease;
+}
+
+/* 高清图叠加层 */
+.stage-hd {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: auto;
+  z-index: 2;
+}
+
+/* 高清图淡入动画 */
+.fade-img-enter-active {
+  transition: opacity 0.4s ease;
+}
+.fade-img-enter-from {
+  opacity: 0;
+}
+.fade-img-enter-to {
+  opacity: 1;
 }
 
 .image-stage.zoom-mode .stage-image {
