@@ -1094,11 +1094,22 @@ watch(
   }
 
   .detail-image-section {
-    height: 60vh;
+    height: auto;
+    min-height: 50vh;
+    max-height: 70vh;
+    flex: none;
   }
 
   .image-stage {
-    inset: 44px 0 44px 0;
+    position: relative;
+    inset: auto;
+    min-height: 300px;
+    height: 100%;
+  }
+
+  .stage-thumb,
+  .stage-hd {
+    max-height: 60vh;
   }
 
   .detail-info-section {
@@ -1128,11 +1139,26 @@ watch(
 
 @media (max-width: 768px) {
   .viewer-toolbar {
+    position: relative;
     padding: 8px 10px;
   }
 
+  .detail-image-section {
+    min-height: 40vh;
+    max-height: 65vh;
+  }
+
   .image-stage {
-    inset: 40px 0 40px 0;
+    min-height: 200px;
+  }
+
+  .stage-thumb,
+  .stage-hd {
+    max-height: 55vh;
+  }
+
+  .stage-bottom-bar {
+    position: relative;
   }
 
   .info-panel {
