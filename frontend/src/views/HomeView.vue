@@ -3,21 +3,13 @@
     <!-- Hero 区域 -->
     <section class="hero-section">
       <div class="hero-bg">
-        <!-- 底层：深蓝主色 -->
-        <div class="hero-bg-layer"></div>
-        <!-- 动态渐变网格 -->
-        <div class="hero-grid-overlay"></div>
-        <!-- 浮动光球 -->
-        <div class="gradient-circle circle-1"></div>
-        <div class="gradient-circle circle-2"></div>
-        <div class="gradient-circle circle-3"></div>
-        <div class="gradient-circle circle-4"></div>
-        <!-- 顶部高光 -->
-        <div class="hero-top-light"></div>
+        <!-- 首图 -->
+        <img src="/hero-banner.jpg" alt="视觉北化" class="hero-bg-image" />
+        <!-- 半透明遮罩，让文字更清晰 -->
+        <div class="hero-bg-overlay"></div>
       </div>
       <div class="hero-content" :style="{ opacity: heroOpacity, transform: heroTranslate }">
-        <h1 class="hero-slogan">视觉之美  触动世界</h1>
-        <p class="hero-subtitle">探索北化校园精彩瞬间</p>
+        <h1 class="hero-slogan">北化之美 美在四季<br>北化育人 育在全面</h1>
 
         <!-- 搜索框 -->
         <div class="hero-search">
@@ -245,100 +237,27 @@ onMounted(() => {
   z-index: 0;
 }
 
-/* 底层：深蓝主色 + 微妙渐变 */
-.hero-bg-layer {
+/* 底层：首图 */
+.hero-bg-image {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(ellipse at 20% 80%, rgba(0, 80, 160, 0.6) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, rgba(0, 100, 180, 0.4) 0%, transparent 40%),
-    linear-gradient(160deg, #0a2540 0%, #003d7a 30%, #0056a6 60%, #004b8d 100%);
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
 }
 
-/* 动态渐变网格 */
-.hero-grid-overlay {
+/* 半透明遮罩 */
+.hero-bg-overlay {
   position: absolute;
   inset: 0;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 60px 60px;
-  mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
-  -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
-}
-
-/* 顶部高光 */
-.hero-top-light {
-  position: absolute;
-  top: -30%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 80%;
-  height: 60%;
-  background: radial-gradient(ellipse at center, rgba(100, 180, 255, 0.15) 0%, transparent 60%);
-  pointer-events: none;
-}
-
-.gradient-circle {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-}
-
-.circle-1 {
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, rgba(80, 160, 255, 0.2), transparent 70%);
-  top: -120px;
-  left: 5%;
-  animation: float-1 12s ease-in-out infinite;
-}
-
-.circle-2 {
-  width: 400px;
-  height: 400px;
-  background: radial-gradient(circle, rgba(0, 100, 200, 0.15), transparent 70%);
-  top: 30%;
-  right: 10%;
-  animation: float-2 10s ease-in-out infinite;
-}
-
-.circle-3 {
-  width: 350px;
-  height: 350px;
-  background: radial-gradient(circle, rgba(60, 140, 220, 0.12), transparent 70%);
-  bottom: 5%;
-  left: 20%;
-  animation: float-3 14s ease-in-out infinite;
-}
-
-.circle-4 {
-  width: 300px;
-  height: 300px;
-  background: radial-gradient(circle, rgba(0, 80, 160, 0.18), transparent 70%);
-  bottom: 15%;
-  right: 25%;
-  animation: float-4 11s ease-in-out infinite;
-}
-
-@keyframes float-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(30px, 20px) scale(1.05); }
-}
-
-@keyframes float-2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-20px, 30px) scale(1.08); }
-}
-
-@keyframes float-3 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(25px, -15px) scale(1.06); }
-}
-
-@keyframes float-4 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-15px, -25px) scale(1.04); }
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.55) 0%,
+    rgba(0, 0, 0, 0.35) 30%,
+    rgba(0, 0, 0, 0.45) 60%,
+    rgba(0, 0, 0, 0.65) 100%
+  );
 }
 
 .hero-content {
@@ -353,18 +272,19 @@ onMounted(() => {
 
 .hero-slogan {
   font-size: 42px;
-  font-weight: 500;
+  font-weight: 600;
   color: #ffffff;
   margin-bottom: 12px;
   letter-spacing: 4px;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.5), 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 .hero-subtitle {
   font-size: 16px;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.9);
   margin-bottom: 40px;
   letter-spacing: 2px;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.4);
 }
 
 /* 搜索框 */
