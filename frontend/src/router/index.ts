@@ -32,6 +32,11 @@ const routes: RouteRecordRaw[] = [
         name: 'PhotoDetail',
         component: () => import('../views/PhotoDetailView.vue'),
       },
+      {
+        path: 'search',
+        name: 'Search',
+        component: () => import('../views/SearchView.vue'),
+      },
     ],
   },
   {

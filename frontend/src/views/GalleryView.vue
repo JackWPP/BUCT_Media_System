@@ -1,10 +1,30 @@
 <template>
   <div class="gallery-view">
+    <!-- 搜索结果头部 -->
+    <div v-if="isVectorSearch && vectorSearchResults.length > 0" class="search-results-header">
+      <div class="search-info">
+        <div class="search-query">
+          <n-icon :component="SearchOutline" size="20" />
+          <span class="query-text">"{{ searchQuery }}"</span>
+        </div>
+        <div class="search-meta">
+          <n-tag type="success" size="small" :bordered="false">
+            ✨ 语义搜索
+          </n-tag>
+          <span class="result-count">找到 {{ vectorSearchResults.length }} 张相关照片</span>
+          <span class="query-time">{{ vectorQueryTime }}ms</span>
+        </div>
+      </div>
+      <n-button text size="small" @click="clearVectorSearch">
+        清除搜索
+      </n-button>
+    </div>
+
     <!-- 筛选栏 -->
     <div class="gallery-toolbar">
       <div class="toolbar-main">
         <div class="result-count">
-          <span v-if="photoStore.filters.search" class="search-term">
+          <span v-if="photoStore.filters.search && !isVectorSearch" class="search-term">
             "{{ photoStore.filters.search }}"
           </span>
         </div>
@@ -162,8 +182,18 @@
 
     <!-- 图片瀑布流 -->
     <div class="gallery-grid">
-      <n-spin :show="photoStore.loading">
-        <div v-if="photoStore.photos.length === 0 && !photoStore.loading" class="gallery-empty">
+      <n-spin :show="photoStore.loading || vectorSearchLoading">
+        <!-- 向量搜索结果为空 -->
+        <div v-if="isVectorSearch && vectorSearchResults.length === 0 && !vectorSearchLoading" class="gallery-empty">
+          <n-empty description="没有找到匹配的照片">
+            <template #extra>
+              <n-button @click="clearVectorSearch">清除搜索</n-button>
+            </template>
+          </n-empty>
+        </div>
+
+        <!-- 普通浏览为空 -->
+        <div v-else-if="!isVectorSearch && photoStore.photos.length === 0 && !photoStore.loading" class="gallery-empty">
           <n-empty description="暂无符合条件的照片">
             <template #extra>
               <n-button @click="handleClearFilters">清空筛选</n-button>
@@ -171,6 +201,57 @@
           </n-empty>
         </div>
 
+        <!-- 向量搜索结果展示 -->
+        <MasonryLayout
+          v-else-if="isVectorSearch && vectorSearchResults.length > 0"
+          :items="vectorSearchResults"
+          :gap="gridGap"
+          :columns-config="masonryColumnsConfig"
+          :get-item-ratio="getVectorItemRatio"
+        >
+          <template #default="{ item: result }">
+            <div class="photo-card-hover vector-search-card" @click="handlePhotoClick({ id: result.photo_id } as Photo)">
+              <img
+                :src="getVectorThumbUrl(result.photo_id)"
+                :alt="result.tags.join(', ')"
+                loading="lazy"
+                class="masonry-img"
+                @load="(e) => handleVectorImageLoad(e, result)"
+                @error="(e) => handleVectorImageError(e, result)"
+              />
+              <div class="photo-overlay vector-overlay">
+                <div class="photo-overlay-content">
+                  <div class="vector-score-badge">
+                    <n-tag :type="getScoreType(result.score)" size="small" :bordered="false">
+                      {{ (result.score * 100).toFixed(0) }}%
+                    </n-tag>
+                  </div>
+                  <div class="vector-tags">
+                    <n-tag
+                      v-for="tag in result.tags.slice(0, 3)"
+                      :key="tag"
+                      size="tiny"
+                      :bordered="false"
+                      type="info"
+                    >
+                      {{ tag }}
+                    </n-tag>
+                  </div>
+                  <div class="vector-classifications" v-if="result.classifications">
+                    <span v-if="result.classifications.season" class="meta-tag">
+                      {{ result.classifications.season }}
+                    </span>
+                    <span v-if="result.classifications.campus" class="meta-tag">
+                      {{ result.classifications.campus }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+        </MasonryLayout>
+
+        <!-- 普通照片展示 -->
         <MasonryLayout
           v-else
           :items="photoStore.photos"
@@ -247,6 +328,7 @@ import {
   GridOutline,
   AppsOutline,
   CreateOutline,
+  SearchOutline,
 } from '@vicons/ionicons5'
 import { useDebounceFn } from '@vueuse/core'
 import type { SelectOption } from 'naive-ui'
@@ -259,6 +341,7 @@ import SearchInterpretation from '../components/search/SearchInterpretation.vue'
 import PhotoDetail from '../components/photo/PhotoDetail.vue'
 import { getPhotoUrl } from '../utils/format'
 import { useAuthStore } from '../stores/auth'
+import { searchPhotos, type SearchResult } from '../api/search'
 
 const router = useRouter()
 const route = useRoute()
@@ -279,6 +362,13 @@ const filterMode = ref<'pills' | 'compact'>('pills')
 const expandedGroups = reactive<Record<string, boolean>>({})
 const showEditModal = ref(false)
 const editingPhotoId = ref<string | null>(null)
+
+// 向量搜索状态
+const isVectorSearch = ref(false)
+const vectorSearchResults = ref<SearchResult[]>([])
+const vectorQueryTime = ref(0)
+const searchQuery = ref('')
+const vectorSearchLoading = ref(false)
 
 const PILL_COLLAPSE_THRESHOLD = 8
 
@@ -443,6 +533,39 @@ function getImageUrl(photo: Photo) {
   return getPhotoUrl(photo.id, 'thumbnail')
 }
 
+// 向量搜索相关函数
+function getVectorThumbUrl(photoId: string): string {
+  return `/api/v1/photos/${photoId}/image/thumbnail`
+}
+
+function getVectorItemRatio(result: SearchResult): number {
+  // 向量搜索结果没有宽高信息，默认返回 3:4 比例
+  return 4 / 3
+}
+
+function handleVectorImageLoad(event: Event, result: SearchResult) {
+  const img = event.target as HTMLImageElement
+  if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+    // 可以在这里更新结果的宽高信息
+  }
+}
+
+function handleVectorImageError(event: Event, result: SearchResult) {
+  const img = event.target as HTMLImageElement
+  if (img.getAttribute('data-tried') === 'true') {
+    img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
+    return
+  }
+  img.setAttribute('data-tried', 'true')
+  img.src = getVectorThumbUrl(result.photo_id)
+}
+
+function getScoreType(score: number): 'success' | 'warning' | 'error' {
+  if (score >= 0.8) return 'success'
+  if (score >= 0.6) return 'warning'
+  return 'error'
+}
+
 function handleImageError(event: Event, photo: Photo) {
   const img = event.target as HTMLImageElement
   if (img.getAttribute('data-tried') === 'true') {
@@ -537,7 +660,61 @@ async function handlePageSizeChange(pageSize: number) {
 async function handleClearFilters() {
   photoStore.clearFilters()
   currentInterpretation.value = null
+  clearVectorSearch()
   await syncQueryAndFetch()
+}
+
+// 向量搜索函数
+async function performVectorSearch(query: string) {
+  console.log('🔍 performVectorSearch called with:', query)
+  
+  if (!query.trim()) {
+    console.log('❌ Empty query, clearing search')
+    clearVectorSearch()
+    return
+  }
+
+  // 清除之前的搜索结果
+  clearVectorSearch()
+  vectorSearchLoading.value = true
+  searchQuery.value = query.trim()
+
+  try {
+    console.log('📡 Calling searchPhotos API...')
+    const response = await searchPhotos({
+      q: query.trim(),
+      limit: 50,
+      ...(photoStore.filters.season ? { season: photoStore.filters.season } : {}),
+      ...(photoStore.filters.campus ? { campus: photoStore.filters.campus } : {}),
+    })
+
+    console.log('✅ API response:', response)
+    isVectorSearch.value = true
+    vectorSearchResults.value = response.results
+    vectorQueryTime.value = response.query_time_ms
+
+    // 将向量搜索结果转换为照片格式显示
+    const photoIds = response.results.map(r => r.photo_id)
+    if (photoIds.length > 0) {
+      // 这里需要批量获取照片详情，暂时使用搜索结果
+      // TODO: 后续优化为批量获取照片详情
+    }
+  } catch (err) {
+    console.error('❌ Vector search failed:', err)
+    // 降级到普通搜索
+    isVectorSearch.value = false
+    photoStore.setFilters({ search: query.trim() })
+    await syncQueryAndFetch()
+  } finally {
+    vectorSearchLoading.value = false
+  }
+}
+
+function clearVectorSearch() {
+  isVectorSearch.value = false
+  vectorSearchResults.value = []
+  vectorQueryTime.value = 0
+  searchQuery.value = ''
 }
 
 function handlePhotoClick(photo: Photo) {
@@ -695,7 +872,16 @@ watch(
   async () => {
     if (syncingRoute.value) return
     applyRouteQuery()
-    await photoStore.fetchPublicPhotos()
+    
+    // 检查是否有搜索查询，优先使用向量搜索
+    const searchQueryValue = route.query.search as string
+    if (searchQueryValue && searchQueryValue.trim()) {
+      await performVectorSearch(searchQueryValue)
+    } else {
+      clearVectorSearch()
+      await photoStore.fetchPublicPhotos()
+    }
+    
     // Display interpretation when navigating to gallery with search (e.g., browser back/forward)
     if (photoStore.searchInterpretation && smartSearchEnabled.value) {
       applyInterpretation(photoStore.searchInterpretation)
@@ -1074,6 +1260,95 @@ onUnmounted(() => {
   padding: 32px 0;
   color: #bbb;
   font-size: 13px;
+}
+
+/* 向量搜索结果头部 */
+.search-results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.search-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.search-query {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1e293b;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.query-text {
+  color: #3b82f6;
+}
+
+.search-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.result-count {
+  font-weight: 500;
+}
+
+.query-time {
+  color: #94a3b8;
+}
+
+/* 向量搜索卡片样式 */
+.vector-search-card {
+  position: relative;
+}
+
+.vector-overlay {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 50%, transparent 100%) !important;
+}
+
+.vector-score-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.vector-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.vector-classifications {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .search-results-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+  
+  .search-meta {
+    flex-wrap: wrap;
+  }
 }
 
 </style>

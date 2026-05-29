@@ -782,7 +782,9 @@ class BatchAIAnalysisRequest(BaseModel):
     category: Optional[str] = Field(default=None, description="Filter by category")
     created_after: Optional[datetime] = Field(default=None, description="Filter photos created after this timestamp")
     max_count: int = Field(default=50, ge=1, le=100, description="Max number of AI tasks to create")
-    prompt_version: str = Field(default="v3", description="Prompt version to use (v2, v3)")
+    prompt_version: str = Field(default="v4", description="Prompt version to use (v3, v4)")
+    force: bool = Field(default=False, description="Force re-analysis even if task exists (for prompt upgrade)")
+    apply_auto: bool = Field(default=False, description="Auto-apply results with confidence >= 0.7")
 
 
 class BatchAIAnalysisResponse(BaseModel):
@@ -828,7 +830,7 @@ async def batch_ai_analysis(
             continue
 
         existing = await get_latest_ai_task_for_photo(db, photo.id)
-        if existing and existing.status in {"pending", "processing", "completed", "applied"}:
+        if not payload.force and existing and existing.status in {"pending", "processing", "completed", "applied"}:
             photos_skipped_has_task += 1
             continue
 

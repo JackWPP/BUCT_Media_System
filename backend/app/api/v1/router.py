@@ -7,6 +7,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import auth, photos, tags, import_photos, stats, taxonomy, notifications, profile, favorites
 from app.api.v1.endpoints import tagging_tasks
 from app.api.v1.endpoints import admin_users, admin_config, admin_permissions, admin_audit
+from app.api.v1.endpoints import search
 
 api_router = APIRouter()
 
@@ -27,3 +28,6 @@ api_router.include_router(admin_users.router, prefix="/admin", tags=["用户管�
 api_router.include_router(admin_config.router, prefix="/admin", tags=["系统设置"])
 api_router.include_router(admin_permissions.router, prefix="/admin", tags=["授权管理"])
 api_router.include_router(admin_audit.router, prefix="/admin", tags=["审计日志"])
+
+# Search endpoint (public, no auth required)
+api_router.include_router(search.router, prefix="", tags=["Search"])

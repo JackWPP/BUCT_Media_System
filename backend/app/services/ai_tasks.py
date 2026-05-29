@@ -151,7 +151,7 @@ async def run_ai_analysis_task(task_id: str) -> Optional[AIAnalysisTask]:
                 task.result_json = result
                 task.provider = result.get("provider", task.provider)
                 task.model_id = result.get("model_id", task.model_id)
-                task.prompt_version = "v3"
+                task.prompt_version = "v5"
                 task.completed_at = datetime.utcnow()
                 photo.processing_status = "completed"
         except Exception as exc:  # noqa: BLE001

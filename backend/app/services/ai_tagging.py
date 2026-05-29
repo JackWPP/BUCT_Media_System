@@ -29,6 +29,9 @@ DEFAULT_RESULT = {
         "award_level": None,
         "photo_type": None,
         "documentary_topic": None,
+        "mood": None,
+        "dominant_color": None,
+        "style": None,
     },
     "free_tags": [],
     "quality_flags": [],
@@ -201,7 +204,7 @@ class AITaggingService:
     @staticmethod
     def _build_prompt(context: dict[str, Any] | None = None) -> str:
         from app.prompts.photo_analysis import get_prompt
-        return get_prompt(version="v3", context=context)
+        return get_prompt(version="v5", context=context)
 
     @staticmethod
     def _normalize_result(payload: dict[str, Any]) -> dict[str, Any]:
@@ -269,6 +272,26 @@ class AITaggingService:
                     result = self._parse_response(response_text)
                     result["provider"] = provider.provider_name
                     result["model_id"] = provider.model_id
+
+                    # Validate and clean tags
+                    from app.services.tag_validation import validate_analysis_result
+                    validation = validate_analysis_result(result)
+                    if validation.cleaned_tags != result.get("free_tags"):
+                        result["free_tags"] = validation.cleaned_tags
+                        result["_tag_validation"] = {
+                            "original_count": len(validation.original_tags),
+                            "cleaned_count": len(validation.cleaned_tags),
+                            "removed": validation.removed_tags,
+                            "categories": validation.tag_categories,
+                            "quality_score": validation.quality_score,
+                        }
+                        logger.info(
+                            "Tags validated: %d → %d (removed: %s)",
+                            len(validation.original_tags),
+                            len(validation.cleaned_tags),
+                            validation.removed_tags,
+                        )
+
                     return result
                 except Exception as exc:  # noqa: BLE001
                     last_error = exc

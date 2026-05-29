@@ -112,10 +112,14 @@ const pagination = reactive({
 })
 
 const categoryOptions = [
-  { label: 'Object (物体)', value: 'object' },
-  { label: 'Scene (场景)', value: 'scene' },
-  { label: 'Color (颜色)', value: 'color' },
-  { label: 'Mood (情绪)', value: 'mood' },
+  { label: '物体 (object)', value: 'object' },
+  { label: '场景 (scene)', value: 'scene' },
+  { label: '风格 (style)', value: 'style' },
+  { label: '颜色 (color)', value: 'color' },
+  { label: '天气 (weather)', value: 'weather' },
+  { label: '活动 (activity)', value: 'activity' },
+  { label: '情绪 (mood)', value: 'mood' },
+  { label: '时间 (time)', value: 'time' },
 ]
 
 const formData = reactive<TagCreate>({
