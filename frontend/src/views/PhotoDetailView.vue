@@ -168,6 +168,29 @@
                   <span class="meta-label">地点</span>
                   <span class="meta-value">{{ photoLocation }}</span>
                 </div>
+                <div class="meta-item">
+                  <span class="meta-label">版权声明</span>
+                  <n-popover
+                    trigger="hover"
+                    placement="bottom-end"
+                    :width="320"
+                    class="copyright-popover"
+                  >
+                    <template #trigger>
+                      <span class="meta-value copyright-summary" tabindex="0">
+                        {{ copyrightSummary }}
+                      </span>
+                    </template>
+                    <div class="copyright-full">
+                      <p
+                        v-for="paragraph in copyrightParagraphs"
+                        :key="paragraph"
+                      >
+                        {{ paragraph }}
+                      </p>
+                    </div>
+                  </n-popover>
+                </div>
               </div>
             </div>
 
@@ -191,16 +214,6 @@
               <p class="photo-description">{{ photo.description }}</p>
             </div>
 
-            <div class="meta-section copyright-section">
-              <h3 class="meta-title">版权声明</h3>
-              <p
-                v-for="paragraph in copyrightParagraphs"
-                :key="paragraph"
-                class="copyright-text"
-              >
-                {{ paragraph }}
-              </p>
-            </div>
           </div>
         </div>
       </div>
@@ -281,6 +294,7 @@ const hdReady = ref(false)
 const hdSrc = ref('')
 const COPYRIGHT_NOTICE = '（1）本网站作品为北京化工大学影像素材，仅限本校人员无偿用于个人学习、教育教学、工作汇报、校园文化展示及校内非商业宣传等合理用途。（2）作品著作人身权依法由原作者享有，任何使用行为均应完整保留原作者署名及作品来源。未经学校许可，不得将作品用于校外参赛、商业经营、有偿使用、批量下载、上传至校外平台、校外公开传播或转授权他人使用；严禁冒用署名，或对作品内容进行篡改、改编、歪曲和丑化。（3）如发现本网站作品涉嫌侵权，请及时拨打电话010-80104006，或通过企业微信“北区办”后台留言，并提供相关权利证明。学校核实后将依法依规处理。（4）本网站仅为作品展示平台，不对任何单位或个人擅自侵权行为承担连带责任。本声明最终解释权归北京化工大学所有。'
 const copyrightParagraphs = COPYRIGHT_NOTICE.match(/（\d）[^（]+/g) || [COPYRIGHT_NOTICE]
+const copyrightSummary = '本网站作品为北京化工大学影像素材，仅限本校人员无偿合理使用，未经学校许可不得校外传播、商业使用或转授权...'
 
 function preloadHd() {
   if (!photo.value) return
@@ -967,16 +981,46 @@ watch(
   line-height: 1.7;
 }
 
-.copyright-section {
-  border-bottom: none;
+.copyright-summary {
+  max-width: 220px;
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: help;
 }
 
-.copyright-text {
+.copyright-summary:focus {
+  outline: 1px solid #0056a6;
+  outline-offset: 2px;
+}
+
+.copyright-full {
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 2px 2px 2px 0;
+}
+
+.copyright-full p {
   font-size: 12px;
-  color: #666;
-  line-height: 1.75;
-  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.8;
+  margin: 0 0 8px;
   text-align: justify;
+}
+
+.copyright-full p:last-child {
+  margin-bottom: 0;
+}
+
+:global(.copyright-popover.n-popover) {
+  background: rgba(24, 24, 28, 0.94);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+
+:global(.copyright-popover.n-popover .n-popover-arrow) {
+  background: rgba(24, 24, 28, 0.94);
 }
 
 /* ===== 关键词区域 ===== */
