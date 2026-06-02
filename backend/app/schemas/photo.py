@@ -59,6 +59,7 @@ class PhotoInDB(PhotoBase):
 class PhotoResponse(PhotoInDB):
     """Photo response schema"""
     uploader_name: Optional[str] = None
+    uploader_student_id: Optional[str] = None
     tags: List[str] = Field(default_factory=list, description="Associated tags")
     free_tags: List[str] = Field(default_factory=list, description="User-visible free tags")
     classifications: Dict[str, TaxonomyValueResponse] | Dict[str, Dict[str, Any]] = Field(

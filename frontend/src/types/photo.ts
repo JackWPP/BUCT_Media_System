@@ -37,6 +37,7 @@ export interface Photo {
   free_tags: string[]
   classifications: Record<string, TaxonomyValue>
   uploader_name: string | null
+  uploader_student_id: string | null
 }
 
 export interface PhotoUploadResponse {

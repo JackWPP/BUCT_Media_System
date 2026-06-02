@@ -1,11 +1,5 @@
 <template>
-  <header
-    class="public-header"
-    :class="{
-      'header-home': isHome && !isScrolled,
-      'header-scrolled': isScrolled || !isHome,
-    }"
-  >
+  <header class="public-header header-scrolled">
     <div class="header-container">
       <!-- Logo -->
       <div class="header-logo" @click="handleLogoClick">
@@ -14,7 +8,7 @@
 
       <!-- 搜索框 - 仅在非首页或滚动后显示 -->
       <div
-        v-if="!hideSearch && (!isHome || isScrolled)"
+        v-if="!hideSearch"
         class="header-search-mini"
       >
         <n-input
@@ -31,7 +25,7 @@
             <n-button
               type="primary"
               size="tiny"
-              class="search-btn-red"
+              class="search-btn-blue"
               @click="handleSearch"
             >
               <n-icon :component="SearchOutline" />
@@ -120,14 +114,12 @@ import { computed, h, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NIcon, useDialog, useMessage } from 'naive-ui'
 import {
-  CloseOutline,
   CloudUploadOutline,
   LogOutOutline,
   PersonOutline,
   SearchOutline,
   SettingsOutline,
 } from '@vicons/ionicons5'
-import { useWindowScroll } from '@vueuse/core'
 import NotificationBell from '../common/NotificationBell.vue'
 import { useAuthStore } from '../../stores/auth'
 
@@ -152,9 +144,7 @@ const router = useRouter()
 const message = useMessage()
 const dialog = useDialog()
 const authStore = useAuthStore()
-const { y: scrollY } = useWindowScroll()
 
-const isScrolled = computed(() => scrollY.value > 60)
 const localKeyword = ref(props.searchKeyword)
 const smartSearchEnabled = ref(false)
 const showMobileSearch = ref(false)
@@ -262,12 +252,6 @@ function handleUserMenuSelect(key: string) {
   background: transparent;
 }
 
-.header-home {
-  background: transparent;
-  box-shadow: none;
-  backdrop-filter: none;
-}
-
 .header-scrolled {
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(12px);
@@ -294,7 +278,8 @@ function handleUserMenuSelect(key: string) {
 }
 
 .logo-image {
-  height: 60px;
+  height: 46px;
+  max-width: 260px;
   width: auto;
   display: block;
 }
@@ -330,18 +315,6 @@ function handleUserMenuSelect(key: string) {
   border-radius: 20px;
 }
 
-.header-home .header-search-mini :deep(.n-input) {
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
-  backdrop-filter: blur(10px);
-}
-
-.header-home .header-search-mini :deep(.n-input__input-el),
-.header-home .header-search-mini :deep(.n-input__placeholder),
-.header-home .header-search-mini :deep(.n-input__prefix) {
-  color: rgba(255, 255, 255, 0.82);
-}
-
 .header-search-mini :deep(.n-input__border) {
   border: none;
 }
@@ -354,8 +327,8 @@ function handleUserMenuSelect(key: string) {
   padding-right: 4px;
 }
 
-.search-btn-red {
-  background: #e60012 !important;
+.search-btn-blue {
+  background: #0056a6 !important;
   border-radius: 50% !important;
   width: 28px;
   height: 28px;
@@ -370,19 +343,13 @@ function handleUserMenuSelect(key: string) {
 }
 
 .login-btn {
-  background: #e60012 !important;
-  border-color: #e60012 !important;
-}
-
-.header-home .login-btn {
-  background: rgba(230, 0, 18, 0.92) !important;
-  border-color: rgba(255, 255, 255, 0.25) !important;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  background: #0056a6 !important;
+  border-color: #0056a6 !important;
 }
 
 .login-btn:hover {
-  background: #c4000f !important;
-  border-color: #c4000f !important;
+  background: #004080 !important;
+  border-color: #004080 !important;
 }
 
 /* 手机端搜索按钮 - 默认隐藏 */
@@ -430,7 +397,8 @@ function handleUserMenuSelect(key: string) {
   }
 
   .logo-image {
-    height: 48px;
+    height: 34px;
+    max-width: 170px;
   }
 
   .action-text {

@@ -136,64 +136,60 @@
         <!-- 右侧：信息面板 -->
         <div class="detail-info-section">
           <div class="info-panel">
-            <!-- 摄影师信息 -->
-            <div class="photographer-card">
-              <div class="photographer-avatar">
-                <n-icon size="36" :component="PersonCircleOutline" />
-              </div>
-              <div class="photographer-info">
-                <div class="photographer-name">{{ photo.uploader_name || '未知摄影师' }}</div>
-                <div class="photographer-id">ID: {{ photo.uploader_id.slice(0, 8) }}</div>
-              </div>
-              <n-button
-                type="primary"
-                size="small"
-                class="follow-btn"
-                disabled
-              >
-                + 关注
-              </n-button>
-            </div>
-
-            <!-- 操作按钮 -->
-            <div class="action-buttons">
-              <n-button type="primary" size="large" block class="action-btn-primary">
-                <template #icon>
-                  <n-icon :component="HeartOutline" />
-                </template>
-                加入收藏
-              </n-button>
-              <n-button size="large" block class="action-btn-secondary" @click="downloadImage">
-                <template #icon>
-                  <n-icon :component="DownloadOutline" />
-                </template>
-                下载图片
-              </n-button>
-            </div>
-
             <!-- 图片信息 -->
             <div class="meta-section">
               <h3 class="meta-title">图片信息</h3>
               <div class="meta-list">
-                <div v-if="photo.width && photo.height" class="meta-item">
-                  <span class="meta-label">尺寸</span>
-                  <span class="meta-value">{{ photo.width }} x {{ photo.height }} px</span>
+                <div class="meta-item">
+                  <span class="meta-label">名称</span>
+                  <span class="meta-value">{{ photoTitle }}</span>
                 </div>
                 <div class="meta-item">
-                  <span class="meta-label">大小</span>
+                  <span class="meta-label">作者</span>
+                  <span class="meta-value">{{ photoAuthor }}</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">来源</span>
+                  <span class="meta-value">{{ photoSource }}</span>
+                </div>
+                <div v-if="photo.width && photo.height" class="meta-item">
+                  <span class="meta-label">尺寸</span>
+                  <span class="meta-value">{{ photoDimensions }}</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">存储大小</span>
                   <span class="meta-value">{{ formatFileSize(photo.file_size) }}</span>
                 </div>
                 <div class="meta-item">
                   <span class="meta-label">格式</span>
-                  <span class="meta-value">{{ photo.mime_type?.split('/')[1]?.toUpperCase() || 'JPG' }}</span>
+                  <span class="meta-value">{{ photoFormat }}</span>
                 </div>
                 <div class="meta-item">
-                  <span class="meta-label">上传时间</span>
-                  <span class="meta-value">{{ formatDate(photo.created_at) }}</span>
+                  <span class="meta-label">地点</span>
+                  <span class="meta-value">{{ photoLocation }}</span>
                 </div>
-                <div v-if="photo.captured_at" class="meta-item">
-                  <span class="meta-label">拍摄时间</span>
-                  <span class="meta-value">{{ formatDate(photo.captured_at) }}</span>
+                <div class="meta-item">
+                  <span class="meta-label">版权声明</span>
+                  <n-popover
+                    trigger="hover"
+                    placement="bottom-end"
+                    :width="320"
+                    class="copyright-popover"
+                  >
+                    <template #trigger>
+                      <span class="meta-value copyright-summary" tabindex="0">
+                        {{ copyrightSummary }}
+                      </span>
+                    </template>
+                    <div class="copyright-full">
+                      <p
+                        v-for="paragraph in copyrightParagraphs"
+                        :key="paragraph"
+                      >
+                        {{ paragraph }}
+                      </p>
+                    </div>
+                  </n-popover>
                 </div>
               </div>
             </div>
@@ -217,6 +213,7 @@
               <h3 class="meta-title">描述</h3>
               <p class="photo-description">{{ photo.description }}</p>
             </div>
+
           </div>
         </div>
       </div>
@@ -272,11 +269,8 @@ import {
   CloseOutline,
   DownloadOutline,
   ExpandOutline,
-  HeartOutline,
-  PersonCircleOutline,
   ShareSocialOutline,
 } from '@vicons/ionicons5'
-import dayjs from 'dayjs'
 import { getPublicPhotos } from '../api/photo'
 import { incrementView } from '../api/stats'
 import { usePhotoStore } from '../stores/photo'
@@ -298,6 +292,9 @@ const imageKey = ref(0)
 // 渐进式加载：缩略图立即显示，高清图后台预加载
 const hdReady = ref(false)
 const hdSrc = ref('')
+const COPYRIGHT_NOTICE = '（1）本网站作品为北京化工大学影像素材，仅限本校人员无偿用于个人学习、教育教学、工作汇报、校园文化展示及校内非商业宣传等合理用途。（2）作品著作人身权依法由原作者享有，任何使用行为均应完整保留原作者署名及作品来源。未经学校许可，不得将作品用于校外参赛、商业经营、有偿使用、批量下载、上传至校外平台、校外公开传播或转授权他人使用；严禁冒用署名，或对作品内容进行篡改、改编、歪曲和丑化。（3）如发现本网站作品涉嫌侵权，请及时拨打电话010-80104006，或通过企业微信“北区办”后台留言，并提供相关权利证明。学校核实后将依法依规处理。（4）本网站仅为作品展示平台，不对任何单位或个人擅自侵权行为承担连带责任。本声明最终解释权归北京化工大学所有。'
+const copyrightParagraphs = COPYRIGHT_NOTICE.match(/（\d）[^（]+/g) || [COPYRIGHT_NOTICE]
+const copyrightSummary = '本网站作品为北京化工大学影像素材，仅限本校人员无偿合理使用，未经学校许可不得校外传播、商业使用或转授权...'
 
 function preloadHd() {
   if (!photo.value) return
@@ -353,6 +350,59 @@ const allTags = computed(() => {
   return Array.from(tags)
 })
 
+const descriptionParts = computed(() => {
+  return (photo.value?.description || '')
+    .split('|')
+    .map((part) => part.trim())
+    .filter(Boolean)
+})
+
+const photoTitle = computed(() => {
+  if (!photo.value) return '未知'
+  const titlePart = descriptionParts.value.find((part) => !part.includes('作者') && !part.includes('序号'))
+  if (titlePart) return titlePart
+  return photo.value.filename.replace(/\.[^.]+$/, '')
+})
+
+const parsedAuthor = computed(() => {
+  const authorPart = descriptionParts.value.find((part) => part.includes('作者'))
+  const match = authorPart?.match(/作者[：:]\s*(.+)$/)
+  return match?.[1]?.trim() || ''
+})
+
+const photoAuthor = computed(() => {
+  if (!photo.value) return '未知'
+  const studentId = photo.value.uploader_student_id
+  const name = photo.value.uploader_name || parsedAuthor.value
+  if (studentId && name) return `学/工号：${studentId} | ${name}`
+  if (studentId) return `学/工号：${studentId}`
+  return name || '未知'
+})
+
+const photoSource = computed(() => {
+  const classifications = photo.value?.classifications || {}
+  const series = classifications.gallery_series?.node_name
+  const year = classifications.gallery_year?.node_name
+  if (series && year) return `${series} - ${year}`
+  return series || year || '未知'
+})
+
+const photoDimensions = computed(() => {
+  if (!photo.value?.width || !photo.value?.height) return '未知'
+  return `${photo.value.width} x ${photo.value.height} px`
+})
+
+const photoFormat = computed(() => {
+  const subtype = photo.value?.mime_type?.split('/')[1]?.toUpperCase()
+  if (!subtype) return 'JPG'
+  return subtype === 'JPEG' ? 'JPG' : subtype
+})
+
+const photoLocation = computed(() => {
+  const classifications = photo.value?.classifications || {}
+  return classifications.landmark?.node_name || classifications.campus?.node_name || photo.value?.campus || '未知'
+})
+
 function loadOriginal() {
   showOriginal.value = !showOriginal.value
   imageKey.value++  // 强制重新加载
@@ -380,28 +430,6 @@ function formatFileSize(bytes: number | null): string {
     unitIndex++
   }
   return `${size.toFixed(2)} ${units[unitIndex]}`
-}
-
-function formatDate(dateString: string | null): string {
-  return dateString ? dayjs(dateString).format('YYYY-MM-DD HH:mm:ss') : '未知'
-}
-
-function getStatusType(status: string): 'success' | 'warning' | 'error' | 'info' {
-  const map: Record<string, 'success' | 'warning' | 'error' | 'info'> = {
-    approved: 'success',
-    pending: 'warning',
-    rejected: 'error',
-  }
-  return map[status] || 'info'
-}
-
-function getStatusText(status: string): string {
-  const map: Record<string, string> = {
-    approved: '已上线',
-    pending: '待审核',
-    rejected: '已拒绝',
-  }
-  return map[status] || status
 }
 
 function handleClose() {
@@ -889,65 +917,6 @@ watch(
   padding: 20px;
 }
 
-/* 摄影师卡片 */
-.photographer-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #f0f0f0;
-  margin-bottom: 16px;
-}
-
-.photographer-avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: #f5f5f5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #999;
-}
-
-.photographer-info {
-  flex: 1;
-}
-
-.photographer-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-}
-
-.photographer-id {
-  font-size: 12px;
-  color: #999;
-  margin-top: 2px;
-}
-
-.follow-btn {
-  background: #e60012 !important;
-  border-color: #e60012 !important;
-}
-
-/* 操作按钮 */
-.action-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.action-btn-primary {
-  background: #e60012 !important;
-  border-color: #e60012 !important;
-}
-
-.action-btn-secondary {
-  border-color: #e0e0e0 !important;
-}
-
 /* 元信息区 */
 .meta-section {
   margin-bottom: 16px;
@@ -975,17 +944,20 @@ watch(
 .meta-item {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   font-size: 13px;
+  gap: 16px;
 }
 
 .meta-label {
   color: #999;
+  flex-shrink: 0;
 }
 
 .meta-value {
   color: #333;
   text-align: right;
+  overflow-wrap: anywhere;
 }
 
 /* 分类标签 */
@@ -1007,6 +979,48 @@ watch(
   font-size: 13px;
   color: #666;
   line-height: 1.7;
+}
+
+.copyright-summary {
+  max-width: 220px;
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.copyright-summary:focus {
+  outline: 1px solid #0056a6;
+  outline-offset: 2px;
+}
+
+.copyright-full {
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 2px 2px 2px 0;
+}
+
+.copyright-full p {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.8;
+  margin: 0 0 8px;
+  text-align: justify;
+}
+
+.copyright-full p:last-child {
+  margin-bottom: 0;
+}
+
+:global(.copyright-popover.n-popover) {
+  background: rgba(24, 24, 28, 0.94);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+
+:global(.copyright-popover.n-popover .n-popover-arrow) {
+  background: rgba(24, 24, 28, 0.94);
 }
 
 /* ===== 关键词区域 ===== */
