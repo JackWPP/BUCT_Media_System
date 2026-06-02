@@ -93,7 +93,9 @@ async def serialize_photo(db: AsyncSession, photo: Photo) -> PhotoResponse:
     photo_dict["tags"] = free_tags
     photo_dict["free_tags"] = free_tags
     photo_dict["classifications"] = serialize_classifications(photo)
-    photo_dict["uploader_name"] = None
+    uploader = getattr(photo, "uploader", None)
+    photo_dict["uploader_name"] = getattr(uploader, "full_name", None)
+    photo_dict["uploader_student_id"] = getattr(uploader, "student_id", None)
     return PhotoResponse(**photo_dict)
 
 
