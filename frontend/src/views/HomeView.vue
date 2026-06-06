@@ -173,7 +173,7 @@ onMounted(() => {
 
 .hero-search-panel {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   width: min(720px, calc(100% - 32px));
   margin-top: 120px;
   display: flex;
@@ -187,7 +187,7 @@ onMounted(() => {
   font-size: 38px;
   font-weight: 700;
   color: #fff;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  text-shadow: 0 3px 14px rgba(0, 0, 0, 0.48), 0 1px 2px rgba(0, 0, 0, 0.36);
 }
 
 .hero-search {
@@ -195,10 +195,11 @@ onMounted(() => {
   display: flex;
   gap: 10px;
   padding: 10px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(255, 255, 255, 0.95);
   border-radius: 8px;
-  box-shadow: 0 12px 32px rgba(17, 42, 84, 0.24);
+  box-shadow: 0 16px 42px rgba(5, 18, 44, 0.34);
+  backdrop-filter: blur(10px);
 }
 
 .hero-search :deep(.n-input) {
@@ -216,6 +217,15 @@ onMounted(() => {
   position: absolute;
   inset: 0;
   z-index: 0;
+}
+
+.hero-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(8, 22, 52, 0.08) 0%, rgba(8, 22, 52, 0.42) 50%, rgba(8, 22, 52, 0.14) 100%),
+    linear-gradient(90deg, rgba(8, 22, 52, 0.08) 0%, rgba(8, 22, 52, 0.24) 42%, rgba(8, 22, 52, 0.24) 58%, rgba(8, 22, 52, 0.08) 100%);
 }
 
 /* 底层：首图 */
