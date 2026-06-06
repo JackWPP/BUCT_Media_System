@@ -46,6 +46,23 @@ YEAR_MAP = {
 }
 
 
+def _flatten_active_nodes(nodes: list[TaxonomyNode]) -> list[str]:
+    by_parent: dict[int | None, list[TaxonomyNode]] = defaultdict(list)
+    for node in nodes:
+        if node.is_active:
+            by_parent[node.parent_id].append(node)
+
+    def visit(parent_id: int | None) -> list[str]:
+        names: list[str] = []
+        siblings = sorted(by_parent.get(parent_id, []), key=lambda item: (item.sort_order, item.id))
+        for node in siblings:
+            names.append(node.name)
+            names.extend(visit(node.id))
+        return names
+
+    return visit(None)
+
+
 async def main(apply: bool) -> None:
     report: dict[str, int] = defaultdict(int)
     unresolved: list[str] = []
@@ -108,7 +125,7 @@ async def main(apply: bool) -> None:
                 select(TaxonomyNode).where(TaxonomyNode.facet_id == facet.id)
             )
             nodes = list(nodes_result.scalars().all())
-            active_names = [node.name for node in nodes if node.is_active]
+            active_names = _flatten_active_nodes(nodes)
             expected_names = _flatten_seed_nodes(facet_seed.get("nodes", []))
             if active_names != expected_names:
                 active_mismatches.append(
