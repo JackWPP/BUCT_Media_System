@@ -744,7 +744,7 @@ def build_node_path(node: TaxonomyNode) -> list[str]:
     current = node
     while current is not None:
         path.insert(0, current.name)
-        current = current.parent
+        current = current.__dict__.get("parent")
     return path
 
 

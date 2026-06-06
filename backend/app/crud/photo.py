@@ -22,7 +22,9 @@ def _photo_with_relations():
     return (
         selectinload(Photo.uploader),
         selectinload(Photo.classifications).selectinload(PhotoClassification.facet),
-        selectinload(Photo.classifications).selectinload(PhotoClassification.node),
+        selectinload(Photo.classifications)
+        .selectinload(PhotoClassification.node)
+        .selectinload(TaxonomyNode.parent),
         selectinload(Photo.tags),
     )
 

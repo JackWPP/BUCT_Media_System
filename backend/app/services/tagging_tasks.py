@@ -27,7 +27,9 @@ def _is_reviewer(user: User) -> bool:
 def _item_photo_load():
     return selectinload(TaggingTaskItem.photo).options(
         selectinload(Photo.classifications).selectinload(PhotoClassification.facet),
-        selectinload(Photo.classifications).selectinload(PhotoClassification.node),
+        selectinload(Photo.classifications)
+        .selectinload(PhotoClassification.node)
+        .selectinload(TaxonomyNode.parent),
         selectinload(Photo.tags),
     )
 
@@ -171,7 +173,9 @@ async def list_photo_candidates(
     result = await db.execute(
         query.options(
             selectinload(Photo.classifications).selectinload(PhotoClassification.facet),
-            selectinload(Photo.classifications).selectinload(PhotoClassification.node),
+            selectinload(Photo.classifications)
+            .selectinload(PhotoClassification.node)
+            .selectinload(TaxonomyNode.parent),
             selectinload(Photo.tags),
         )
         .order_by(Photo.created_at.desc())
