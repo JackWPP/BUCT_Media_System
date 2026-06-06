@@ -1,14 +1,19 @@
 <template>
   <div class="tagging-workspace">
-    <n-page-header title="标注工作台" subtitle="处理分配给你的照片标签和分类任务">
+    <n-page-header title="标注工作台" subtitle="按照片内容完成题材、楼宇和明显可见标签">
       <template #extra>
-        <n-button @click="loadTasks" :loading="loading">刷新</n-button>
+        <n-space align="center">
+          <n-tag v-if="draftState" size="small" :type="draftState === '已保存' ? 'success' : 'warning'">
+            {{ draftState }}
+          </n-tag>
+          <n-button @click="loadTasks" :loading="loading">刷新</n-button>
+        </n-space>
       </template>
     </n-page-header>
 
-    <n-grid :cols="24" :x-gap="16" responsive="screen" class="workspace-grid">
-      <n-grid-item :span="5">
-        <n-card title="任务列表" size="small">
+    <div class="workspace-grid">
+      <aside class="task-column">
+        <n-card title="任务" size="small">
           <n-list v-if="tasks.length">
             <n-list-item
               v-for="task in tasks"
@@ -18,131 +23,271 @@
               @click="selectTask(task)"
             >
               <n-space vertical size="small">
-                <n-text strong>{{ task.title }}</n-text>
-                <n-space>
-                  <n-tag size="small">{{ task.status }}</n-tag>
-                  <n-text depth="3">{{ task.items.length }} 张</n-text>
+                <n-space justify="space-between" align="center">
+                  <n-text strong>{{ task.title }}</n-text>
+                  <n-tag size="small">{{ statusLabel(task.status) }}</n-tag>
                 </n-space>
+                <n-progress
+                  type="line"
+                  :percentage="task.stats?.completion_rate || 0"
+                  :height="6"
+                  :show-indicator="false"
+                />
+                <n-text depth="3" class="small-text">
+                  {{ task.stats?.approved || 0 }} 已通过 / {{ task.stats?.submitted || 0 }} 待审核 / {{ task.stats?.pending || 0 }} 待标注
+                </n-text>
               </n-space>
             </n-list-item>
           </n-list>
           <n-empty v-else description="暂无标注任务" />
         </n-card>
-      </n-grid-item>
 
-      <n-grid-item :span="19">
-        <n-card v-if="selectedItem?.photo" size="small">
-          <template #header>
-            <n-space justify="space-between" align="center">
-              <span>{{ selectedItem.photo.filename }}</span>
-              <n-select
-                v-model:value="selectedItemId"
-                :options="itemOptions"
-                style="width: 220px"
-                @update:value="handleItemSelect"
-              />
-            </n-space>
-          </template>
-
-          <div class="editor-layout">
-            <div class="image-panel">
-              <img :src="getPhotoUrl(selectedItem.photo.id, 'compressed')" :alt="selectedItem.photo.filename" />
-            </div>
-
-            <div class="side-panel">
-              <n-space vertical size="large">
-                <div>
-                  <n-text strong>自由标签</n-text>
-                  <n-dynamic-tags v-model:value="tagDraft" style="margin-top: 8px" />
-                  <n-input
-                    v-model:value="tagSearch"
-                    placeholder="搜索已有标签候选"
-                    clearable
-                    style="margin-top: 10px"
-                    @update:value="loadTagSuggestions"
-                  />
-                  <n-space v-if="tagSuggestions.length" wrap style="margin-top: 8px">
-                    <n-tag
-                      v-for="tag in tagSuggestions"
-                      :key="tag.id"
-                      class="candidate-tag"
-                      @click="addCandidateTag(tag.name)"
-                    >
-                      {{ tag.name }}
-                    </n-tag>
-                  </n-space>
-                </div>
-
-                <div>
-                  <n-text strong>核心分类</n-text>
-                  <n-form label-placement="top" style="margin-top: 8px">
-                    <n-form-item v-for="facet in singleFacets" :key="facet.key" :label="facet.name">
-                      <n-select
-                        v-model:value="classificationDraft[facet.key]"
-                        :options="facetNodeOptions(facet)"
-                        clearable
-                        filterable
-                      />
-                    </n-form-item>
-                  </n-form>
-                </div>
-
-                <div v-if="multiFacets.length">
-                  <n-text strong>细分标签</n-text>
-                  <n-collapse style="margin-top: 8px">
-                    <n-collapse-item
-                      v-for="facet in multiFacets"
-                      :key="facet.key"
-                      :title="facet.name"
-                      :name="facet.key"
-                    >
-                      <n-select
-                        v-model:value="multiClassificationDraft[facet.key]"
-                        :options="facetNodeOptions(facet)"
-                        multiple
-                        clearable
-                        filterable
-                        placeholder="可多选"
-                      />
-                    </n-collapse-item>
-                  </n-collapse>
-                  <div v-if="selectedFineTagCount" class="selected-summary">
-                    已选择 {{ selectedFineTagCount }} 个细分标签
-                  </div>
-                </div>
-
-                <n-input v-model:value="note" type="textarea" :rows="3" placeholder="提交说明（可选）" />
-
-                <n-alert v-if="selectedItem.status !== 'pending' && selectedItem.status !== 'rejected'" type="info">
-                  当前状态：{{ selectedItem.status }}。已提交或已审核的条目不会直接修改正式数据，需等待管理员审核。
-                </n-alert>
-
-                <n-button
-                  type="primary"
-                  block
-                  :loading="submitting"
-                  :disabled="!canSubmit"
-                  @click="submitCurrent"
-                >
-                  提交审核
-                </n-button>
-              </n-space>
-            </div>
+        <n-card v-if="selectedTask" title="照片队列" size="small">
+          <n-radio-group v-model:value="queueFilter" size="small">
+            <n-radio-button value="all">全部</n-radio-button>
+            <n-radio-button value="pending">待标</n-radio-button>
+            <n-radio-button value="submitted">待审</n-radio-button>
+            <n-radio-button value="rejected">驳回</n-radio-button>
+          </n-radio-group>
+          <div class="queue-list">
+            <button
+              v-for="(item, index) in filteredItems"
+              :key="item.id"
+              class="queue-item"
+              :class="{ active: selectedItem?.id === item.id }"
+              type="button"
+              @click="selectItem(item.id)"
+            >
+              <span>{{ index + 1 }}</span>
+              <img v-if="item.photo" :src="getPhotoUrl(item.photo.id, 'thumbnail')" :alt="item.photo.filename" />
+              <div>
+                <strong>{{ item.photo?.filename || item.photo_id }}</strong>
+                <small>{{ statusLabel(item.status) }}</small>
+              </div>
+            </button>
           </div>
         </n-card>
-        <n-empty v-else description="请选择一个标注任务" />
-      </n-grid-item>
-    </n-grid>
+      </aside>
+
+      <main v-if="selectedItem?.photo" class="photo-column">
+        <section class="photo-toolbar">
+          <n-space vertical size="small">
+            <n-text strong>{{ selectedItem.photo.filename }}</n-text>
+            <n-text depth="3">
+              {{ currentIndex + 1 }} / {{ selectedTask?.items.length || 0 }}
+            </n-text>
+          </n-space>
+          <n-space>
+            <n-button :disabled="!previousItem" @click="goRelative(-1)">上一张</n-button>
+            <n-button :disabled="!nextItem" @click="goRelative(1)">下一张</n-button>
+          </n-space>
+        </section>
+
+        <section class="image-panel">
+          <img :src="getPhotoUrl(selectedItem.photo.id, 'compressed')" :alt="selectedItem.photo.filename" />
+        </section>
+
+        <section class="metadata-panel">
+          <div>
+            <span>导入描述</span>
+            <p>{{ selectedItem.photo.description || '暂无描述' }}</p>
+          </div>
+          <div>
+            <span>已有自由标签</span>
+            <p>{{ existingTags.join('、') || '暂无' }}</p>
+          </div>
+          <div>
+            <span>已有分类</span>
+            <p>{{ existingClassificationSummary || '暂无' }}</p>
+          </div>
+        </section>
+      </main>
+
+      <aside v-if="selectedItem?.photo" class="question-column">
+        <n-card size="small" title="选择题">
+          <n-space vertical size="large">
+            <section class="question-section">
+              <div class="section-head">
+                <strong>1. 内容核心</strong>
+                <n-tag size="small" type="error">必填</n-tag>
+              </div>
+              <n-form label-placement="top">
+                <n-form-item label="题材">
+                  <n-radio-group v-model:value="classificationDraft.photo_type">
+                    <n-space vertical size="small">
+                      <n-radio
+                        v-for="option in optionsFor('photo_type')"
+                        :key="option.value"
+                        :value="option.value"
+                      >
+                        {{ option.label }}
+                      </n-radio>
+                    </n-space>
+                  </n-radio-group>
+                </n-form-item>
+                <n-form-item label="楼宇/建筑">
+                  <n-select
+                    v-model:value="classificationDraft.landmark"
+                    :options="optionsFor('landmark')"
+                    filterable
+                    clearable
+                    placeholder="能判断就选具体建筑，不能判断选其它"
+                  />
+                </n-form-item>
+              </n-form>
+              <n-alert v-if="validationMessage" type="warning" :show-icon="false">
+                {{ validationMessage }}
+              </n-alert>
+            </section>
+
+            <section class="question-section">
+              <div class="section-head">
+                <strong>2. 季节</strong>
+                <n-tag size="small">明显时填写</n-tag>
+              </div>
+              <n-radio-group v-model:value="classificationDraft.season">
+                <n-space wrap>
+                  <n-radio-button :value="null">不填写</n-radio-button>
+                  <n-radio-button
+                    v-for="option in optionsFor('season')"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </n-radio-button>
+                </n-space>
+              </n-radio-group>
+            </section>
+
+            <section class="question-section">
+              <div class="section-head">
+                <strong>3. 细分标签</strong>
+                <n-tag size="small">只选明显可见项</n-tag>
+              </div>
+              <n-input v-model:value="fineSearch" clearable placeholder="搜索设施、景观、动植物等" />
+              <n-collapse :default-expanded-names="['facility', 'landscape']">
+                <n-collapse-item
+                  v-for="facet in visibleFineFacets"
+                  :key="facet.key"
+                  :title="facet.name"
+                  :name="facet.key"
+                >
+                  <n-checkbox-group v-model:value="multiClassificationDraft[facet.key]">
+                    <div class="check-grid">
+                      <n-checkbox
+                        v-for="option in filteredOptionsFor(facet.key)"
+                        :key="option.value"
+                        :value="option.value"
+                      >
+                        {{ option.label }}
+                      </n-checkbox>
+                    </div>
+                  </n-checkbox-group>
+                </n-collapse-item>
+              </n-collapse>
+              <n-space v-if="selectedFineLabels.length" wrap>
+                <n-tag
+                  v-for="label in selectedFineLabels"
+                  :key="label.key"
+                  closable
+                  @close="removeFineLabel(label.facetKey, label.value)"
+                >
+                  {{ label.label }}
+                </n-tag>
+              </n-space>
+            </section>
+
+            <section v-if="isDocumentary" class="question-section">
+              <div class="section-head">
+                <strong>4. 纪实补充</strong>
+                <n-tag size="small">人文纪实时填写</n-tag>
+              </div>
+              <n-select
+                v-model:value="classificationDraft.documentary_topic"
+                :options="optionsFor('documentary_topic')"
+                clearable
+                filterable
+                placeholder="选择纪实主题"
+              />
+            </section>
+
+            <section class="question-section muted">
+              <div class="section-head">
+                <strong>元数据参考</strong>
+                <n-tag size="small">不强制</n-tag>
+              </div>
+              <div class="reference-grid">
+                <span>专区</span><b>{{ referenceValue('gallery_series') }}</b>
+                <span>届次</span><b>{{ referenceValue('gallery_year') }}</b>
+                <span>奖项</span><b>{{ referenceValue('award_level') }}</b>
+                <span>来源</span><b>{{ referenceValue('source_type') }}</b>
+                <span>校区</span><b>{{ referenceValue('campus') }}</b>
+              </div>
+            </section>
+
+            <section class="question-section">
+              <div class="section-head">
+                <strong>自由标签</strong>
+                <n-tag size="small">辅助可选</n-tag>
+              </div>
+              <n-dynamic-tags v-model:value="tagDraft" />
+              <n-input
+                v-model:value="tagSearch"
+                placeholder="搜索已有标签候选"
+                clearable
+                @update:value="loadTagSuggestions"
+              />
+              <n-space v-if="tagSuggestions.length" wrap>
+                <n-tag
+                  v-for="tag in tagSuggestions"
+                  :key="tag.id"
+                  class="candidate-tag"
+                  @click="addCandidateTag(tag.name)"
+                >
+                  {{ tag.name }}
+                </n-tag>
+              </n-space>
+            </section>
+
+            <n-input v-model:value="note" type="textarea" :rows="3" placeholder="备注（可选）" />
+
+            <n-button
+              type="primary"
+              block
+              size="large"
+              :loading="submitting"
+              :disabled="!canSubmit"
+              @click="submitCurrent"
+            >
+              提交并下一张
+            </n-button>
+          </n-space>
+        </n-card>
+      </aside>
+
+      <n-empty v-if="!selectedItem?.photo" class="empty-state" description="请选择一个标注任务" />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import { getTagSuggestions, type TagSuggestion } from '../api/tag'
-import { getPublicTaxonomy, type TaxonomyFacet } from '../api/taxonomy'
-import { getTaggingTasks, submitTaggingItem, type TaggingTask, type TaggingTaskItem } from '../api/taggingTasks'
+import { getPublicTaxonomy, type TaxonomyFacet, type TaxonomyNode } from '../api/taxonomy'
+import {
+  getTaggingTasks,
+  saveTaggingItemDraft,
+  submitTaggingItem,
+  type TaggingTask,
+  type TaggingTaskItem,
+} from '../api/taggingTasks'
 import { getPhotoUrl } from '../utils/format'
+
+type SelectOption = { label: string; value: number; searchText: string }
+
+const FINE_FACETS = ['facility', 'landscape', 'natural_phenomenon', 'technique', 'animal', 'plant']
+const REFERENCE_FACETS = ['gallery_series', 'gallery_year', 'award_level', 'source_type', 'campus']
 
 const message = useMessage()
 const loading = ref(false)
@@ -157,37 +302,94 @@ const tagSuggestions = ref<TagSuggestion[]>([])
 const classificationDraft = reactive<Record<string, number | null>>({})
 const multiClassificationDraft = reactive<Record<string, number[]>>({})
 const note = ref('')
+const fineSearch = ref('')
+const queueFilter = ref<'all' | 'pending' | 'submitted' | 'rejected'>('all')
+const draftState = ref('')
+let draftTimer: number | undefined
+let hydrating = false
 
 const selectedItem = computed(() =>
   selectedTask.value?.items.find((item) => item.id === selectedItemId.value) || null,
 )
 
-const itemOptions = computed(() =>
-  (selectedTask.value?.items || []).map((item, index) => ({
-    label: `${index + 1}. ${item.photo?.filename || item.photo_id} (${item.status})`,
-    value: item.id,
-  })),
+const currentIndex = computed(() =>
+  selectedTask.value?.items.findIndex((item) => item.id === selectedItemId.value) ?? -1,
 )
+
+const previousItem = computed(() => {
+  if (!selectedTask.value || currentIndex.value <= 0) return null
+  return selectedTask.value.items[currentIndex.value - 1]
+})
+
+const nextItem = computed(() => {
+  if (!selectedTask.value || currentIndex.value < 0) return null
+  return selectedTask.value.items[currentIndex.value + 1] || null
+})
+
+const filteredItems = computed(() => {
+  const items = selectedTask.value?.items || []
+  if (queueFilter.value === 'all') return items
+  return items.filter((item) => item.status === queueFilter.value)
+})
 
 const canSubmit = computed(() =>
-  !!selectedItem.value && ['pending', 'submitted', 'rejected'].includes(selectedItem.value.status),
+  !!selectedItem.value && ['pending', 'submitted', 'rejected'].includes(selectedItem.value.status) && !validationMessage.value,
 )
 
-const singleFacets = computed(() =>
-  taxonomyFacets.value.filter((facet) => facet.selection_mode !== 'multiple'),
+const validationMessage = computed(() => {
+  if (!classificationDraft.photo_type) return '请选择题材'
+  if (!classificationDraft.landmark) return '请选择楼宇/建筑；无法具体判断时请选择“其它”'
+  return ''
+})
+
+const isDocumentary = computed(() => optionLabel('photo_type', classificationDraft.photo_type) === '人文纪实')
+
+const visibleFineFacets = computed(() =>
+  taxonomyFacets.value.filter((facet) => FINE_FACETS.includes(facet.key)),
 )
 
-const multiFacets = computed(() =>
-  taxonomyFacets.value.filter((facet) => facet.selection_mode === 'multiple'),
-)
+const existingTags = computed(() => selectedItem.value?.photo?.free_tags || selectedItem.value?.photo?.tags || [])
 
-const selectedFineTagCount = computed(() =>
-  Object.values(multiClassificationDraft).reduce((sum, values) => sum + values.length, 0),
+const existingClassificationSummary = computed(() => {
+  const values = selectedItem.value?.photo?.classifications || {}
+  return Object.entries(values)
+    .map(([key, value]) => {
+      const facet = taxonomyFacets.value.find((item) => item.key === key)
+      const names = Array.isArray(value)
+        ? value.map((item) => item.node_name).join('、')
+        : value?.node_name
+      return names ? `${facet?.name || key}：${names}` : ''
+    })
+    .filter(Boolean)
+    .join('；')
+})
+
+const selectedFineLabels = computed(() =>
+  Object.entries(multiClassificationDraft).flatMap(([facetKey, values]) =>
+    values.map((value) => ({
+      key: `${facetKey}-${value}`,
+      facetKey,
+      value,
+      label: optionLabel(facetKey, value),
+    })),
+  ),
 )
 
 onMounted(async () => {
   await Promise.all([loadTaxonomy(), loadTasks()])
 })
+
+onBeforeUnmount(() => {
+  if (draftTimer) window.clearTimeout(draftTimer)
+})
+
+watch(
+  [tagDraft, () => ({ ...classificationDraft }), () => ({ ...multiClassificationDraft }), note],
+  () => {
+    if (!hydrating) scheduleDraftSave()
+  },
+  { deep: true },
+)
 
 async function loadTaxonomy() {
   taxonomyFacets.value = await getPublicTaxonomy()
@@ -198,49 +400,144 @@ async function loadTasks() {
   try {
     const response = await getTaggingTasks({ limit: 100 })
     tasks.value = response.items
-    if (!selectedTask.value && tasks.value.length) selectTask(tasks.value[0])
+    if (!selectedTask.value && tasks.value.length) await selectTask(tasks.value[0])
+    else if (selectedTask.value) {
+      selectedTask.value = tasks.value.find((task) => task.id === selectedTask.value?.id) || selectedTask.value
+      hydrateDraft()
+    }
   } finally {
     loading.value = false
   }
 }
 
-function selectTask(task: TaggingTask) {
+async function selectTask(task: TaggingTask) {
+  await saveDraftNow()
   selectedTask.value = task
   selectedItemId.value = task.items[0]?.id || null
   hydrateDraft()
 }
 
-function handleItemSelect() {
+async function selectItem(itemId: string) {
+  await saveDraftNow()
+  selectedItemId.value = itemId
   hydrateDraft()
 }
 
-function hydrateDraft() {
-  const item = selectedItem.value
-  tagDraft.value = item?.submitted_tags || item?.photo?.free_tags || item?.photo?.tags || []
-  Object.keys(classificationDraft).forEach((key) => delete classificationDraft[key])
-  Object.keys(multiClassificationDraft).forEach((key) => delete multiClassificationDraft[key])
-  taxonomyFacets.value.forEach((facet) => {
-    const submitted = item?.submitted_classifications?.[facet.key]?.node_id
-    const current = item?.photo?.classifications?.[facet.key]?.node_id
-    const submittedIds = item?.submitted_classifications?.[facet.key]?.node_ids
-    const currentValue = item?.photo?.classifications?.[facet.key]
-    const currentIds = Array.isArray(currentValue) ? currentValue.map((value) => value.node_id) : []
-    if (facet.selection_mode === 'multiple') {
-      multiClassificationDraft[facet.key] = submittedIds || currentIds || []
-    } else {
-      classificationDraft[facet.key] = submitted || current || null
-    }
-  })
-  note.value = item?.submitter_note || ''
+async function goRelative(offset: number) {
+  const target = offset < 0 ? previousItem.value : nextItem.value
+  if (target) await selectItem(target.id)
 }
 
-function facetNodeOptions(facet: TaxonomyFacet) {
-  const flatten = (nodes: TaxonomyFacet['nodes']): Array<{ label: string; value: number }> =>
-    nodes.flatMap((node) => [
-      { label: node.name, value: node.id },
-      ...flatten(node.children || []),
-    ])
-  return flatten(facet.nodes)
+function hydrateDraft() {
+  hydrating = true
+  const item = selectedItem.value
+  tagDraft.value = item?.submitted_tags || item?.draft_tags || item?.photo?.free_tags || item?.photo?.tags || []
+  Object.keys(classificationDraft).forEach((key) => delete classificationDraft[key])
+  Object.keys(multiClassificationDraft).forEach((key) => delete multiClassificationDraft[key])
+
+  taxonomyFacets.value.forEach((facet) => {
+    if (facet.selection_mode === 'multiple') multiClassificationDraft[facet.key] = []
+    else classificationDraft[facet.key] = null
+  })
+
+  const source = item?.submitted_classifications || item?.draft_classifications || item?.photo?.classifications || {}
+  Object.entries(source).forEach(([facetKey, value]) => {
+    const facet = taxonomyFacets.value.find((item) => item.key === facetKey)
+    if (!facet || !value) return
+    if (facet.selection_mode === 'multiple') {
+      multiClassificationDraft[facetKey] = extractNodeIds(value)
+    } else {
+      classificationDraft[facetKey] = extractNodeIds(value)[0] || null
+    }
+  })
+  note.value = item?.submitter_note || item?.draft_note || ''
+  draftState.value = item?.draft_saved_at ? `已保存 ${formatTime(item.draft_saved_at)}` : ''
+  nextTick(() => {
+    hydrating = false
+  })
+}
+
+function optionsFor(facetKey: string): SelectOption[] {
+  const facet = taxonomyFacets.value.find((item) => item.key === facetKey)
+  return facet ? flattenOptions(facet.nodes) : []
+}
+
+function filteredOptionsFor(facetKey: string): SelectOption[] {
+  const query = fineSearch.value.trim().toLowerCase()
+  const options = optionsFor(facetKey)
+  if (!query) return options
+  return options.filter((option) => option.searchText.includes(query))
+}
+
+function flattenOptions(nodes: TaxonomyNode[], prefix = ''): SelectOption[] {
+  return nodes.flatMap((node) => {
+    const label = prefix ? `${prefix} / ${node.name}` : node.name
+    const aliases = (node.aliases || []).map((alias) => alias.alias).join(' ')
+    return [
+      { label, value: node.id, searchText: `${label} ${aliases}`.toLowerCase() },
+      ...flattenOptions(node.children || [], label),
+    ]
+  })
+}
+
+function extractNodeIds(value: any): number[] {
+  if (!value) return []
+  if (Array.isArray(value)) return value.map((item) => item.node_id).filter(Boolean)
+  if (Array.isArray(value.node_ids)) return value.node_ids
+  if (Array.isArray(value.nodes)) return value.nodes.map((item: any) => item.node_id).filter(Boolean)
+  return value.node_id ? [value.node_id] : []
+}
+
+function optionLabel(facetKey: string, value: number | null | undefined) {
+  if (!value) return ''
+  return optionsFor(facetKey).find((option) => option.value === value)?.label || ''
+}
+
+function referenceValue(facetKey: string) {
+  const value = classificationDraft[facetKey]
+  if (value) return optionLabel(facetKey, value)
+  const source = selectedItem.value?.photo?.classifications?.[facetKey]
+  const names = Array.isArray(source) ? source.map((item) => item.node_name).join('、') : source?.node_name
+  return names || '暂无'
+}
+
+function buildClassifications() {
+  const classifications: Record<string, number | number[]> = {}
+  Object.entries(classificationDraft).forEach(([key, value]) => {
+    if (value) classifications[key] = value
+  })
+  Object.entries(multiClassificationDraft).forEach(([key, values]) => {
+    if (values.length) classifications[key] = values
+  })
+  return classifications
+}
+
+function scheduleDraftSave() {
+  if (!selectedItem.value || selectedItem.value.status === 'approved') return
+  draftState.value = '保存中'
+  if (draftTimer) window.clearTimeout(draftTimer)
+  draftTimer = window.setTimeout(() => {
+    saveDraftNow()
+  }, 700)
+}
+
+async function saveDraftNow() {
+  if (draftTimer) {
+    window.clearTimeout(draftTimer)
+    draftTimer = undefined
+  }
+  if (!selectedItem.value || selectedItem.value.status === 'approved') return
+  try {
+    const updated = await saveTaggingItemDraft(selectedItem.value.id, {
+      tags: tagDraft.value,
+      classifications: buildClassifications(),
+      note: note.value || undefined,
+    })
+    replaceItem(updated)
+    draftState.value = `已保存 ${formatTime(updated.draft_saved_at)}`
+  } catch (error: any) {
+    draftState.value = '保存失败'
+  }
 }
 
 async function loadTagSuggestions(value: string) {
@@ -252,27 +549,29 @@ async function loadTagSuggestions(value: string) {
 }
 
 function addCandidateTag(name: string) {
-  if (!tagDraft.value.includes(name)) tagDraft.value.push(name)
+  const clean = name.trim()
+  if (clean && !tagDraft.value.includes(clean)) tagDraft.value.push(clean)
+}
+
+function removeFineLabel(facetKey: string, value: number) {
+  multiClassificationDraft[facetKey] = (multiClassificationDraft[facetKey] || []).filter((item) => item !== value)
 }
 
 async function submitCurrent() {
-  if (!selectedItem.value) return
+  if (!selectedItem.value || validationMessage.value) {
+    message.warning(validationMessage.value || '当前照片不能提交')
+    return
+  }
   submitting.value = true
   try {
-    const classifications: Record<string, number | number[]> = {}
-    Object.entries(classificationDraft).forEach(([key, value]) => {
-      if (value) classifications[key] = value
-    })
-    Object.entries(multiClassificationDraft).forEach(([key, values]) => {
-      if (values.length) classifications[key] = values
-    })
     const updated = await submitTaggingItem(selectedItem.value.id, {
       tags: tagDraft.value,
-      classifications,
+      classifications: buildClassifications(),
       note: note.value || undefined,
     })
     replaceItem(updated)
     message.success('已提交审核')
+    if (nextItem.value) await selectItem(nextItem.value.id)
   } catch (error: any) {
     message.error(error?.response?.data?.detail || '提交失败')
   } finally {
@@ -281,19 +580,57 @@ async function submitCurrent() {
 }
 
 function replaceItem(updated: TaggingTaskItem) {
-  if (!selectedTask.value) return
-  const index = selectedTask.value.items.findIndex((item) => item.id === updated.id)
-  if (index !== -1) selectedTask.value.items[index] = updated
+  const task = tasks.value.find((task) => task.id === updated.task_id)
+  if (!task) return
+  const index = task.items.findIndex((item) => item.id === updated.id)
+  if (index !== -1) task.items[index] = updated
 }
+
+function statusLabel(status: string) {
+  const labels: Record<string, string> = {
+    pending: '待标注',
+    in_progress: '进行中',
+    reviewing: '审核中',
+    submitted: '待审核',
+    approved: '已通过',
+    rejected: '已驳回',
+    completed: '已完成',
+  }
+  return labels[status] || status
+}
+
+function formatTime(value: string | null | undefined) {
+  if (!value) return ''
+  return new Date(value).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+}
+
+REFERENCE_FACETS.forEach((key) => {
+  classificationDraft[key] = null
+})
 </script>
 
 <style scoped>
 .tagging-workspace {
-  padding: 24px;
+  padding: 20px;
+  background: #f6f7f9;
+  min-height: calc(100vh - 64px);
 }
 
 .workspace-grid {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 400px;
+  gap: 16px;
   margin-top: 16px;
+  align-items: start;
+}
+
+.task-column,
+.question-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: 16px;
 }
 
 .task-item {
@@ -302,18 +639,72 @@ function replaceItem(updated: TaggingTaskItem) {
   border-radius: 6px;
 }
 
-.task-item.active {
-  background: #f3f4f6;
+.task-item.active,
+.queue-item.active {
+  background: #eef6f0;
 }
 
-.editor-layout {
+.small-text {
+  font-size: 12px;
+}
+
+.queue-list {
+  margin-top: 12px;
+  max-height: 520px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.queue-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 20px;
+  grid-template-columns: 24px 52px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 6px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.queue-item img {
+  width: 52px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.queue-item strong,
+.queue-item small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-item small {
+  color: #6b7280;
+}
+
+.photo-column {
+  min-width: 0;
+}
+
+.photo-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px 14px;
 }
 
 .image-panel {
-  min-height: 540px;
+  min-height: 560px;
   background: #111827;
   display: flex;
   align-items: center;
@@ -324,21 +715,104 @@ function replaceItem(updated: TaggingTaskItem) {
 
 .image-panel img {
   max-width: 100%;
-  max-height: 720px;
+  max-height: 760px;
   object-fit: contain;
 }
 
-.side-panel {
-  min-width: 0;
+.metadata-panel {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.metadata-panel div {
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.metadata-panel span {
+  display: block;
+  color: #6b7280;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.metadata-panel p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.question-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.question-section.muted {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.reference-grid {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 6px 10px;
+  font-size: 13px;
+}
+
+.reference-grid span {
+  color: #6b7280;
+}
+
+.reference-grid b {
+  font-weight: 500;
 }
 
 .candidate-tag {
   cursor: pointer;
 }
 
-@media (max-width: 960px) {
-  .editor-layout {
+.empty-state {
+  grid-column: 2 / 4;
+  min-height: 400px;
+  background: #fff;
+  border-radius: 8px;
+}
+
+@media (max-width: 1200px) {
+  .workspace-grid {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  .question-column {
+    grid-column: 1 / -1;
+    position: static;
+  }
+}
+
+@media (max-width: 820px) {
+  .workspace-grid,
+  .metadata-panel {
     grid-template-columns: 1fr;
+  }
+
+  .task-column {
+    position: static;
   }
 }
 </style>

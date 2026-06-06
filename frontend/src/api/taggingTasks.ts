@@ -11,6 +11,10 @@ export interface TaggingTaskItem {
   submitted_tags: string[] | null
   original_classifications: Record<string, any> | null
   submitted_classifications: Record<string, any> | null
+  draft_tags: string[] | null
+  draft_classifications: Record<string, any> | null
+  draft_note: string | null
+  draft_saved_at: string | null
   submitter_note: string | null
   reviewer_id: string | null
   reviewer_note: string | null
@@ -19,6 +23,15 @@ export interface TaggingTaskItem {
   created_at: string
   updated_at: string
   photo: Photo | null
+}
+
+export interface TaggingTaskStats {
+  total: number
+  pending: number
+  submitted: number
+  approved: number
+  rejected: number
+  completion_rate: number
 }
 
 export interface TaggingTask {
@@ -31,6 +44,7 @@ export interface TaggingTask {
   created_at: string
   updated_at: string
   completed_at: string | null
+  stats: TaggingTaskStats
   items: TaggingTaskItem[]
 }
 
@@ -93,10 +107,26 @@ export function submitTaggingItem(itemId: string, data: {
   return request.post<TaggingTaskItem>(`/api/v1/tagging-tasks/items/${itemId}/submit`, data)
 }
 
+export function saveTaggingItemDraft(itemId: string, data: {
+  tags: string[]
+  classifications: Record<string, number | number[]>
+  note?: string
+}) {
+  return request.post<TaggingTaskItem>(`/api/v1/tagging-tasks/items/${itemId}/draft`, data)
+}
+
 export function approveTaggingItem(itemId: string, note?: string) {
   return request.post<TaggingTaskItem>(`/api/v1/tagging-tasks/items/${itemId}/approve`, { note })
 }
 
 export function rejectTaggingItem(itemId: string, note?: string) {
   return request.post<TaggingTaskItem>(`/api/v1/tagging-tasks/items/${itemId}/reject`, { note })
+}
+
+export function batchApproveTaggingItems(itemIds: string[], note?: string) {
+  return request.post<TaggingTaskItem[]>('/api/v1/tagging-tasks/items/batch-approve', { item_ids: itemIds, note })
+}
+
+export function batchRejectTaggingItems(itemIds: string[], note?: string) {
+  return request.post<TaggingTaskItem[]>('/api/v1/tagging-tasks/items/batch-reject', { item_ids: itemIds, note })
 }

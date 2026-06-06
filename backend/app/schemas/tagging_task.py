@@ -34,8 +34,28 @@ class TaggingTaskItemSubmit(BaseModel):
     note: Optional[str] = None
 
 
+class TaggingTaskItemDraft(BaseModel):
+    tags: list[str] = Field(default_factory=list)
+    classifications: dict[str, int | list[int]] = Field(default_factory=dict)
+    note: Optional[str] = None
+
+
 class TaggingTaskItemReview(BaseModel):
     note: Optional[str] = None
+
+
+class TaggingTaskItemBatchReview(BaseModel):
+    item_ids: list[str] = Field(default_factory=list, min_length=1)
+    note: Optional[str] = None
+
+
+class TaggingTaskStats(BaseModel):
+    total: int = 0
+    pending: int = 0
+    submitted: int = 0
+    approved: int = 0
+    rejected: int = 0
+    completion_rate: float = 0
 
 
 class TaggingTaskItemResponse(BaseModel):
@@ -47,6 +67,10 @@ class TaggingTaskItemResponse(BaseModel):
     submitted_tags: list[str] | None = None
     original_classifications: dict[str, Any] | None = None
     submitted_classifications: dict[str, Any] | None = None
+    draft_tags: list[str] | None = None
+    draft_classifications: dict[str, Any] | None = None
+    draft_note: Optional[str] = None
+    draft_saved_at: Optional[datetime] = None
     submitter_note: Optional[str] = None
     reviewer_id: Optional[str] = None
     reviewer_note: Optional[str] = None
@@ -69,6 +93,7 @@ class TaggingTaskResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     completed_at: Optional[datetime] = None
+    stats: TaggingTaskStats = Field(default_factory=TaggingTaskStats)
     items: list[TaggingTaskItemResponse] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)

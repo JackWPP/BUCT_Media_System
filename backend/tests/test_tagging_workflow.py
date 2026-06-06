@@ -19,6 +19,22 @@ def headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def flatten_nodes(nodes: list[dict]) -> list[dict]:
+    flattened = []
+    for node in nodes:
+        flattened.append(node)
+        flattened.extend(flatten_nodes(node.get("children") or []))
+    return flattened
+
+
+def find_taxonomy_node(taxonomy: list[dict], facet_key: str, node_name: str) -> dict:
+    return next(
+        node
+        for facet in taxonomy if facet["key"] == facet_key
+        for node in flatten_nodes(facet["nodes"]) if node["name"] == node_name
+    )
+
+
 async def setup_db(session_factory: async_sessionmaker) -> dict[str, str]:
     async with session_factory() as session:
         admin = User(
@@ -227,23 +243,48 @@ def test_tagger_can_submit_and_admin_approval_writes_photo_data(tagging_client):
         },
     )
     assert create_response.status_code == 201
+    assert create_response.json()["stats"]["pending"] == 1
     item_id = create_response.json()["items"][0]["id"]
 
     taxonomy = client.get("/api/v1/taxonomy/public").json()
-    type_node = next(
-        node
-        for facet in taxonomy if facet["key"] == "photo_type"
-        for node in facet["nodes"] if node["name"] == "校园风光"
-    )
+    type_node = find_taxonomy_node(taxonomy, "photo_type", "校园风光")
+    landmark_node = find_taxonomy_node(taxonomy, "landmark", "图书馆")
     phenomenon_nodes = [
         node
         for facet in taxonomy if facet["key"] == "natural_phenomenon"
-        for node in facet["nodes"] if node["name"] in {"日出", "蓝天"}
+        for node in flatten_nodes(facet["nodes"]) if node["name"] in {"日出", "蓝天"}
     ]
     assert len(phenomenon_nodes) == 2
 
     denied = client.get("/api/v1/tagging-tasks", headers=headers(tokens["other"]))
     assert denied.status_code == 403
+
+    draft_response = client.post(
+        f"/api/v1/tagging-tasks/items/{item_id}/draft",
+        headers=headers(tokens["tagger"]),
+        json={
+            "tags": ["草稿标签"],
+            "classifications": {
+                "photo_type": type_node["id"],
+            },
+            "note": "草稿",
+        },
+    )
+    assert draft_response.status_code == 200
+    assert draft_response.json()["draft_saved_at"]
+
+    invalid_response = client.post(
+        f"/api/v1/tagging-tasks/items/{item_id}/submit",
+        headers=headers(tokens["tagger"]),
+        json={
+            "tags": ["图书馆"],
+            "classifications": {
+                "photo_type": type_node["id"],
+            },
+        },
+    )
+    assert invalid_response.status_code == 400
+    assert "楼宇/建筑" in invalid_response.json()["detail"]
 
     submit_response = client.post(
         f"/api/v1/tagging-tasks/items/{item_id}/submit",
@@ -252,6 +293,7 @@ def test_tagger_can_submit_and_admin_approval_writes_photo_data(tagging_client):
             "tags": [" 图书馆 ", "Library"],
             "classifications": {
                 "photo_type": type_node["id"],
+                "landmark": landmark_node["id"],
                 "natural_phenomenon": [node["id"] for node in phenomenon_nodes],
             },
             "note": "已调整",
@@ -274,6 +316,69 @@ def test_tagger_can_submit_and_admin_approval_writes_photo_data(tagging_client):
             classifications = (await session.execute(select(PhotoClassification))).scalars().all()
             assert "图书馆" in tags
             assert "library" in tags
-            assert len(classifications) == 3
+            assert len(classifications) == 4
 
     asyncio.run(assert_written())
+
+
+def test_batch_review_only_processes_submitted_items_and_updates_stats(tagging_client):
+    client, tokens, _ = tagging_client
+
+    create_response = client.post(
+        "/api/v1/tagging-tasks",
+        headers=headers(tokens["admin"]),
+        json={
+            "title": "批量审核测试",
+            "assignee_id": "tagger-user",
+            "photo_ids": ["photo-1"],
+        },
+    )
+    assert create_response.status_code == 201
+    item_id = create_response.json()["items"][0]["id"]
+
+    taxonomy = client.get("/api/v1/taxonomy/public").json()
+    type_node = find_taxonomy_node(taxonomy, "photo_type", "人文纪实")
+    landmark_node = find_taxonomy_node(taxonomy, "landmark", "其它")
+
+    submitted = client.post(
+        f"/api/v1/tagging-tasks/items/{item_id}/submit",
+        headers=headers(tokens["tagger"]),
+        json={
+            "tags": [],
+            "classifications": {
+                "photo_type": type_node["id"],
+                "landmark": landmark_node["id"],
+            },
+        },
+    )
+    assert submitted.status_code == 200
+
+    task = client.get(
+        f"/api/v1/tagging-tasks/{create_response.json()['id']}",
+        headers=headers(tokens["admin"]),
+    ).json()
+    assert task["stats"]["submitted"] == 1
+
+    approved = client.post(
+        "/api/v1/tagging-tasks/items/batch-approve",
+        headers=headers(tokens["admin"]),
+        json={"item_ids": [item_id, "missing-item"], "note": "批量通过"},
+    )
+    assert approved.status_code == 200
+    assert len(approved.json()) == 1
+    assert approved.json()[0]["status"] == "approved"
+
+    rejected = client.post(
+        "/api/v1/tagging-tasks/items/batch-reject",
+        headers=headers(tokens["admin"]),
+        json={"item_ids": [item_id], "note": "不会重复处理"},
+    )
+    assert rejected.status_code == 200
+    assert rejected.json() == []
+
+    task = client.get(
+        f"/api/v1/tagging-tasks/{create_response.json()['id']}",
+        headers=headers(tokens["admin"]),
+    ).json()
+    assert task["stats"]["approved"] == 1
+    assert task["stats"]["completion_rate"] == 100

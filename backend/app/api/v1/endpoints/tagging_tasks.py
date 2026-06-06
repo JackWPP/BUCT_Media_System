@@ -14,6 +14,8 @@ from app.schemas.tagging_task import (
     TaggingTaskCreate,
     TaggingTaskBatchCreate,
     TaggingPhotoCandidateListResponse,
+    TaggingTaskItemBatchReview,
+    TaggingTaskItemDraft,
     TaggingTaskItemResponse,
     TaggingTaskItemReview,
     TaggingTaskItemSubmit,
@@ -43,6 +45,10 @@ async def _serialize_item(db: AsyncSession, item: TaggingTaskItem) -> TaggingTas
         submitted_tags=item.submitted_tags,
         original_classifications=item.original_classifications,
         submitted_classifications=item.submitted_classifications,
+        draft_tags=item.draft_tags,
+        draft_classifications=item.draft_classifications,
+        draft_note=item.draft_note,
+        draft_saved_at=item.draft_saved_at,
         submitter_note=item.submitter_note,
         reviewer_id=item.reviewer_id,
         reviewer_note=item.reviewer_note,
@@ -68,6 +74,7 @@ async def _serialize_task(db: AsyncSession, task: TaggingTask) -> TaggingTaskRes
         created_at=task.created_at,
         updated_at=task.updated_at,
         completed_at=task.completed_at,
+        stats=tagging_service.task_stats(task),
         items=[],
     )
     data.items = [await _serialize_item(db, item) for item in task.items]
@@ -207,6 +214,27 @@ async def get_tagging_task(
     return await _serialize_task(db, task)
 
 
+@router.post("/items/{item_id}/draft", response_model=TaggingTaskItemResponse)
+async def save_tagging_item_draft(
+    item_id: str,
+    payload: TaggingTaskItemDraft,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_tagger_user),
+):
+    item = await tagging_service.get_item(db, item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Task item not found")
+    if not _can_submit_item(current_user, item):
+        raise HTTPException(status_code=403, detail="Only the assignee can save this item")
+    if item.status == "approved":
+        raise HTTPException(status_code=400, detail="Approved items cannot be edited")
+    try:
+        item = await tagging_service.save_draft(db, item, payload.tags, payload.classifications, payload.note)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return await _serialize_item(db, item)
+
+
 @router.post("/items/{item_id}/submit", response_model=TaggingTaskItemResponse)
 async def submit_tagging_item(
     item_id: str,
@@ -226,6 +254,29 @@ async def submit_tagging_item(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return await _serialize_item(db, item)
+
+
+@router.post("/items/batch-approve", response_model=list[TaggingTaskItemResponse])
+async def batch_approve_tagging_items(
+    payload: TaggingTaskItemBatchReview,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_auditor_user),
+):
+    try:
+        items = await tagging_service.batch_approve_items(db, payload.item_ids, current_user, payload.note)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return [await _serialize_item(db, item) for item in items]
+
+
+@router.post("/items/batch-reject", response_model=list[TaggingTaskItemResponse])
+async def batch_reject_tagging_items(
+    payload: TaggingTaskItemBatchReview,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_auditor_user),
+):
+    items = await tagging_service.batch_reject_items(db, payload.item_ids, current_user, payload.note)
+    return [await _serialize_item(db, item) for item in items]
 
 
 @router.post("/items/{item_id}/approve", response_model=TaggingTaskItemResponse)

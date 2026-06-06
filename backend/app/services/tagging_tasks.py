@@ -17,11 +17,27 @@ from app.models.tag import PhotoTag, Tag
 from app.models.taxonomy import PhotoClassification, TaxonomyFacet, TaxonomyNode
 from app.models.tagging_task import TaggingTask, TaggingTaskItem
 from app.models.user import User
-from app.services.taxonomy import get_node_by_id, serialize_classifications, set_photo_classifications
+from app.services.taxonomy import get_facet_by_key, get_node_by_id, serialize_classifications, set_photo_classifications
 
 
 def _is_reviewer(user: User) -> bool:
     return user.role in ("admin", "auditor")
+
+
+def task_stats(task: TaggingTask) -> dict[str, int | float]:
+    statuses = [item.status for item in task.items]
+    total = len(statuses)
+    approved = statuses.count("approved")
+    rejected = statuses.count("rejected")
+    completed = approved + rejected
+    return {
+        "total": total,
+        "pending": statuses.count("pending"),
+        "submitted": statuses.count("submitted"),
+        "approved": approved,
+        "rejected": rejected,
+        "completion_rate": round((completed / total) * 100, 1) if total else 0,
+    }
 
 
 def _item_photo_load():
@@ -31,6 +47,7 @@ def _item_photo_load():
         .selectinload(PhotoClassification.node)
         .selectinload(TaxonomyNode.parent),
         selectinload(Photo.tags),
+        selectinload(Photo.uploader),
     )
 
 
@@ -246,6 +263,64 @@ async def create_evenly_distributed_tasks(
     return hydrated
 
 
+def _has_classification(payload: dict[str, object], facet_key: str) -> bool:
+    value = payload.get(facet_key)
+    if not value:
+        return False
+    if isinstance(value, dict) and value.get("node_id"):
+        return True
+    if isinstance(value, dict) and value.get("node_ids"):
+        return bool(value["node_ids"])
+    return False
+
+
+async def _serialize_submission_classifications(
+    db: AsyncSession,
+    classifications: dict[str, int | list[int]],
+) -> dict[str, dict[str, object]]:
+    submitted_classifications = {}
+    for facet_key, value in classifications.items():
+        facet = await get_facet_by_key(db, facet_key)
+        if facet is None or not facet.is_active:
+            raise ValueError(f"Unknown facet: {facet_key}")
+        node_ids = value if isinstance(value, list) else [value]
+        nodes_payload = []
+        for node_id in node_ids:
+            node = await get_node_by_id(db, int(node_id))
+            if node is None or not node.is_active:
+                raise ValueError(f"Unknown node id: {node_id}")
+            if node.facet_id != facet.id:
+                raise ValueError(f"Node {node_id} does not belong to facet: {facet_key}")
+            nodes_payload.append({"node_id": node.id, "node_name": node.name})
+        if isinstance(value, list):
+            submitted_classifications[facet_key] = {
+                "node_ids": [node["node_id"] for node in nodes_payload],
+                "nodes": nodes_payload,
+            }
+        elif nodes_payload:
+            submitted_classifications[facet_key] = nodes_payload[0]
+    return submitted_classifications
+
+
+async def save_draft(
+    db: AsyncSession,
+    item: TaggingTaskItem,
+    tag_names: list[str],
+    classifications: dict[str, int | list[int]],
+    note: str | None,
+) -> TaggingTaskItem:
+    item.draft_tags = [tag.strip() for tag in tag_names if tag.strip()]
+    item.draft_classifications = await _serialize_submission_classifications(db, classifications)
+    item.draft_note = note
+    item.draft_saved_at = datetime.utcnow()
+    item.updated_at = datetime.utcnow()
+    if item.status == "pending":
+        item.task.status = "in_progress"
+        item.task.updated_at = datetime.utcnow()
+    await db.commit()
+    return await get_item(db, item.id)
+
+
 async def submit_item(
     db: AsyncSession,
     item: TaggingTaskItem,
@@ -257,28 +332,21 @@ async def submit_item(
     if photo is None:
         raise ValueError("Photo not found")
 
-    submitted_classifications = {}
-    for facet_key, value in classifications.items():
-        node_ids = value if isinstance(value, list) else [value]
-        nodes_payload = []
-        for node_id in node_ids:
-            node = await get_node_by_id(db, int(node_id))
-            if node is None or not node.is_active:
-                raise ValueError(f"Unknown node id: {node_id}")
-            nodes_payload.append({"node_id": node.id, "node_name": node.name})
-        if isinstance(value, list):
-            submitted_classifications[facet_key] = {
-                "node_ids": [node["node_id"] for node in nodes_payload],
-                "nodes": nodes_payload,
-            }
-        elif nodes_payload:
-            submitted_classifications[facet_key] = nodes_payload[0]
+    submitted_classifications = await _serialize_submission_classifications(db, classifications)
+    if not _has_classification(submitted_classifications, "photo_type"):
+        raise ValueError("题材为必填项")
+    if not _has_classification(submitted_classifications, "landmark"):
+        raise ValueError("楼宇/建筑为必填项，无法具体判断时请选择“其它”")
 
     item.original_tags = [tag.name for tag in await photo_crud.get_photo_tags(db, photo.id)]
     item.original_classifications = serialize_classifications(photo)
-    item.submitted_tags = tag_names
+    item.submitted_tags = [tag.strip() for tag in tag_names if tag.strip()]
     item.submitted_classifications = submitted_classifications
     item.submitter_note = note
+    item.draft_tags = item.submitted_tags
+    item.draft_classifications = submitted_classifications
+    item.draft_note = note
+    item.draft_saved_at = datetime.utcnow()
     item.status = "submitted"
     item.submitted_at = datetime.utcnow()
     item.updated_at = datetime.utcnow()
@@ -338,6 +406,46 @@ async def reject_item(
     await _refresh_task_status(db, item.task)
     await db.commit()
     return await get_item(db, item.id)
+
+
+async def batch_approve_items(
+    db: AsyncSession,
+    item_ids: list[str],
+    reviewer: User,
+    note: str | None,
+) -> list[TaggingTaskItem]:
+    result = await db.execute(
+        select(TaggingTaskItem)
+        .options(selectinload(TaggingTaskItem.task), _item_photo_load())
+        .where(TaggingTaskItem.id.in_(item_ids), TaggingTaskItem.status == "submitted")
+    )
+    items = list(result.scalars().all())
+    approved: list[TaggingTaskItem] = []
+    for item in items:
+        approved_item = await approve_item(db, item, reviewer, note)
+        if approved_item:
+            approved.append(approved_item)
+    return approved
+
+
+async def batch_reject_items(
+    db: AsyncSession,
+    item_ids: list[str],
+    reviewer: User,
+    note: str | None,
+) -> list[TaggingTaskItem]:
+    result = await db.execute(
+        select(TaggingTaskItem)
+        .options(selectinload(TaggingTaskItem.task), _item_photo_load())
+        .where(TaggingTaskItem.id.in_(item_ids), TaggingTaskItem.status == "submitted")
+    )
+    items = list(result.scalars().all())
+    rejected: list[TaggingTaskItem] = []
+    for item in items:
+        rejected_item = await reject_item(db, item, reviewer, note)
+        if rejected_item:
+            rejected.append(rejected_item)
+    return rejected
 
 
 async def _refresh_task_status(db: AsyncSession, task: TaggingTask) -> None:
