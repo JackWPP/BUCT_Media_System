@@ -5,6 +5,25 @@
       <div class="hero-bg">
         <img src="/hero-banner.jpg" alt="视觉北化" class="hero-bg-image" />
       </div>
+      <div class="hero-search-panel">
+        <h1>视觉北化</h1>
+        <div class="hero-search">
+          <n-input
+            v-model:value="heroSearch"
+            size="large"
+            placeholder="搜索四季校园、建筑地点、摄影作品"
+            clearable
+            @keyup.enter="submitHeroSearch"
+          >
+            <template #prefix>
+              <n-icon :component="SearchOutline" />
+            </template>
+          </n-input>
+          <n-button type="primary" size="large" class="hero-search-button" @click="submitHeroSearch">
+            搜索
+          </n-button>
+        </div>
+      </div>
     </section>
 
     <!-- 精选图片区域 -->
@@ -40,11 +59,11 @@
               <div class="photo-overlay-content">
                 <div class="photo-title">{{ photo.filename }}</div>
                 <div class="photo-meta">
-                  <span v-if="photo.classifications?.season">
-                    {{ photo.classifications.season.node_name }}
+                  <span v-if="taxonomyValueName(photo.classifications?.season)">
+                    {{ taxonomyValueName(photo.classifications?.season) }}
                   </span>
-                  <span v-if="photo.classifications?.campus">
-                    {{ photo.classifications.campus.node_name }}
+                  <span v-if="taxonomyValueName(photo.classifications?.campus)">
+                    {{ taxonomyValueName(photo.classifications?.campus) }}
                   </span>
                 </div>
               </div>
@@ -61,15 +80,18 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ChevronForwardOutline,
+  SearchOutline,
 } from '@vicons/ionicons5'
 import { getPublicPhotos } from '../api/photo'
 import type { Photo } from '../types/photo'
+import { taxonomyValueName } from '../types/photo'
 import { getPhotoUrl } from '../utils/format'
 
 const router = useRouter()
 
 const photos = ref<Photo[]>([])
 const loading = ref(false)
+const heroSearch = ref('')
 
 function getImageUrl(photo: Photo) {
   return getPhotoUrl(photo.id, 'thumbnail')
@@ -89,6 +111,15 @@ function handlePhotoClick(photo: Photo) {
   router.push(`/photo/${photo.id}`)
 }
 
+function submitHeroSearch() {
+  const keyword = heroSearch.value.trim()
+  if (!keyword) {
+    router.push('/gallery')
+    return
+  }
+  router.push({ path: '/gallery', query: { search: keyword, smart: 'true' } })
+}
+
 // 奖项等级排序权重（数字越小越靠前）
 const AWARD_ORDER: Record<string, number> = {
   '特等奖': 1,
@@ -98,7 +129,7 @@ const AWARD_ORDER: Record<string, number> = {
 }
 
 function getAwardOrder(photo: Photo): number {
-  const award = photo.classifications?.award_level?.node_name
+  const award = taxonomyValueName(photo.classifications?.award_level)
   return award ? (AWARD_ORDER[award] ?? 99) : 99
 }
 
@@ -107,8 +138,8 @@ async function loadPhotos() {
   try {
     const response = await getPublicPhotos({
       limit: 100,
-      gallery_year: '2025年第八届获奖作品',
-      photo_type: '风光类',
+      gallery_year: '第八届获奖作品（2025年）',
+      photo_type: '校园风光',
     })
     // 按奖项等级排序：特等奖 → 一等奖 → 二等奖 → 优秀奖 → 无奖项
     photos.value = response.items.sort((a, b) => getAwardOrder(a) - getAwardOrder(b))
@@ -138,6 +169,47 @@ onMounted(() => {
   justify-content: center;
   padding: 0;
   overflow: hidden;
+}
+
+.hero-search-panel {
+  position: relative;
+  z-index: 1;
+  width: min(720px, calc(100% - 32px));
+  margin-top: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.hero-search-panel h1 {
+  margin: 0;
+  font-size: 38px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.hero-search {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(17, 42, 84, 0.24);
+}
+
+.hero-search :deep(.n-input) {
+  flex: 1;
+  background: #fff;
+}
+
+.hero-search-button {
+  min-width: 96px;
+  background: #0056a6 !important;
+  border-color: #0056a6 !important;
 }
 
 .hero-bg {
@@ -194,6 +266,24 @@ onMounted(() => {
 @media (max-width: 768px) {
   .hero-section {
     min-height: 280px;
+  }
+
+  .hero-search-panel {
+    margin-top: 64px;
+    gap: 12px;
+  }
+
+  .hero-search-panel h1 {
+    font-size: 28px;
+  }
+
+  .hero-search {
+    flex-direction: column;
+    padding: 8px;
+  }
+
+  .hero-search-button {
+    width: 100%;
   }
 
   .featured-section {

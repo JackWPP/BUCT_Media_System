@@ -141,6 +141,11 @@ const routes: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+  scrollBehavior(to, _from, savedPosition) {
+    if (savedPosition && to.name !== 'PhotoDetail') return savedPosition
+    if (to.name === 'PhotoDetail') return { top: 0 }
+    return { top: 0 }
+  },
 })
 
 router.beforeEach((to, _from, next) => {

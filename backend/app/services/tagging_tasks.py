@@ -123,6 +123,9 @@ def _photo_candidate_query(
         legacy_categories = {
             "风光类": ("Landscape", "风光", "风光类"),
             "纪实类": ("Documentary", "Activity", "纪实", "活动", "纪实类"),
+            "校园风光": ("Landscape", "风光", "风光类", "校园风光"),
+            "人文纪实": ("Documentary", "Activity", "纪实", "活动", "纪实类", "人文纪实"),
+            "自然生态": ("Landscape", "自然生态"),
         }.get(photo_type, ())
         type_subquery = (
             select(PhotoClassification.photo_id)
@@ -243,7 +246,7 @@ async def submit_item(
     db: AsyncSession,
     item: TaggingTaskItem,
     tag_names: list[str],
-    classifications: dict[str, int],
+    classifications: dict[str, int | list[int]],
     note: str | None,
 ) -> TaggingTaskItem:
     photo = await photo_crud.get_photo_with_tags(db, item.photo_id)
@@ -251,14 +254,21 @@ async def submit_item(
         raise ValueError("Photo not found")
 
     submitted_classifications = {}
-    for facet_key, node_id in classifications.items():
-        node = await get_node_by_id(db, node_id)
-        if node is None or not node.is_active:
-            raise ValueError(f"Unknown node id: {node_id}")
-        submitted_classifications[facet_key] = {
-            "node_id": node.id,
-            "node_name": node.name,
-        }
+    for facet_key, value in classifications.items():
+        node_ids = value if isinstance(value, list) else [value]
+        nodes_payload = []
+        for node_id in node_ids:
+            node = await get_node_by_id(db, int(node_id))
+            if node is None or not node.is_active:
+                raise ValueError(f"Unknown node id: {node_id}")
+            nodes_payload.append({"node_id": node.id, "node_name": node.name})
+        if isinstance(value, list):
+            submitted_classifications[facet_key] = {
+                "node_ids": [node["node_id"] for node in nodes_payload],
+                "nodes": nodes_payload,
+            }
+        elif nodes_payload:
+            submitted_classifications[facet_key] = nodes_payload[0]
 
     item.original_tags = [tag.name for tag in await photo_crud.get_photo_tags(db, photo.id)]
     item.original_classifications = serialize_classifications(photo)
@@ -289,11 +299,14 @@ async def approve_item(
         tag_ids.append(tag.id)
     await photo_crud.add_tags_to_photo(db, photo.id, tag_ids)
 
-    classification_ids = {
-        facet_key: int(value["node_id"])
-        for facet_key, value in (item.submitted_classifications or {}).items()
-        if value and value.get("node_id")
-    }
+    classification_ids = {}
+    for facet_key, value in (item.submitted_classifications or {}).items():
+        if not value:
+            continue
+        if value.get("node_ids"):
+            classification_ids[facet_key] = [int(node_id) for node_id in value["node_ids"]]
+        elif value.get("node_id"):
+            classification_ids[facet_key] = int(value["node_id"])
     if classification_ids:
         await set_photo_classifications(db, photo, classification_ids)
 

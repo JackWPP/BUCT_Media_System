@@ -67,7 +67,7 @@
                 <n-form-item label="校区">
                   <n-select v-model:value="formData.campus" :options="campusOptions" clearable />
                 </n-form-item>
-                <n-form-item label="类别">
+                <n-form-item label="题材">
                   <n-select v-model:value="formData.category" :options="categoryOptions" clearable />
                 </n-form-item>
                 <n-form-item label="描述">
@@ -89,8 +89,8 @@
                 <n-text strong>受控分类</n-text>
                 <n-space style="margin-top: 8px;" wrap>
                   <n-popover
-                    v-for="classification in Object.values(photo.classifications || {})"
-                    :key="classification.facet_key"
+                    v-for="classification in classificationList"
+                    :key="`${classification.facet_key}-${classification.node_id}`"
                     trigger="click"
                     placement="bottom"
                   >
@@ -144,8 +144,8 @@
                 <n-text strong>受控分类</n-text>
                 <n-space style="margin-top: 8px;" wrap>
                   <n-tag
-                    v-for="classification in Object.values(photo.classifications)"
-                    :key="classification.node_id"
+                    v-for="classification in classificationList"
+                    :key="`${classification.facet_key}-${classification.node_id}`"
                     type="success"
                     size="small"
                   >
@@ -297,7 +297,7 @@ import {
 import { incrementView } from '../../api/stats'
 import { SEASON_OPTIONS, CATEGORY_OPTIONS } from '../../constants/options'
 import { usePhotoStore } from '../../stores/photo'
-import type { Photo, PhotoUpdate } from '../../types/photo'
+import type { Photo, PhotoUpdate, TaxonomyValue } from '../../types/photo'
 import { getPhotoUrl, getPhotoDownloadUrl } from '../../utils/format'
 import { getPublicTaxonomy, type TaxonomyFacet } from '../../api/taxonomy'
 
@@ -377,14 +377,28 @@ const classificationSuggestions = computed(() => {
   const labelMap: Record<string, string> = {
     season: '季节',
     campus: '校区',
-    building: '楼宇',
-    gallery_series: '专题/赛事',
-    gallery_year: '年份',
-    photo_type: '照片类型',
+    building: '楼宇/建筑',
+    landmark: '楼宇/建筑',
+    gallery_series: '专区',
+    gallery_year: '届次/年份',
+    source_type: '来源',
+    photo_type: '题材',
+    facility: '设施',
+    landscape: '景观',
+    natural_phenomenon: '自然现象',
+    technique: '表现手法',
+    animal: '动物',
+    plant: '植物',
+    documentary_topic: '纪实主题',
   }
   return Object.entries(classifications)
     .filter(([, value]) => !!value)
     .map(([key, value]) => ({ key, label: labelMap[key] || key, value: String(value) }))
+})
+
+const classificationList = computed<TaxonomyValue[]>(() => {
+  if (!photo.value?.classifications) return []
+  return Object.values(photo.value.classifications).flatMap((value) => Array.isArray(value) ? value : [value])
 })
 
 function handleKeydown(event: KeyboardEvent) {

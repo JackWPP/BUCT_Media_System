@@ -115,8 +115,8 @@ async def list_photo_candidates(
 ):
     if selection_mode not in {"all", "zero_tags"}:
         raise HTTPException(status_code=400, detail="selection_mode must be all or zero_tags")
-    if photo_type and photo_type not in {"风光类", "纪实类"}:
-        raise HTTPException(status_code=400, detail="photo_type must be 风光类 or 纪实类")
+    if photo_type and photo_type not in {"风光类", "纪实类", "校园风光", "人文纪实", "自然生态"}:
+        raise HTTPException(status_code=400, detail="photo_type must be a known photo type")
     limit = min(limit, 120)
     photos, total = await tagging_service.list_photo_candidates(
         db,

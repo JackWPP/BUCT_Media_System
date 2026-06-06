@@ -95,7 +95,7 @@ class PhotoClassification(Base):
 
     __tablename__ = "photo_classifications"
     __table_args__ = (
-        UniqueConstraint("photo_id", "facet_id", name="uq_photo_classification_photo_facet"),
+        UniqueConstraint("photo_id", "facet_id", "node_id", name="uq_photo_classification_photo_facet_node"),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)

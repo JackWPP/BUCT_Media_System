@@ -97,7 +97,7 @@ export function updatePhotoTags(id: string, tagNames: string[]): Promise<Photo> 
   return request({ url: `/api/v1/photos/${id}/tags`, method: 'post', data: tagNames })
 }
 
-export function updatePhotoClassifications(id: string, classifications: Record<string, number>): Promise<Photo> {
+export function updatePhotoClassifications(id: string, classifications: Record<string, number | number[]>): Promise<Photo> {
   return request({ url: `/api/v1/photos/${id}/classifications`, method: 'post', data: { classifications } })
 }
 

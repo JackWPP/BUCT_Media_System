@@ -49,10 +49,11 @@ npm install
 ### 3. 启动开发服务器
 
 ```bash
-# 方式一：连接远程后端（推荐）
-VITE_API_BASE_URL=http://121.195.148.85 npm run dev
+# 方式一：连接本地后端（推荐）
+# .env.development 中 VITE_API_BASE_URL 保持为空，Vite 会把 /api 代理到 http://localhost:8000
+npm run dev
 
-# 方式二：使用环境变量文件
+# 方式二：显式连接远程后端（只用于排查线上数据，不推荐日常开发）
 cp .env.development .env.development.local
 # 编辑 .env.development.local，修改 VITE_API_BASE_URL
 npm run dev
@@ -72,7 +73,7 @@ npm run dev
 
 | 变量 | 说明 | 示例 |
 |------|------|------|
-| `VITE_API_BASE_URL` | API 基础 URL | `http://121.195.148.85` |
+| `VITE_API_BASE_URL` | API 基础 URL；留空时使用同源 `/api` | 空值 |
 | `VITE_APP_TITLE` | 应用标题 | `视觉北化 - Dev` |
 
 ### 环境文件优先级
@@ -81,12 +82,23 @@ npm run dev
 .env.development.local  >  .env.development  >  .env
 ```
 
+### 推荐的本地后端配置
+
+默认 `.env.development`：
+
+```bash
+VITE_API_BASE_URL=
+VITE_APP_TITLE=视觉北化 - Dev
+```
+
+这种方式和生产环境一致：浏览器请求同源 `/api/...`，开发时由 Vite proxy 转发到 `http://localhost:8000`，生产时由 Nginx 转发到 `127.0.0.1:8000`。
+
 ### 连接远程后端配置
 
 创建 `.env.development.local` 文件：
 
 ```bash
-# 连接校园网服务器
+# 仅用于排查线上数据；日常开发优先使用本地后端 + Vite proxy
 VITE_API_BASE_URL=http://121.195.148.85
 VITE_APP_TITLE=视觉北化 - 本地开发
 ```
@@ -290,7 +302,7 @@ export default defineConfig({
 })
 ```
 
-然后将 `VITE_API_BASE_URL` 设为空或 `/`。
+然后将 `VITE_API_BASE_URL` 设为空。不要设为 `/api`，因为代码中的接口路径已经以 `/api/v1/...` 开头。
 
 ### 3. 图片加载失败
 

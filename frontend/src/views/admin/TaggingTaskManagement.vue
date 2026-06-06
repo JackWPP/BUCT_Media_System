@@ -49,9 +49,10 @@
                 <n-radio-button value="zero_tags">0 标签照片</n-radio-button>
               </n-radio-group>
               <n-radio-group v-model:value="candidatePhotoType" size="small" @update:value="reloadCandidates">
-                <n-radio-button value="">全部类型</n-radio-button>
-                <n-radio-button value="风光类">风光类</n-radio-button>
-                <n-radio-button value="纪实类">纪实类</n-radio-button>
+                <n-radio-button value="">全部题材</n-radio-button>
+                <n-radio-button value="校园风光">校园风光</n-radio-button>
+                <n-radio-button value="人文纪实">人文纪实</n-radio-button>
+                <n-radio-button value="自然生态">自然生态</n-radio-button>
               </n-radio-group>
               <n-input
                 v-model:value="candidateSearch"
@@ -150,7 +151,7 @@ const candidateTotal = ref(0)
 const candidatePage = ref(1)
 const candidatePageSize = 36
 const candidateMode = ref<'all' | 'zero_tags'>('zero_tags')
-const candidatePhotoType = ref<'' | '风光类' | '纪实类'>('')
+const candidatePhotoType = ref<'' | '校园风光' | '人文纪实' | '自然生态'>('')
 const candidateSearch = ref('')
 const selectedPhotoIds = ref<string[]>([])
 const assignAllMatched = ref(true)

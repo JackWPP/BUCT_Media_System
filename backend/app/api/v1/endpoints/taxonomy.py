@@ -64,8 +64,6 @@ def _serialize_facet(facet: TaxonomyFacet) -> TaxonomyFacetResponse:
 async def list_public_taxonomy(
     db: AsyncSession = Depends(get_db),
 ):
-    await ensure_default_taxonomy(db)
-    await db.commit()
     facets = await get_facets(db, active_only=True)
     return [_serialize_facet(facet) for facet in facets]
 
@@ -74,8 +72,6 @@ async def list_public_taxonomy(
 async def get_public_taxonomy_guide(
     db: AsyncSession = Depends(get_db),
 ):
-    await ensure_default_taxonomy(db)
-    await db.commit()
     return TAXONOMY_GUIDE
 
 

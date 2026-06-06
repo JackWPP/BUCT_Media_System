@@ -19,6 +19,13 @@ export const usePhotoStore = defineStore('photo', () => {
     category: null,
     campus: null,
     building: null,
+    source_type: null,
+    facility: null,
+    landscape: null,
+    natural_phenomenon: null,
+    technique: null,
+    animal: null,
+    plant: null,
     gallery_series: null,
     gallery_year: null,
     award_level: null,
@@ -41,6 +48,13 @@ export const usePhotoStore = defineStore('photo', () => {
     if (filters.value.category) queryParams.category = filters.value.category
     if (filters.value.campus) queryParams.campus = filters.value.campus
     if (filters.value.building) queryParams.building = filters.value.building
+    if (filters.value.source_type) queryParams.source_type = filters.value.source_type
+    if (filters.value.facility) queryParams.facility = filters.value.facility
+    if (filters.value.landscape) queryParams.landscape = filters.value.landscape
+    if (filters.value.natural_phenomenon) queryParams.natural_phenomenon = filters.value.natural_phenomenon
+    if (filters.value.technique) queryParams.technique = filters.value.technique
+    if (filters.value.animal) queryParams.animal = filters.value.animal
+    if (filters.value.plant) queryParams.plant = filters.value.plant
     if (filters.value.gallery_series) queryParams.gallery_series = filters.value.gallery_series
     if (filters.value.gallery_year) queryParams.gallery_year = filters.value.gallery_year
     if (filters.value.award_level) queryParams.award_level = filters.value.award_level
@@ -148,6 +162,13 @@ export const usePhotoStore = defineStore('photo', () => {
       category: null,
       campus: null,
       building: null,
+      source_type: null,
+      facility: null,
+      landscape: null,
+      natural_phenomenon: null,
+      technique: null,
+      animal: null,
+      plant: null,
       gallery_series: null,
       gallery_year: null,
       award_level: null,

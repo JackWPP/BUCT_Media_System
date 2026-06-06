@@ -55,23 +55,19 @@
     <div v-else-if="results.length > 0" class="search-results">
       <div
         v-for="result in results"
-        :key="result.photo_id"
+        :key="result.id"
         class="result-card"
-        @click="goToPhoto(result.photo_id)"
+        @click="goToPhoto(result.id)"
       >
         <div class="result-image">
           <img
-            :src="getThumbUrl(result.photo_id)"
-            :alt="result.tags.join(', ')"
+            :src="getPhotoUrl(result.id, 'thumbnail')"
+            :alt="result.filename"
             loading="lazy"
           />
-          <div class="result-score">
-            <n-tag size="small" :bordered="false" :color="{ color: 'rgba(0,0,0,0.6)', textColor: '#fff' }">
-              {{ (result.score * 100).toFixed(0) }}%
-            </n-tag>
-          </div>
         </div>
         <div class="result-info">
+          <div class="result-title">{{ result.filename }}</div>
           <div class="result-tags">
             <n-tag
               v-for="tag in result.tags.slice(0, 5)"
@@ -85,9 +81,9 @@
           </div>
           <div class="result-classifications">
             <n-text depth="3" style="font-size: 12px;">
-              <span v-if="result.classifications.season">{{ result.classifications.season }}</span>
-              <span v-if="result.classifications.campus"> · {{ result.classifications.campus }}</span>
-              <span v-if="result.classifications.landmark"> · {{ result.classifications.landmark }}</span>
+              <span v-if="taxonomyValueName(result.classifications.season)">{{ taxonomyValueName(result.classifications.season) }}</span>
+              <span v-if="taxonomyValueName(result.classifications.campus)"> · {{ taxonomyValueName(result.classifications.campus) }}</span>
+              <span v-if="taxonomyValueName(result.classifications.landmark)"> · {{ taxonomyValueName(result.classifications.landmark) }}</span>
             </n-text>
           </div>
         </div>
@@ -101,7 +97,10 @@ import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NInput, NIcon, NSelect, NTag, NSpin, NEmpty, NText } from 'naive-ui'
 import { SearchOutline } from '@vicons/ionicons5'
-import { searchPhotos, type SearchResult } from '@/api/search'
+import { getPublicPhotos } from '@/api/photo'
+import type { Photo } from '@/types/photo'
+import { taxonomyValueName } from '@/types/photo'
+import { getPhotoUrl } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -109,7 +108,7 @@ const router = useRouter()
 const query = ref((route.query.q as string) || '')
 const loading = ref(false)
 const searched = ref(false)
-const results = ref<SearchResult[]>([])
+const results = ref<Photo[]>([])
 const total = ref(0)
 const queryTime = ref(0)
 
@@ -161,15 +160,17 @@ async function doSearch() {
   })
 
   try {
-    const resp = await searchPhotos({
-      q,
+    const startedAt = performance.now()
+    const resp = await getPublicPhotos({
+      search: q,
+      smart: true,
       limit: 30,
       ...(filters.season ? { season: filters.season } : {}),
       ...(filters.campus ? { campus: filters.campus } : {}),
     })
-    results.value = resp.results
+    results.value = resp.items
     total.value = resp.total
-    queryTime.value = resp.query_time_ms
+    queryTime.value = Math.round(performance.now() - startedAt)
   } catch (err: any) {
     console.error('Search failed:', err)
     results.value = []
@@ -177,10 +178,6 @@ async function doSearch() {
   } finally {
     loading.value = false
   }
-}
-
-function getThumbUrl(photoId: string): string {
-  return `/api/v1/photos/${photoId}/thumbnail`
 }
 
 function goToPhoto(photoId: string) {
@@ -243,7 +240,7 @@ onMounted(() => {
 
 .result-image {
   position: relative;
-  aspect-ratio: 4/3;
+  aspect-ratio: 1 / 1;
   overflow: hidden;
 }
 
@@ -261,6 +258,14 @@ onMounted(() => {
 
 .result-info {
   padding: 10px;
+}
+
+.result-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  margin-bottom: 8px;
+  word-break: break-word;
 }
 
 .result-tags {

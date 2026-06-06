@@ -141,7 +141,7 @@
                 />
                 <n-select
                   v-model:value="photoStore.filters.gallery_series"
-                  placeholder="专题 / 赛事"
+                  placeholder="专区"
                   clearable
                   style="width: 180px;"
                   :options="facetOptions('gallery_series')"
@@ -157,7 +157,7 @@
                 />
                 <n-select
                   v-model:value="photoStore.filters.photo_type"
-                  placeholder="照片类型"
+                  placeholder="题材"
                   clearable
                   style="width: 140px;"
                   :options="facetOptions('photo_type')"
@@ -240,14 +240,14 @@
                     </div>
                     <div class="photo-info">
                       <n-space size="small" wrap>
-                        <n-tag v-if="photo.classifications?.season" size="small" type="success">
-                          {{ photo.classifications.season.node_name }}
+                        <n-tag v-if="taxonomyValueName(photo.classifications?.season)" size="small" type="success">
+                          {{ taxonomyValueName(photo.classifications?.season) }}
                         </n-tag>
-                        <n-tag v-if="photo.classifications?.campus" size="small" type="warning">
-                          {{ photo.classifications.campus.node_name }}
+                        <n-tag v-if="taxonomyValueName(photo.classifications?.campus)" size="small" type="warning">
+                          {{ taxonomyValueName(photo.classifications?.campus) }}
                         </n-tag>
-                        <n-tag v-if="photo.classifications?.photo_type" size="small" type="info">
-                          {{ photo.classifications.photo_type.node_name }}
+                        <n-tag v-if="taxonomyValueName(photo.classifications?.photo_type)" size="small" type="info">
+                          {{ taxonomyValueName(photo.classifications?.photo_type) }}
                         </n-tag>
                         <n-tag
                           v-for="tag in (photo.free_tags || photo.tags || []).slice(0, 3)"
@@ -339,6 +339,7 @@ import { useAppStore } from '../stores/app'
 import { useAuthStore } from '../stores/auth'
 import { usePhotoStore } from '../stores/photo'
 import type { Photo, PhotoFilters, SearchInterpretation as SearchInterpretationType } from '../types/photo'
+import { taxonomyValueName } from '../types/photo'
 import { getPhotoUrl } from '../utils/format'
 
 const router = useRouter()
@@ -429,9 +430,9 @@ const activeFilters = computed(() => {
     season: '季节',
     campus: '校区',
     building: '楼宇',
-    gallery_series: '专题',
-    gallery_year: '年份',
-    photo_type: '照片类型',
+    gallery_series: '专区',
+    gallery_year: '届次/年份',
+    photo_type: '题材',
     tag: '自由标签',
     search: '搜索',
   }
@@ -481,12 +482,14 @@ function facetOptions(key: string): SelectOption[] {
     return [
       { label: '昌平校区', value: '昌平校区' },
       { label: '朝阳校区', value: '朝阳校区' },
+      { label: '海淀校区', value: '海淀校区' },
     ]
   }
   if (key === 'photo_type') {
     return [
-      { label: '风光', value: '风光' },
-      { label: '纪实', value: '纪实' },
+      { label: '校园风光', value: '校园风光' },
+      { label: '人文纪实', value: '人文纪实' },
+      { label: '自然生态', value: '自然生态' },
     ]
   }
 

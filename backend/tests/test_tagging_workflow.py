@@ -106,7 +106,7 @@ def test_taxonomy_seed_and_public_guide(tagging_client):
     assert facet_names["award_level"] == "奖项"
     assert facet_names["documentary_topic"] == "纪实主题"
     assert guide.status_code == 200
-    assert guide.json()["dependencies"]["photo_type"]["纪实类"] == ["documentary_topic"]
+    assert guide.json()["dependencies"]["photo_type"]["人文纪实"] == ["documentary_topic"]
 
 
 def test_taxonomy_seed_converges_legacy_nodes_to_new_scheme(tagging_client):
@@ -179,14 +179,14 @@ def test_taxonomy_seed_converges_legacy_nodes_to_new_scheme(tagging_client):
             rows = await session.execute(
                 select(TaxonomyFacet.key, TaxonomyNode.name, TaxonomyNode.is_active)
                 .join(TaxonomyNode, TaxonomyNode.facet_id == TaxonomyFacet.id)
-                .where(TaxonomyNode.name.in_(["风光", "人像", "摄影大赛", "2018", "风光类"]))
+                .where(TaxonomyNode.name.in_(["风光", "人像", "摄影大赛", "2018", "校园风光"]))
             )
             node_states = {(facet, name): is_active for facet, name, is_active in rows.all()}
             assert node_states[("photo_type", "风光")] is False
             assert node_states[("photo_type", "人像")] is False
             assert node_states[("gallery_series", "摄影大赛")] is False
             assert node_states[("gallery_year", "2018")] is False
-            assert node_states[("photo_type", "风光类")] is True
+            assert node_states[("photo_type", "校园风光")] is True
 
             classification = (
                 await session.execute(
@@ -196,7 +196,7 @@ def test_taxonomy_seed_converges_legacy_nodes_to_new_scheme(tagging_client):
                     .where(PhotoClassification.photo_id == "photo-1", TaxonomyFacet.key == "photo_type")
                 )
             ).scalar_one()
-            assert classification == "风光类"
+            assert classification == "校园风光"
 
     asyncio.run(add_legacy_nodes())
     asyncio.run(assert_converged())
@@ -211,7 +211,7 @@ def test_taxonomy_seed_converges_legacy_nodes_to_new_scheme(tagging_client):
     assert ("photo_type", "人像") not in public_nodes
     assert ("gallery_series", "摄影大赛") not in public_nodes
     assert ("gallery_year", "2018") not in public_nodes
-    assert ("photo_type", "风光类") in public_nodes
+    assert ("photo_type", "校园风光") in public_nodes
 
 
 def test_tagger_can_submit_and_admin_approval_writes_photo_data(tagging_client):
@@ -233,8 +233,14 @@ def test_tagger_can_submit_and_admin_approval_writes_photo_data(tagging_client):
     type_node = next(
         node
         for facet in taxonomy if facet["key"] == "photo_type"
-        for node in facet["nodes"] if node["name"] == "风光类"
+        for node in facet["nodes"] if node["name"] == "校园风光"
     )
+    phenomenon_nodes = [
+        node
+        for facet in taxonomy if facet["key"] == "natural_phenomenon"
+        for node in facet["nodes"] if node["name"] in {"日出", "蓝天"}
+    ]
+    assert len(phenomenon_nodes) == 2
 
     denied = client.get("/api/v1/tagging-tasks", headers=headers(tokens["other"]))
     assert denied.status_code == 403
@@ -244,7 +250,10 @@ def test_tagger_can_submit_and_admin_approval_writes_photo_data(tagging_client):
         headers=headers(tokens["tagger"]),
         json={
             "tags": [" 图书馆 ", "Library"],
-            "classifications": {"photo_type": type_node["id"]},
+            "classifications": {
+                "photo_type": type_node["id"],
+                "natural_phenomenon": [node["id"] for node in phenomenon_nodes],
+            },
             "note": "已调整",
         },
     )
@@ -265,6 +274,6 @@ def test_tagger_can_submit_and_admin_approval_writes_photo_data(tagging_client):
             classifications = (await session.execute(select(PhotoClassification))).scalars().all()
             assert "图书馆" in tags
             assert "library" in tags
-            assert len(classifications) == 1
+            assert len(classifications) == 3
 
     asyncio.run(assert_written())

@@ -35,7 +35,7 @@ export interface Photo {
   published_at: string | null
   tags: string[]
   free_tags: string[]
-  classifications: Record<string, TaxonomyValue>
+  classifications: Record<string, TaxonomyValue | TaxonomyValue[]>
   uploader_name: string | null
   uploader_student_id: string | null
 }
@@ -76,6 +76,13 @@ export interface PhotoListParams {
   category?: string
   campus?: string
   building?: string
+  source_type?: string
+  facility?: string
+  landscape?: string
+  natural_phenomenon?: string
+  technique?: string
+  animal?: string
+  plant?: string
   gallery_series?: string
   gallery_year?: string
   award_level?: string
@@ -101,6 +108,13 @@ export interface PhotoFilters {
   category?: string | null
   campus?: string | null
   building?: string | null
+  source_type?: string | null
+  facility?: string | null
+  landscape?: string | null
+  natural_phenomenon?: string | null
+  technique?: string | null
+  animal?: string | null
+  plant?: string | null
   gallery_series?: string | null
   gallery_year?: string | null
   award_level?: string | null
@@ -111,4 +125,13 @@ export interface PhotoFilters {
   tag?: string | null
   sortBy?: string
   sortOrder?: string
+}
+
+export function firstTaxonomyValue(value: TaxonomyValue | TaxonomyValue[] | null | undefined): TaxonomyValue | null {
+  if (!value) return null
+  return Array.isArray(value) ? (value[0] || null) : value
+}
+
+export function taxonomyValueName(value: TaxonomyValue | TaxonomyValue[] | null | undefined): string {
+  return firstTaxonomyValue(value)?.node_name || ''
 }

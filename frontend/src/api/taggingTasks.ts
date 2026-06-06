@@ -54,7 +54,7 @@ export interface TaggingTaskBatchCreate {
   selection_mode: 'manual' | 'all' | 'zero_tags'
   status?: string | null
   search?: string
-  photo_type?: '风光类' | '纪实类'
+  photo_type?: '校园风光' | '人文纪实' | '自然生态'
   max_photos?: number
 }
 
@@ -78,7 +78,7 @@ export function getTaggingPhotoCandidates(params?: {
   selection_mode?: 'all' | 'zero_tags'
   status?: string | null
   search?: string
-  photo_type?: '风光类' | '纪实类'
+  photo_type?: '校园风光' | '人文纪实' | '自然生态'
   skip?: number
   limit?: number
 }) {
@@ -87,7 +87,7 @@ export function getTaggingPhotoCandidates(params?: {
 
 export function submitTaggingItem(itemId: string, data: {
   tags: string[]
-  classifications: Record<string, number>
+  classifications: Record<string, number | number[]>
   note?: string
 }) {
   return request.post<TaggingTaskItem>(`/api/v1/tagging-tasks/items/${itemId}/submit`, data)

@@ -23,20 +23,20 @@ from app.services.taxonomy import resolve_taxonomy_node, set_photo_classificatio
 
 # Mapping from English category values (stored in Photo.category) to Chinese taxonomy values
 _CATEGORY_TO_PHOTO_TYPE = {
-    "Landscape": "风光类",
-    "Documentary": "纪实类",
-    "Activity": "纪实类",
+    "Landscape": "校园风光",
+    "Documentary": "人文纪实",
+    "Activity": "人文纪实",
 }
 
 _CONTEST_YEAR_MAP = {
-    "2018": "2018年第一届获奖作品",
-    "2019": "2019年第二届获奖作品",
-    "2020": "2020年第三届获奖作品",
-    "2021": "2021年第四届获奖作品",
-    "2022": "2022年第五届获奖作品",
-    "2023": "2023年第六届获奖作品",
-    "2024": "2024年第七届获奖作品",
-    "2025": "2025年第八届获奖作品",
+    "2018": "第一届获奖作品（2018年）",
+    "2019": "第二届获奖作品（2019年）",
+    "2020": "第三届获奖作品（2020年）",
+    "2021": "第四届获奖作品（2021年）",
+    "2022": "第五届获奖作品（2022年）",
+    "2023": "第六届获奖作品（2023年）",
+    "2024": "第七届获奖作品（2024年）",
+    "2025": "第八届获奖作品（2025年）",
 }
 
 

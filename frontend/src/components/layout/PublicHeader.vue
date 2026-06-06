@@ -8,7 +8,7 @@
 
       <!-- 搜索框 - 仅在非首页或滚动后显示 -->
       <div
-        v-if="!hideSearch"
+        v-if="!hideSearch && !isHome"
         class="header-search-mini"
       >
         <n-input
@@ -32,6 +32,9 @@
             </n-button>
           </template>
         </n-input>
+      </div>
+      <div v-else-if="isHome" class="header-slogan">
+        北化之美 美在四季
       </div>
 
       <!-- 右侧操作区 -->
@@ -292,6 +295,16 @@ function handleUserMenuSelect(key: string) {
   gap: 8px;
 }
 
+.header-slogan {
+  flex: 1;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: #173d7a;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
 .header-smart-toggle {
   display: flex;
   align-items: center;
@@ -410,6 +423,10 @@ function handleUserMenuSelect(key: string) {
     min-width: 0;
   }
 
+  .header-slogan {
+    font-size: 15px;
+  }
+
   .header-search-mini :deep(.n-input) {
     font-size: 13px;
   }
@@ -417,6 +434,10 @@ function handleUserMenuSelect(key: string) {
 
 @media (max-width: 480px) {
   .header-search-mini {
+    display: none;
+  }
+
+  .header-slogan {
     display: none;
   }
 

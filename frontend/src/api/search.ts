@@ -39,6 +39,13 @@ export interface SearchParams {
   gallery_year?: string
   award_level?: string
   photo_type?: string
+  source_type?: string
+  facility?: string
+  landscape?: string
+  natural_phenomenon?: string
+  technique?: string
+  animal?: string
+  plant?: string
 }
 
 /**

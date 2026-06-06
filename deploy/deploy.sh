@@ -15,7 +15,7 @@ deploy_backend() {
 
     log "Installing Python dependencies..."
     cd "$PROJECT_DIR/backend"
-    .venv/bin/pip install -r requirements.txt -q
+    .venv/bin/pip install -r requirements.txt -c constraints-prod.txt -q
 
     log "Running database migrations..."
     .venv/bin/alembic upgrade head

@@ -7,6 +7,7 @@ __pycache__/
 env/
 venv/
 ENV/
+.venv312/
 build/
 develop-eggs/
 dist/
@@ -31,6 +32,7 @@ backend/ENV/
 .env
 .env.local
 backend/.env
+backend/.env.remote-dev
 
 # IDEs
 .vscode/

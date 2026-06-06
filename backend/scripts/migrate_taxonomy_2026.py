@@ -5,26 +5,40 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import sys
 from collections import defaultdict
+from pathlib import Path
 
-from sqlalchemy import select
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from sqlalchemy import inspect, select
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.database import AsyncSessionLocal
 from app.models.photo import Photo
 from app.models.taxonomy import TaxonomyFacet, TaxonomyNode
-from app.services.taxonomy import DEFAULT_TAXONOMY, ensure_default_taxonomy, resolve_taxonomy_node, set_photo_classification
+from app.services.taxonomy import (
+    DEFAULT_TAXONOMY,
+    _flatten_seed_nodes,
+    ensure_default_taxonomy,
+    resolve_taxonomy_node,
+    set_photo_classification,
+)
 
 PHOTO_TYPE_MAP = {
-    "Landscape": "风光类",
-    "风光": "风光类",
-    "Documentary": "纪实类",
-    "纪实": "纪实类",
-    "Activity": "纪实类",
-    "活动": "纪实类",
+    "Landscape": "校园风光",
+    "风光": "校园风光",
+    "风光类": "校园风光",
+    "Documentary": "人文纪实",
+    "纪实": "人文纪实",
+    "纪实类": "人文纪实",
+    "Activity": "人文纪实",
+    "活动": "人文纪实",
+    "自然生态": "自然生态",
 }
 
 YEAR_MAP = {
-    str(year): f"{year}年第{label}届获奖作品"
+    str(year): f"第{label}届获奖作品（{year}年）"
     for year, label in [
         (2018, "一"), (2019, "二"), (2020, "三"), (2021, "四"),
         (2022, "五"), (2023, "六"), (2024, "七"), (2025, "八"),
@@ -38,6 +52,17 @@ async def main(apply: bool) -> None:
     inactive_nodes: list[str] = []
     active_mismatches: list[str] = []
     async with AsyncSessionLocal() as db:
+        required_tables = {"photos", "taxonomy_facets", "taxonomy_nodes", "photo_classifications"}
+        connection = await db.connection()
+        existing_tables = set(await connection.run_sync(lambda sync_conn: inspect(sync_conn).get_table_names()))
+        missing_tables = sorted(required_tables - existing_tables)
+        if missing_tables:
+            print("taxonomy migration report")
+            print(f"mode: {'apply' if apply else 'dry-run'}")
+            print(f"missing tables: {', '.join(missing_tables)}")
+            print("Configure DATABASE_URL for an initialized backend database before running this script.")
+            return
+
         await ensure_default_taxonomy(db)
         result = await db.execute(select(Photo).order_by(Photo.created_at.asc()))
         photos = result.scalars().all()
@@ -84,7 +109,7 @@ async def main(apply: bool) -> None:
             )
             nodes = list(nodes_result.scalars().all())
             active_names = [node.name for node in nodes if node.is_active]
-            expected_names = list(facet_seed.get("nodes", []))
+            expected_names = _flatten_seed_nodes(facet_seed.get("nodes", []))
             if active_names != expected_names:
                 active_mismatches.append(
                     f"{facet.key}: active={active_names} expected={expected_names}"
@@ -115,4 +140,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--apply", action="store_true", help="Write mapped taxonomy values")
     args = parser.parse_args()
-    asyncio.run(main(apply=args.apply))
+    try:
+        asyncio.run(main(apply=args.apply))
+    except SQLAlchemyError as exc:
+        print("taxonomy migration report")
+        print(f"mode: {'apply' if args.apply else 'dry-run'}")
+        print(f"database error: {exc}")
+        print("No changes were applied unless --apply reached the final commit step.")

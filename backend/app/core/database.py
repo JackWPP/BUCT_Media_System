@@ -17,6 +17,8 @@ if settings.DATABASE_URL.startswith("sqlite"):
 elif settings.DATABASE_URL.startswith("postgresql"):
     engine_kwargs["pool_size"] = 10
     engine_kwargs["max_overflow"] = 20
+    engine_kwargs["pool_pre_ping"] = True
+    engine_kwargs["pool_recycle"] = 1800
 
 # 创建异步数据库引擎
 engine = create_async_engine(settings.DATABASE_URL, **engine_kwargs)

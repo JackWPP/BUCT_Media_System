@@ -24,13 +24,13 @@ class TaggingTaskBatchCreate(BaseModel):
     selection_mode: str = Field(default="manual", pattern="^(manual|all|zero_tags)$")
     status: Optional[str] = "approved"
     search: Optional[str] = None
-    photo_type: Optional[str] = Field(default=None, pattern="^(风光类|纪实类)$")
+    photo_type: Optional[str] = Field(default=None, pattern="^(风光类|纪实类|校园风光|人文纪实|自然生态)$")
     max_photos: int = Field(default=5000, ge=1, le=20000)
 
 
 class TaggingTaskItemSubmit(BaseModel):
     tags: list[str] = Field(default_factory=list)
-    classifications: dict[str, int] = Field(default_factory=dict)
+    classifications: dict[str, int | list[int]] = Field(default_factory=dict)
     note: Optional[str] = None
 
 

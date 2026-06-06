@@ -38,6 +38,7 @@ class SearchResponse(BaseModel):
     results: list[SearchPhotoResult] = Field(default_factory=list)
     total: int = Field(..., ge=0, description="Number of results returned")
     query_time_ms: float = Field(..., ge=0, description="Query execution time in milliseconds")
+    search_mode: str = Field("vector", description="Search mode used: vector, keyword, or hybrid")
 
 
 # ---- Endpoint ----
@@ -50,6 +51,18 @@ async def search_photos(
     campus: Optional[str] = Query(None, description="校区 filter (e.g. 昌平校区)"),
     category: Optional[str] = Query(None, description="Category filter (e.g. landscape)"),
     landmark: Optional[str] = Query(None, description="地标 filter"),
+    building: Optional[str] = Query(None, description="楼宇/建筑 filter"),
+    gallery_series: Optional[str] = Query(None, description="专区 filter"),
+    gallery_year: Optional[str] = Query(None, description="届次/年份 filter"),
+    award_level: Optional[str] = Query(None, description="奖项 filter"),
+    photo_type: Optional[str] = Query(None, description="题材 filter"),
+    source_type: Optional[str] = Query(None, description="来源 filter"),
+    facility: Optional[str] = Query(None, description="设施 filter"),
+    landscape: Optional[str] = Query(None, description="景观 filter"),
+    natural_phenomenon: Optional[str] = Query(None, description="自然现象 filter"),
+    technique: Optional[str] = Query(None, description="表现手法 filter"),
+    animal: Optional[str] = Query(None, description="动物 filter"),
+    plant: Optional[str] = Query(None, description="植物 filter"),
     db: AsyncSession = Depends(get_db),
 ) -> SearchResponse:
     """Search photos using natural language + optional structured filters.
@@ -72,6 +85,23 @@ async def search_photos(
         filters["category"] = category
     if landmark:
         filters["landmark"] = landmark
+    if building:
+        filters["landmark"] = building
+    for key, value in {
+        "gallery_series": gallery_series,
+        "gallery_year": gallery_year,
+        "award_level": award_level,
+        "photo_type": photo_type,
+        "source_type": source_type,
+        "facility": facility,
+        "landscape": landscape,
+        "natural_phenomenon": natural_phenomenon,
+        "technique": technique,
+        "animal": animal,
+        "plant": plant,
+    }.items():
+        if value:
+            filters[key] = value
 
     service = get_vector_search_service()
     results = await service.search(
@@ -95,4 +125,5 @@ async def search_photos(
         ],
         total=len(results),
         query_time_ms=round(elapsed_ms, 2),
+        search_mode="vector",
     )

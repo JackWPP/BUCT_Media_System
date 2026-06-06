@@ -7,7 +7,7 @@ Each version is a Python constant for easy version control and review.
 Usage:
     from app.prompts.photo_analysis import get_prompt
 
-    prompt = get_prompt("v5", context={"photo_type": "风光类", "gallery_year": "2020年第三届获奖作品"})
+    prompt = get_prompt("v5", context={"photo_type": "校园风光", "gallery_year": "第三届获奖作品（2020年）"})
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ PROMPT_V3 = """\
 ## 判断指南
 - 观察植被状态判断季节：绿叶茂盛→夏季，银杏黄叶/红叶→秋季，枯枝/雪景→冬季，樱花/新绿→春季
 - 识别建筑特征判断地标：圆形玻璃建筑→图书馆，红砖建筑→大学生活动中心，旧主楼等非标准地点统一归为其它
-- 若记录事件/活动过程→纪实类，若以自然或建筑为主→风光类；不要输出人像作为受控分类
+- 若记录事件/活动过程→人文纪实，若以自然或建筑为主→校园风光；不要输出人像作为受控分类
 - 若完全无法判断某个字段，填 null，不要编造
 
 ## 返回格式
@@ -38,10 +38,10 @@ PROMPT_V3 = """\
     "season": "春季|夏季|秋季|冬季|null",
     "campus": "朝阳校区|昌平校区|海淀校区|null",
     "landmark": "见下方地标列表|null",
-    "gallery_series": "昌平校区摄影大赛|师生投稿|null",
+    "gallery_series": "昌平校区摄影大赛|投稿作品|null",
     "gallery_year": "见下方届次/年份列表|null",
     "award_level": "特等奖|一等奖|二等奖|优秀奖|null",
-    "photo_type": "风光类|纪实类|null",
+    "photo_type": "校园风光|人文纪实|null",
     "documentary_topic": "见下方纪实主题列表|null"
   },
   "free_tags": ["标签1", "标签2"],
@@ -58,20 +58,20 @@ PROMPT_V3 = """\
 - campus: 朝阳校区、昌平校区、海淀校区
 - landmark: 北化昌平校区常见地标（如果不在列表中，返回你认为最准确的名称）：
   第一教学楼、体育馆、图书馆、第二教学楼、大学生活动中心、文理楼、实验楼、工程训练中心、校史博物馆、机电信息楼A座、学生公寓、紫竹餐厅、玉兰餐厅、后勤服务楼、新校区建设指挥部、柳湖、玉屏山、校名石、运动场、其它
-- gallery_series: 昌平校区摄影大赛、师生投稿
-- gallery_year: 2018年第一届获奖作品、2019年第二届获奖作品、2020年第三届获奖作品、2021年第四届获奖作品、2022年第五届获奖作品、2023年第六届获奖作品、2024年第七届获奖作品、2025年第八届获奖作品
+- gallery_series: 昌平校区摄影大赛、投稿作品
+- gallery_year: 第一届获奖作品（2018年）、第二届获奖作品（2019年）、第三届获奖作品（2020年）、第四届获奖作品（2021年）、第五届获奖作品（2022年）、第六届获奖作品（2023年）、第七届获奖作品（2024年）、第八届获奖作品（2025年）
 - award_level: 特等奖、一等奖、二等奖、优秀奖
-- photo_type: 风光类、纪实类
+- photo_type: 校园风光、人文纪实
 - documentary_topic: 德育、智育、体育、美育、劳育、春季百花节、夏季荷花节、秋季山楂节、秋季枫叶节、冬季冰雪节、接待会议、大型活动、其他
 
 ## 常见错误避免
 
 - ❌ "春天" → ✅ "春季"
-- ❌ "风景"/"风景照"/"风光" → ✅ "风光类"
-- ❌ "记录"/"活动"/"纪实" → ✅ "纪实类"
+- ❌ "风景"/"风景照"/"风光" → ✅ "校园风光"
+- ❌ "记录"/"活动"/"纪实" → ✅ "人文纪实"
 - ❌ "摄影大赛" → ✅ "昌平校区摄影大赛"
-- ❌ "校园风光"/"活动纪实" → ✅ "师生投稿"
-- ❌ "人像" → ✅ null（或按事件内容判断为纪实类）
+- ❌ "校园风光"/"活动纪实" → ✅ "投稿作品"
+- ❌ "人像" → ✅ null（或按事件内容判断为人文纪实）
 - ❌ "校园" 作为 campus → ✅ "昌平校区" 或 "朝阳校区"
 - ❌ 返回英文值 → ✅ 所有分类值使用中文
 
@@ -82,8 +82,8 @@ PROMPT_V3 = """\
   "summary": "秋季图书馆门前银杏落叶，学生在台阶上阅读",
   "classifications": {
     "season": "秋季", "campus": "昌平校区", "landmark": "图书馆",
-    "gallery_series": "师生投稿", "gallery_year": null, "award_level": null,
-    "photo_type": "风光类", "documentary_topic": null
+    "gallery_series": "投稿作品", "gallery_year": null, "award_level": null,
+    "photo_type": "校园风光", "documentary_topic": null
   },
   "free_tags": ["银杏", "图书馆", "秋天", "阳光", "校园", "落叶"],
   "quality_flags": [],
@@ -96,8 +96,8 @@ PROMPT_V3 = """\
   "summary": "学生身穿实验服在实验楼进行化学实验操作",
   "classifications": {
     "season": null, "campus": "昌平校区", "landmark": "实验楼",
-    "gallery_series": "师生投稿", "gallery_year": null, "award_level": null,
-    "photo_type": "纪实类", "documentary_topic": "智育"
+    "gallery_series": "投稿作品", "gallery_year": null, "award_level": null,
+    "photo_type": "人文纪实", "documentary_topic": "智育"
   },
   "free_tags": ["化学实验", "实验课", "学生", "实验服"],
   "quality_flags": [],
@@ -111,7 +111,7 @@ PROMPT_V3 = """\
   "classifications": {
     "season": "春季", "campus": "昌平校区", "landmark": "柳湖",
     "gallery_series": "昌平校区摄影大赛", "gallery_year": null, "award_level": null,
-    "photo_type": "风光类", "documentary_topic": null
+    "photo_type": "校园风光", "documentary_topic": null
   },
   "free_tags": ["柳湖", "樱花", "倒影", "水面", "教学楼", "春景"],
   "quality_flags": [],
@@ -172,8 +172,8 @@ PROMPT_V3_CONTEST = """\
 ## 常见错误避免
 
 - ❌ "春天" → ✅ "春季"
-- ❌ "风景"/"风景照"/"风光" → ✅ "风光类"
-- ❌ "记录"/"活动"/"纪实" → ✅ "纪实类"
+- ❌ "风景"/"风景照"/"风光" → ✅ "校园风光"
+- ❌ "记录"/"活动"/"纪实" → ✅ "人文纪实"
 - ❌ 返回英文值 → ✅ 所有分类值使用中文
 
 ## 示例
@@ -184,7 +184,7 @@ PROMPT_V3_CONTEST = """\
   "classifications": {{
     "season": "春季", "campus": "昌平校区", "landmark": "柳湖",
     "gallery_series": "昌平校区摄影大赛", "gallery_year": "{gallery_year}",
-    "award_level": null, "photo_type": "风光类", "documentary_topic": null
+    "award_level": null, "photo_type": "校园风光", "documentary_topic": null
   }},
   "free_tags": ["柳湖", "樱花", "倒影", "水面", "教学楼", "春景"],
   "quality_flags": [],
@@ -198,7 +198,7 @@ PROMPT_V3_CONTEST = """\
   "classifications": {{
     "season": null, "campus": "昌平校区", "landmark": "实验楼",
     "gallery_series": "昌平校区摄影大赛", "gallery_year": "{gallery_year}",
-    "award_level": null, "photo_type": "纪实类", "documentary_topic": "智育"
+    "award_level": null, "photo_type": "人文纪实", "documentary_topic": "智育"
   }},
   "free_tags": ["化学实验", "实验课", "学生", "实验服"],
   "quality_flags": [],
@@ -219,7 +219,7 @@ PROMPT_V5 = """\
 ## 判断指南
 - 观察植被状态判断季节：绿叶茂盛→夏季，银杏黄叶/红叶→秋季，枯枝/雪景→冬季，樱花/新绿→春季
 - 识别建筑特征判断地标：圆形玻璃建筑→图书馆，红砖建筑→大学生活动中心，旧主楼等非标准地点统一归为其它
-- 若记录事件/活动过程→纪实类，若以自然或建筑为主→风光类；不要输出人像作为受控分类
+- 若记录事件/活动过程→人文纪实，若以自然或建筑为主→校园风光；不要输出人像作为受控分类
 - 若完全无法判断某个字段，填 null，不要编造
 
 ## 标签生成指南（重要！）
@@ -248,7 +248,7 @@ free_tags 是用于语义搜索的核心数据，质量直接决定搜索效果�
 - **不要在 free_tags 中重复 classifications 已有的信息**
   - ❌ "夏季"、"秋季"、"春季"、"冬季"（season 已有）
   - ❌ "昌平校区"、"朝阳校区"（campus 已有）
-  - ❌ "风光类"、"纪实类"（photo_type 已有）
+  - ❌ "校园风光"、"人文纪实"（photo_type 已有）
 - **标签之间不要互相包含**
   - ❌ ["银杏", "银杏树", "银杏叶"]
   - ✅ ["银杏大道", "落叶纷飞", "金秋暖阳"]
@@ -266,10 +266,10 @@ free_tags 是用于语义搜索的核心数据，质量直接决定搜索效果�
     "season": "春季|夏季|秋季|冬季|null",
     "campus": "朝阳校区|昌平校区|海淀校区|null",
     "landmark": "见下方地标列表|null",
-    "gallery_series": "昌平校区摄影大赛|师生投稿|null",
+    "gallery_series": "昌平校区摄影大赛|投稿作品|null",
     "gallery_year": "见下方届次/年份列表|null",
     "award_level": "特等奖|一等奖|二等奖|优秀奖|null",
-    "photo_type": "风光类|纪实类|null",
+    "photo_type": "校园风光|人文纪实|null",
     "documentary_topic": "见下方纪实主题列表|null",
     "mood": "宁静|活力|庄严|温馨|欢快|肃穆|浪漫|壮丽|诗意|null",
     "dominant_color": "金黄|翠绿|火红|湛蓝|洁白|暖橙|深紫|银灰|墨黑|null",
@@ -289,10 +289,10 @@ free_tags 是用于语义搜索的核心数据，质量直接决定搜索效果�
 - campus: 朝阳校区、昌平校区、海淀校区
 - landmark: 北化昌平校区常见地标（如果不在列表中，返回你认为最准确的名称）：
   第一教学楼、体育馆、图书馆、第二教学楼、大学生活动中心、文理楼、实验楼、工程训练中心、校史博物馆、机电信息楼A座、学生公寓、紫竹餐厅、玉兰餐厅、后勤服务楼、新校区建设指挥部、柳湖、玉屏山、校名石、运动场、其它
-- gallery_series: 昌平校区摄影大赛、师生投稿
-- gallery_year: 2018年第一届获奖作品、2019年第二届获奖作品、2020年第三届获奖作品、2021年第四届获奖作品、2022年第五届获奖作品、2023年第六届获奖作品、2024年第七届获奖作品、2025年第八届获奖作品
+- gallery_series: 昌平校区摄影大赛、投稿作品
+- gallery_year: 第一届获奖作品（2018年）、第二届获奖作品（2019年）、第三届获奖作品（2020年）、第四届获奖作品（2021年）、第五届获奖作品（2022年）、第六届获奖作品（2023年）、第七届获奖作品（2024年）、第八届获奖作品（2025年）
 - award_level: 特等奖、一等奖、二等奖、优秀奖
-- photo_type: 风光类、纪实类
+- photo_type: 校园风光、人文纪实
 - documentary_topic: 德育、智育、体育、美育、劳育、春季百花节、夏季荷花节、秋季山楂节、秋季枫叶节、冬季冰雪节、接待会议、大型活动、其他
 - mood: 宁静、活力、庄严、温馨、欢快、肃穆、浪漫、壮丽、诗意
 - dominant_color: 金黄、翠绿、火红、湛蓝、洁白、暖橙、深紫、银灰、墨黑
@@ -301,11 +301,11 @@ free_tags 是用于语义搜索的核心数据，质量直接决定搜索效果�
 ## 常见错误避免
 
 - ❌ "春天" → ✅ "春季"
-- ❌ "风景"/"风景照"/"风光" → ✅ "风光类"
-- ❌ "记录"/"活动"/"纪实" → ✅ "纪实类"
+- ❌ "风景"/"风景照"/"风光" → ✅ "校园风光"
+- ❌ "记录"/"活动"/"纪实" → ✅ "人文纪实"
 - ❌ "摄影大赛" → ✅ "昌平校区摄影大赛"
-- ❌ "校园风光"/"活动纪实" → ✅ "师生投稿"
-- ❌ "人像" → ✅ null（或按事件内容判断为纪实类）
+- ❌ "校园风光"/"活动纪实" → ✅ "投稿作品"
+- ❌ "人像" → ✅ null（或按事件内容判断为人文纪实）
 - ❌ "校园" 作为 campus → ✅ "昌平校区" 或 "朝阳校区"
 - ❌ 返回英文值 → ✅ 所有分类值使用中文
 - ❌ free_tags 包含 "照片"、"摄影"、"图片"、"建筑"、"校园" 等无意义标签
@@ -319,8 +319,8 @@ free_tags 是用于语义搜索的核心数据，质量直接决定搜索效果�
   "summary": "秋季图书馆门前银杏落叶，学生在台阶上阅读",
   "classifications": {
     "season": "秋季", "campus": "昌平校区", "landmark": "图书馆",
-    "gallery_series": "师生投稿", "gallery_year": null, "award_level": null,
-    "photo_type": "风光类", "documentary_topic": null,
+    "gallery_series": "投稿作品", "gallery_year": null, "award_level": null,
+    "photo_type": "校园风光", "documentary_topic": null,
     "mood": "宁静", "dominant_color": "金黄", "style": "风光"
   },
   "free_tags": ["银杏大道", "落叶纷飞", "台阶阅读", "秋日暖阳", "图书馆台阶", "逆光剪影"],
@@ -334,8 +334,8 @@ free_tags 是用于语义搜索的核心数据，质量直接决定搜索效果�
   "summary": "学生身穿实验服在实验楼进行化学实验操作",
   "classifications": {
     "season": null, "campus": "昌平校区", "landmark": "实验楼",
-    "gallery_series": "师生投稿", "gallery_year": null, "award_level": null,
-    "photo_type": "纪实类", "documentary_topic": "智育",
+    "gallery_series": "投稿作品", "gallery_year": null, "award_level": null,
+    "photo_type": "人文纪实", "documentary_topic": "智育",
     "mood": "庄严", "dominant_color": "洁白", "style": "纪实"
   },
   "free_tags": ["化学实验", "试管操作", "实验服", "专注神情", "科研氛围", "实验台特写"],
@@ -350,7 +350,7 @@ free_tags 是用于语义搜索的核心数据，质量直接决定搜索效果�
   "classifications": {
     "season": "春季", "campus": "昌平校区", "landmark": "柳湖",
     "gallery_series": "昌平校区摄影大赛", "gallery_year": null, "award_level": null,
-    "photo_type": "风光类", "documentary_topic": null,
+    "photo_type": "校园风光", "documentary_topic": null,
     "mood": "诗意", "dominant_color": "翠绿", "style": "风光"
   },
   "free_tags": ["柳湖倒影", "樱花盛开", "水面镜像", "春意盎然", "教学楼远景", "晨光斜照"],
@@ -443,8 +443,8 @@ free_tags 是用于语义搜索的核心数据，质量直接决定搜索效果�
 ## 常见错误避免
 
 - ❌ "春天" → ✅ "春季"
-- ❌ "风景"/"风景照"/"风光" → ✅ "风光类"
-- ❌ "记录"/"活动"/"纪实" → ✅ "纪实类"
+- ❌ "风景"/"风景照"/"风光" → ✅ "校园风光"
+- ❌ "记录"/"活动"/"纪实" → ✅ "人文纪实"
 - ❌ 返回英文值 → ✅ 所有分类值使用中文
 - ❌ free_tags 包含 "照片"、"摄影"、"图片"、"建筑"、"校园" 等无意义标签
 
@@ -456,7 +456,7 @@ free_tags 是用于语义搜索的核心数据，质量直接决定搜索效果�
   "classifications": {{
     "season": "春季", "campus": "昌平校区", "landmark": "柳湖",
     "gallery_series": "昌平校区摄影大赛", "gallery_year": "{gallery_year}",
-    "award_level": null, "photo_type": "风光类", "documentary_topic": null,
+    "award_level": null, "photo_type": "校园风光", "documentary_topic": null,
     "mood": "诗意", "dominant_color": "翠绿", "style": "风光"
   }},
   "free_tags": ["柳湖倒影", "樱花盛开", "水面镜像", "春意盎然", "教学楼远景", "晨光斜照"],
@@ -471,7 +471,7 @@ free_tags 是用于语义搜索的核心数据，质量直接决定搜索效果�
   "classifications": {{
     "season": null, "campus": "昌平校区", "landmark": "实验楼",
     "gallery_series": "昌平校区摄影大赛", "gallery_year": "{gallery_year}",
-    "award_level": null, "photo_type": "纪实类", "documentary_topic": "智育",
+    "award_level": null, "photo_type": "人文纪实", "documentary_topic": "智育",
     "mood": "庄严", "dominant_color": "洁白", "style": "纪实"
   }},
   "free_tags": ["化学实验", "试管操作", "实验服", "专注神情", "科研氛围", "实验台特写"],
@@ -514,7 +514,7 @@ def get_prompt(version: str = "v5", context: dict[str, Any] | None = None) -> st
         if contest_key in PROMPTS:
             template = PROMPTS[contest_key]
             gallery_year = context.get("gallery_year", "null")
-            photo_type = context.get("photo_type", "风光类")
+            photo_type = context.get("photo_type", "校园风光")
             return template.format(
                 gallery_year=gallery_year,
                 photo_type=photo_type,

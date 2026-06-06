@@ -76,13 +76,13 @@ npm run preview
 
 ### .env.development
 ```
-VITE_API_BASE_URL=http://localhost:8000
+VITE_API_BASE_URL=
 VITE_APP_TITLE=视觉北化 - Dev
 ```
 
 ### .env.production
 ```
-VITE_API_BASE_URL=/api
+VITE_API_BASE_URL=
 VITE_APP_TITLE=视觉北化
 ```
 

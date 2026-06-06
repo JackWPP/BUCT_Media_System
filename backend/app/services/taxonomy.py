@@ -4,7 +4,7 @@ Taxonomy service helpers.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Iterable, Optional
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
@@ -24,11 +24,22 @@ LEGACY_SEASON_MAP = {
 LEGACY_PHOTO_TYPE_MAP = {
     "风光": "Landscape",
     "风光类": "Landscape",
+    "校园风光": "Landscape",
     "人像": "Portrait",
     "活动": "Activity",
     "纪实": "Documentary",
     "纪实类": "Documentary",
+    "人文纪实": "Documentary",
+    "自然生态": "Landscape",
 }
+
+CHANGPING_BUILDINGS = [
+    "第一教学楼", "体育馆", "图书馆", "实验楼", "文理楼", "第二教学楼",
+    "大学生活动中心", "校史博物馆", "工程训练中心", "机电信息楼A座",
+    "学生公寓", "紫竹餐厅", "玉兰餐厅", "后勤服务楼", "新校区建设指挥部",
+    "保卫处监控指挥中心", "樱花苑", "紫竹苑", "玉兰苑", "留学生公寓",
+    "杏坛苑/青教公寓", "杏坛苑/短租公寓",
+]
 
 DEFAULT_TAXONOMY = [
     {
@@ -58,15 +69,10 @@ DEFAULT_TAXONOMY = [
     },
     {
         "key": "landmark",
-        "name": "建筑/地点",
+        "name": "楼宇/建筑",
         "is_system": True,
         "sort_order": 30,
-        "nodes": [
-            "第一教学楼", "体育馆", "图书馆", "第二教学楼", "大学生活动中心",
-            "文理楼", "实验楼", "工程训练中心", "校史博物馆", "机电信息楼A座",
-            "学生公寓", "紫竹餐厅", "玉兰餐厅", "后勤服务楼", "新校区建设指挥部",
-            "柳湖", "玉屏山", "校名石", "运动场", "其它",
-        ],
+        "nodes": ["朝阳校区", {"name": "昌平校区", "children": CHANGPING_BUILDINGS}, "海淀校区", "其它"],
         "aliases": {
             "图书馆": ["北化图书馆", "新图书馆"],
             "大学生活动中心": ["学生活动中心", "活动中心", "学生中心"],
@@ -85,11 +91,19 @@ DEFAULT_TAXONOMY = [
         "name": "专区",
         "is_system": True,
         "sort_order": 40,
-        "nodes": ["昌平校区摄影大赛", "师生投稿"],
+        "nodes": ["昌平校区摄影大赛", "投稿作品"],
         "aliases": {
             "昌平校区摄影大赛": ["摄影大赛", "摄影比赛", "摄影大赛作品", "昌平摄影大赛"],
-            "师生投稿": ["学生投稿", "教师投稿", "师生作品"],
+            "投稿作品": ["师生投稿", "学生投稿", "教师投稿", "教职工投稿", "师生作品"],
         },
+    },
+    {
+        "key": "source_type",
+        "name": "来源",
+        "is_system": True,
+        "sort_order": 45,
+        "nodes": ["教职工投稿", "学生投稿"],
+        "aliases": {"教职工投稿": ["教师投稿", "教工投稿"], "学生投稿": ["同学投稿"]},
     },
     {
         "key": "gallery_year",
@@ -97,24 +111,24 @@ DEFAULT_TAXONOMY = [
         "is_system": True,
         "sort_order": 50,
         "nodes": [
-            "2018年第一届获奖作品",
-            "2019年第二届获奖作品",
-            "2020年第三届获奖作品",
-            "2021年第四届获奖作品",
-            "2022年第五届获奖作品",
-            "2023年第六届获奖作品",
-            "2024年第七届获奖作品",
-            "2025年第八届获奖作品",
+            "第一届获奖作品（2018年）",
+            "第二届获奖作品（2019年）",
+            "第三届获奖作品（2020年）",
+            "第四届获奖作品（2021年）",
+            "第五届获奖作品（2022年）",
+            "第六届获奖作品（2023年）",
+            "第七届获奖作品（2024年）",
+            "第八届获奖作品（2025年）",
         ],
         "aliases": {
-            "2018年第一届获奖作品": ["2018", "2018年", "第一届"],
-            "2019年第二届获奖作品": ["2019", "2019年", "第二届"],
-            "2020年第三届获奖作品": ["2020", "2020年", "第三届"],
-            "2021年第四届获奖作品": ["2021", "2021年", "第四届"],
-            "2022年第五届获奖作品": ["2022", "2022年", "第五届"],
-            "2023年第六届获奖作品": ["2023", "2023年", "第六届"],
-            "2024年第七届获奖作品": ["2024", "2024年", "第七届"],
-            "2025年第八届获奖作品": ["2025", "2025年", "第八届"],
+            "第一届获奖作品（2018年）": ["2018", "2018年", "第一届", "2018年第一届获奖作品"],
+            "第二届获奖作品（2019年）": ["2019", "2019年", "第二届", "2019年第二届获奖作品"],
+            "第三届获奖作品（2020年）": ["2020", "2020年", "第三届", "2020年第三届获奖作品"],
+            "第四届获奖作品（2021年）": ["2021", "2021年", "第四届", "2021年第四届获奖作品"],
+            "第五届获奖作品（2022年）": ["2022", "2022年", "第五届", "2022年第五届获奖作品"],
+            "第六届获奖作品（2023年）": ["2023", "2023年", "第六届", "2023年第六届获奖作品"],
+            "第七届获奖作品（2024年）": ["2024", "2024年", "第七届", "2024年第七届获奖作品"],
+            "第八届获奖作品（2025年）": ["2025", "2025年", "第八届", "2025年第八届获奖作品"],
         },
     },
     {
@@ -127,14 +141,78 @@ DEFAULT_TAXONOMY = [
     },
     {
         "key": "photo_type",
-        "name": "类别",
+        "name": "题材",
         "is_system": True,
         "sort_order": 60,
-        "nodes": ["风光类", "纪实类"],
+        "nodes": ["校园风光", "人文纪实", "自然生态"],
         "aliases": {
-            "风光类": ["风光", "风景", "风景照", "自然风光", "景色", "风光摄影", "Landscape"],
-            "纪实类": ["纪实", "活动", "记录", "纪实摄影", "记录片", "Documentary", "Activity"],
+            "校园风光": ["风光", "风光类", "风景", "风景照", "景色", "风光摄影", "Landscape"],
+            "人文纪实": ["纪实", "纪实类", "活动", "记录", "纪实摄影", "记录片", "Documentary", "Activity"],
+            "自然生态": ["自然", "生态", "动植物", "动物", "植物"],
         },
+    },
+    {
+        "key": "facility",
+        "name": "设施",
+        "selection_mode": "multiple",
+        "is_system": True,
+        "sort_order": 80,
+        "nodes": [
+            {"name": "室外设施", "children": ["运动场/风雨操场", "第二运动场", "足球场", "篮球场", "网球场", "排球场", "素质拓展基地"]},
+            {"name": "教学设施", "children": ["教室（第一教学楼）", "教室（第二教学楼）", "求真讲堂（第二教学楼）", "励学讲堂（第二教学楼）", "教研室（大学生活动中心）"]},
+            {"name": "体育设施", "children": ["比赛主场馆（体育馆）", "健身房（体育馆）", "篮球训练馆（体育馆）", "网球馆（体育馆）", "羽毛球馆（体育馆）", "乒乓球馆（体育馆）", "游泳馆（体育馆）", "健美操室（体育馆）", "舞蹈室（体育馆）", "跆拳道室（体育馆）", "形体室（体育馆）", "体测室（体育馆）"]},
+            {"name": "美育设施", "children": ["蓝晒美育工坊（实验楼）", "人因工学美育工坊（实验楼）", "掐丝珐琅美育工坊（实验楼）", "滴胶艺术坊（实验楼）", "陶艺拉坯美育工坊（实验楼）", "陶艺彩绘美育工坊（实验楼）", "情绪串珠美育工坊（实验楼）", "永生绒花美育工坊（实验楼）", "木艺工坊（实验楼）"]},
+            {"name": "实验设施", "children": ["数字化智能教学未来中心（实验楼）", "思政学习创新中心（实验楼）", "实践教学与创新培养未来中心（实验楼）"]},
+            {"name": "办公设施", "children": ["一站式服务大厅（图书馆）", "马克思主义学院（文理楼）", "数理学院（文理楼）", "文法学院（文理楼）", "经济管理学院（文理楼）"]},
+            {"name": "会议设施", "children": ["网络视频会议室（图书馆）", "共享研讨空间（图书馆）", "第一会议室（图书馆）", "第二会议室（图书馆）", "学术报告厅（图书馆）", "共享办公空间（图书馆）", "多功能厅（体育馆）", "会议室（第二教学楼）", "会议室（后勤服务楼）", "贵宾室（体育馆）", "贵宾室（第二教学楼）", "会议室（校史博物馆）"]},
+            {"name": "其他设施", "children": ["小剧场（大学生活动中心）", "主题摄影展（图书馆）", "212大型视听室（图书馆）", "校史馆临时展厅（图书馆）", "智慧教学运行中心（第二教学楼）", "艺术展厅（大学生活动中心）", "琴房（大学生活动中心）", "活动室（大学生活动中心）", "排练厅（大学生活动中心）", "创享商圈（大学生活动中心）", "主题展厅（校史博物馆）", "藏品修复室（校史博物馆）", "数控仿真室（工程训练中心）", "创客空间（工程训练中心）", "游戏设计工坊（工程训练中心）", "寓建生活工坊（学生公寓）"]},
+        ],
+        "aliases": {},
+    },
+    {
+        "key": "landscape",
+        "name": "景观",
+        "selection_mode": "multiple",
+        "is_system": True,
+        "sort_order": 90,
+        "nodes": ["校名石", "荷塘", "柳湖", "玉屏山", "北化知行园", "静心亭（柳湖）", "师贤亭（荷塘）", "燕贺亭（玉屏山）", "钟塔（第二教学楼）", "文化墙（第二教学楼）", "质量文化（图书馆）", "中心广场（大学生活动中心）", "枫叶广场（玉屏山）", "校名标识字（玉屏山）", "化彩三台（北化八景）", "馆声凫影（北化八景）", "镜湖书柳（北化八景）", "小荷听书（北化八景）", "花海晴光（北化八景）", "平湖跃金（北化八景）", "花海聆淙（北化八景）", "烟雨玉屏（北化八景）"],
+        "aliases": {"柳湖": ["湖"], "玉屏山": ["山"]},
+    },
+    {
+        "key": "natural_phenomenon",
+        "name": "自然现象",
+        "selection_mode": "multiple",
+        "is_system": True,
+        "sort_order": 100,
+        "nodes": ["日出", "日落", "蓝天", "日食", "月食", "雨", "白云", "雾", "雷电", "彩虹", "晚霞", "星", "乌云", "雪", "星轨", "银河"],
+        "aliases": {},
+    },
+    {
+        "key": "technique",
+        "name": "表现手法",
+        "selection_mode": "multiple",
+        "is_system": True,
+        "sort_order": 110,
+        "nodes": ["冷暖对比", "补色碰撞", "单色意境", "黑白"],
+        "aliases": {},
+    },
+    {
+        "key": "animal",
+        "name": "动物",
+        "selection_mode": "multiple",
+        "is_system": True,
+        "sort_order": 120,
+        "nodes": ["猫", "黑天鹅", "白鹅", "绿头鸭", "麻鸭", "苍鹭", "番鸭", "黑水鸡", "小天鹅"],
+        "aliases": {},
+    },
+    {
+        "key": "plant",
+        "name": "植物",
+        "selection_mode": "multiple",
+        "is_system": True,
+        "sort_order": 130,
+        "nodes": ["迎春", "杏", "连翘", "芍药", "郁金香", "二月兰", "桃", "牡丹", "紫花地丁", "海棠", "樱花", "玉兰"],
+        "aliases": {},
     },
     {
         "key": "documentary_topic",
@@ -170,23 +248,34 @@ LEGACY_NODE_MERGES = {
     },
     "gallery_series": {
         "摄影大赛": "昌平校区摄影大赛",
-        "校园风光": "师生投稿",
-        "活动纪实": "师生投稿",
+        "师生投稿": "投稿作品",
+        "校园风光": "投稿作品",
+        "活动纪实": "投稿作品",
     },
     "gallery_year": {
-        "2018": "2018年第一届获奖作品",
-        "2019": "2019年第二届获奖作品",
-        "2020": "2020年第三届获奖作品",
-        "2021": "2021年第四届获奖作品",
-        "2022": "2022年第五届获奖作品",
-        "2023": "2023年第六届获奖作品",
-        "2024": "2024年第七届获奖作品",
-        "2025": "2025年第八届获奖作品",
+        "2018": "第一届获奖作品（2018年）",
+        "2018年第一届获奖作品": "第一届获奖作品（2018年）",
+        "2019": "第二届获奖作品（2019年）",
+        "2019年第二届获奖作品": "第二届获奖作品（2019年）",
+        "2020": "第三届获奖作品（2020年）",
+        "2020年第三届获奖作品": "第三届获奖作品（2020年）",
+        "2021": "第四届获奖作品（2021年）",
+        "2021年第四届获奖作品": "第四届获奖作品（2021年）",
+        "2022": "第五届获奖作品（2022年）",
+        "2022年第五届获奖作品": "第五届获奖作品（2022年）",
+        "2023": "第六届获奖作品（2023年）",
+        "2023年第六届获奖作品": "第六届获奖作品（2023年）",
+        "2024": "第七届获奖作品（2024年）",
+        "2024年第七届获奖作品": "第七届获奖作品（2024年）",
+        "2025": "第八届获奖作品（2025年）",
+        "2025年第八届获奖作品": "第八届获奖作品（2025年）",
     },
     "photo_type": {
-        "风光": "风光类",
-        "纪实": "纪实类",
-        "活动": "纪实类",
+        "风光": "校园风光",
+        "风光类": "校园风光",
+        "纪实": "人文纪实",
+        "纪实类": "人文纪实",
+        "活动": "人文纪实",
         "人像": None,
     },
 }
@@ -194,9 +283,16 @@ LEGACY_NODE_MERGES = {
 TAXONOMY_GUIDE = {
     "primary": ["gallery_series", "campus", "photo_type"],
     "dependencies": {
-        "campus": {"昌平校区": ["landmark"]},
-        "gallery_series": {"昌平校区摄影大赛": ["gallery_year", "award_level"]},
-        "photo_type": {"风光类": ["season"], "纪实类": ["documentary_topic"]},
+        "campus": {"昌平校区": ["landmark", "facility", "landscape"]},
+        "gallery_series": {
+            "昌平校区摄影大赛": ["gallery_year", "award_level"],
+            "投稿作品": ["source_type"],
+        },
+        "photo_type": {
+            "校园风光": ["season", "natural_phenomenon", "technique", "animal", "plant"],
+            "人文纪实": ["documentary_topic"],
+            "自然生态": ["season", "natural_phenomenon", "animal", "plant"],
+        },
     },
     "legacy_query_aliases": {"building": "landmark"},
 }
@@ -204,6 +300,65 @@ TAXONOMY_GUIDE = {
 
 def _node_key(name: str) -> str:
     return name.strip().lower().replace(" ", "-")
+
+
+def _flatten_seed_nodes(nodes: list) -> list[str]:
+    names: list[str] = []
+    for node in nodes:
+        if isinstance(node, dict):
+            names.append(node["name"])
+            names.extend(_flatten_seed_nodes(node.get("children", [])))
+        else:
+            names.append(str(node))
+    return names
+
+
+async def _upsert_seed_nodes(
+    db: AsyncSession,
+    facet: TaxonomyFacet,
+    nodes: list,
+    existing_nodes: dict[str, TaxonomyNode],
+    parent: TaxonomyNode | None = None,
+) -> bool:
+    changed = False
+    for index, seed in enumerate(nodes, start=1):
+        if isinstance(seed, dict):
+            node_name = seed["name"]
+            children = seed.get("children", [])
+        else:
+            node_name = str(seed)
+            children = []
+
+        node = existing_nodes.get(node_name)
+        if node is None:
+            node = TaxonomyNode(
+                facet_id=facet.id,
+                parent_id=parent.id if parent else None,
+                key=_node_key(node_name),
+                name=node_name,
+                sort_order=index,
+                is_active=True,
+            )
+            db.add(node)
+            await db.flush()
+            existing_nodes[node.name] = node
+            changed = True
+        else:
+            target_parent_id = parent.id if parent else None
+            if node.parent_id != target_parent_id:
+                node.parent_id = target_parent_id
+                changed = True
+            if node.sort_order != index:
+                node.sort_order = index
+                changed = True
+            if not node.is_active:
+                node.is_active = True
+                changed = True
+
+        if children:
+            if await _upsert_seed_nodes(db, facet, children, existing_nodes, node):
+                changed = True
+    return changed
 
 
 async def ensure_default_taxonomy(db: AsyncSession) -> None:
@@ -219,7 +374,7 @@ async def ensure_default_taxonomy(db: AsyncSession) -> None:
             facet = TaxonomyFacet(
                 key=facet_seed["key"],
                 name=facet_seed["name"],
-                selection_mode="single",
+                selection_mode=facet_seed.get("selection_mode", "single"),
                 is_system=facet_seed.get("is_system", False),
                 sort_order=facet_seed.get("sort_order", 0),
                 is_active=True,
@@ -229,7 +384,7 @@ async def ensure_default_taxonomy(db: AsyncSession) -> None:
             created = True
         else:
             facet.name = facet_seed["name"]
-            facet.selection_mode = "single"
+            facet.selection_mode = facet_seed.get("selection_mode", "single")
             facet.is_system = facet_seed.get("is_system", facet.is_system)
             facet.sort_order = facet_seed.get("sort_order", facet.sort_order)
             facet.is_active = True
@@ -238,18 +393,7 @@ async def ensure_default_taxonomy(db: AsyncSession) -> None:
             select(TaxonomyNode).where(TaxonomyNode.facet_id == facet.id)
         )
         existing_nodes = {node.name: node for node in existing_nodes_result.scalars().all()}
-        for index, node_name in enumerate(facet_seed.get("nodes", []), start=1):
-            if node_name in existing_nodes:
-                continue
-            db.add(
-                TaxonomyNode(
-                    facet_id=facet.id,
-                    key=_node_key(node_name),
-                    name=node_name,
-                    sort_order=index,
-                    is_active=True,
-                )
-            )
+        if await _upsert_seed_nodes(db, facet, facet_seed.get("nodes", []), existing_nodes):
             created = True
 
         await db.flush()
@@ -298,7 +442,7 @@ async def reconcile_facet_to_seed(db: AsyncSession, facet: TaxonomyFacet, facet_
     exists, photo classifications are moved to the new node first.
     """
     changed = False
-    allowed_names = set(facet_seed.get("nodes", []))
+    allowed_names = set(_flatten_seed_nodes(facet_seed.get("nodes", [])))
     merge_map = LEGACY_NODE_MERGES.get(facet.key, {})
 
     result = await db.execute(select(TaxonomyNode).where(TaxonomyNode.facet_id == facet.id))
@@ -329,16 +473,6 @@ async def reconcile_facet_to_seed(db: AsyncSession, facet: TaxonomyFacet, facet_
             else:
                 await db.delete(classification)
             changed = True
-
-    for index, node_name in enumerate(facet_seed.get("nodes", []), start=1):
-        node = nodes_by_name.get(node_name)
-        if node is not None:
-            if node.sort_order != index:
-                node.sort_order = index
-                changed = True
-            if not node.is_active:
-                node.is_active = True
-                changed = True
 
     for node in nodes:
         if node.name not in allowed_names and node.is_active:
@@ -479,14 +613,28 @@ async def set_photo_classification(
     if node.facet_id != facet.id:
         raise ValueError(f"Node {node.id} does not belong to facet: {facet_key}")
 
-    result = await db.execute(
-        select(PhotoClassification).where(
-            PhotoClassification.photo_id == photo.id,
-            PhotoClassification.facet_id == facet.id,
-        )
-    )
-    classification = result.scalar_one_or_none()
     now = datetime.utcnow()
+    if facet.selection_mode == "single":
+        result = await db.execute(
+            select(PhotoClassification).where(
+                PhotoClassification.photo_id == photo.id,
+                PhotoClassification.facet_id == facet.id,
+            )
+        )
+        existing = list(result.scalars().all())
+        classification = existing[0] if existing else None
+        for extra in existing[1:]:
+            await db.delete(extra)
+    else:
+        result = await db.execute(
+            select(PhotoClassification).where(
+                PhotoClassification.photo_id == photo.id,
+                PhotoClassification.facet_id == facet.id,
+                PhotoClassification.node_id == node.id,
+            )
+        )
+        classification = result.scalar_one_or_none()
+
     if classification is None:
         classification = PhotoClassification(
             photo_id=photo.id,
@@ -508,17 +656,56 @@ async def set_photo_classification(
         photo.category = LEGACY_PHOTO_TYPE_MAP.get(node.name, node.name)
 
 
-async def set_photo_classifications(
+async def set_photo_classification_nodes(
     db: AsyncSession,
     photo: Photo,
-    classifications: dict[str, int],
+    facet_key: str,
+    node_ids: Iterable[int],
 ) -> None:
-    """Batch set classifications for a photo: { facet_key: node_id }."""
-    for facet_key, node_id in classifications.items():
+    facet = await get_facet_by_key(db, facet_key)
+    if facet is None:
+        raise ValueError(f"Unknown facet: {facet_key}")
+
+    clean_ids = [int(node_id) for node_id in node_ids if node_id]
+    if facet.selection_mode == "single":
+        if not clean_ids:
+            await delete_photo_classification(db, photo, facet_key)
+            return
+        node = await get_node_by_id(db, clean_ids[0])
+        if node is None:
+            raise ValueError(f"Unknown node id: {clean_ids[0]}")
+        await set_photo_classification(db, photo, facet_key, node)
+        return
+
+    result = await db.execute(
+        select(PhotoClassification).where(
+            PhotoClassification.photo_id == photo.id,
+            PhotoClassification.facet_id == facet.id,
+        )
+    )
+    existing = {classification.node_id: classification for classification in result.scalars().all()}
+    target_ids = set(clean_ids)
+    for node_id in target_ids:
         node = await get_node_by_id(db, node_id)
         if node is None:
             raise ValueError(f"Unknown node id: {node_id}")
         await set_photo_classification(db, photo, facet_key, node)
+    for node_id, classification in existing.items():
+        if node_id not in target_ids:
+            await db.delete(classification)
+
+
+async def set_photo_classifications(
+    db: AsyncSession,
+    photo: Photo,
+    classifications: dict[str, int | list[int]],
+) -> None:
+    """Batch set classifications for a photo: { facet_key: node_id | node_ids }."""
+    for facet_key, value in classifications.items():
+        if isinstance(value, list):
+            await set_photo_classification_nodes(db, photo, facet_key, value)
+        else:
+            await set_photo_classification_nodes(db, photo, facet_key, [value])
 
 
 async def delete_photo_classification(
@@ -537,11 +724,12 @@ async def delete_photo_classification(
             PhotoClassification.facet_id == facet.id,
         )
     )
-    classification = result.scalar_one_or_none()
-    if classification is None:
+    classifications = list(result.scalars().all())
+    if not classifications:
         return
 
-    await db.delete(classification)
+    for classification in classifications:
+        await db.delete(classification)
 
     if facet_key == "season":
         photo.season = None
@@ -567,7 +755,7 @@ def serialize_classifications(photo: Photo) -> dict[str, dict[str, object]]:
             continue
         if not classification.facet.is_active or not classification.node.is_active:
             continue
-        values[classification.facet.key] = {
+        payload = {
             "facet_key": classification.facet.key,
             "facet_name": classification.facet.name,
             "node_id": classification.node.id,
@@ -575,4 +763,9 @@ def serialize_classifications(photo: Photo) -> dict[str, dict[str, object]]:
             "node_name": classification.node.name,
             "path": build_node_path(classification.node),
         }
+        if classification.facet.selection_mode == "multiple":
+            values.setdefault(classification.facet.key, [])
+            values[classification.facet.key].append(payload)
+        else:
+            values[classification.facet.key] = payload
     return values

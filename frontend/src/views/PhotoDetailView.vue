@@ -168,6 +168,10 @@
                   <span class="meta-label">地点</span>
                   <span class="meta-value">{{ photoLocation }}</span>
                 </div>
+                <div v-if="photoBuilding" class="meta-item">
+                  <span class="meta-label">楼宇/建筑</span>
+                  <span class="meta-value">{{ photoBuilding }}</span>
+                </div>
                 <div class="meta-item">
                   <span class="meta-label">版权声明</span>
                   <n-popover
@@ -199,7 +203,7 @@
               <h3 class="meta-title">分类</h3>
               <div class="class-tags">
                 <span
-                  v-for="cls in Object.values(photo.classifications)"
+                  v-for="cls in classificationList"
                   :key="cls.node_id"
                   class="class-tag"
                 >
@@ -208,33 +212,25 @@
               </div>
             </div>
 
-            <!-- 描述 -->
-            <div v-if="photo.description" class="meta-section">
-              <h3 class="meta-title">描述</h3>
-              <p class="photo-description">{{ photo.description }}</p>
+            <!-- 关键词 -->
+            <div v-if="allTags.length" class="meta-section">
+              <h3 class="meta-title">关键词</h3>
+              <div class="compact-keywords-list">
+                <span
+                  v-for="tag in allTags"
+                  :key="tag"
+                  class="keyword-tag"
+                  @click="handleKeywordClick(tag)"
+                >
+                  {{ tag }}
+                </span>
+              </div>
             </div>
 
           </div>
         </div>
       </div>
     </n-spin>
-
-    <!-- 关键词区域 -->
-    <div v-if="photo && allTags.length" class="detail-keywords">
-      <div class="keywords-container">
-        <h3 class="section-title">关键词</h3>
-        <div class="keywords-list">
-          <span
-            v-for="tag in allTags"
-            :key="tag"
-            class="keyword-tag"
-            @click="handleKeywordClick(tag)"
-          >
-            {{ tag }}
-          </span>
-        </div>
-      </div>
-    </div>
 
     <!-- 推荐图片 -->
     <div v-if="relatedPhotos.length" class="detail-related">
@@ -274,7 +270,8 @@ import {
 import { getPublicPhotos } from '../api/photo'
 import { incrementView } from '../api/stats'
 import { usePhotoStore } from '../stores/photo'
-import type { Photo } from '../types/photo'
+import type { Photo, TaxonomyValue } from '../types/photo'
+import { taxonomyValueName } from '../types/photo'
 import { getPhotoUrl, getPhotoDownloadUrl } from '../utils/format'
 
 const route = useRoute()
@@ -350,6 +347,11 @@ const allTags = computed(() => {
   return Array.from(tags)
 })
 
+const classificationList = computed<TaxonomyValue[]>(() => {
+  if (!photo.value?.classifications) return []
+  return Object.values(photo.value.classifications).flatMap((value) => Array.isArray(value) ? value : [value])
+})
+
 const descriptionParts = computed(() => {
   return (photo.value?.description || '')
     .split('|')
@@ -381,9 +383,14 @@ const photoAuthor = computed(() => {
 
 const photoSource = computed(() => {
   const classifications = photo.value?.classifications || {}
-  const series = classifications.gallery_series?.node_name
-  const year = classifications.gallery_year?.node_name
-  if (series && year) return `${series} - ${year}`
+  const sourceType = taxonomyValueName(classifications.source_type)
+  if (sourceType) return sourceType
+  const series = taxonomyValueName(classifications.gallery_series)
+  const year = taxonomyValueName(classifications.gallery_year)
+  if (series === '昌平校区摄影大赛' && year) {
+    return `${normalizeGalleryYear(year)}昌平校区摄影大赛获奖作品（${extractGalleryYear(year)}）`
+  }
+  if (series === '投稿作品') return '学生投稿'
   return series || year || '未知'
 })
 
@@ -400,8 +407,23 @@ const photoFormat = computed(() => {
 
 const photoLocation = computed(() => {
   const classifications = photo.value?.classifications || {}
-  return classifications.landmark?.node_name || classifications.campus?.node_name || photo.value?.campus || '未知'
+  return taxonomyValueName(classifications.campus) || photo.value?.campus || '未知'
 })
+
+const photoBuilding = computed(() => {
+  const classifications = photo.value?.classifications || {}
+  return taxonomyValueName(classifications.building) || taxonomyValueName(classifications.landmark) || ''
+})
+
+function normalizeGalleryYear(value: string): string {
+  const match = value.match(/(第[一二三四五六七八九十]+届)/)
+  return match?.[1] || value.replace(/（?\d{4}年?）?/g, '').replace('获奖作品', '').trim()
+}
+
+function extractGalleryYear(value: string): string {
+  const match = value.match(/(20\d{2})/)
+  return match ? `${match[1]}年` : ''
+}
 
 function loadOriginal() {
   showOriginal.value = !showOriginal.value
@@ -693,6 +715,7 @@ function handleKeydown(event: KeyboardEvent) {
 }
 
 onMounted(() => {
+  window.scrollTo({ top: 0, behavior: 'auto' })
   window.addEventListener('keydown', handleKeydown)
   const id = route.params.id as string
   if (id) loadPhotoDetail(id)
@@ -1024,22 +1047,10 @@ watch(
 }
 
 /* ===== 关键词区域 ===== */
-.detail-keywords {
-  background: #fafafa;
-  border-top: 1px solid #f0f0f0;
-  padding: 28px 24px;
-}
-
-.keywords-container {
-  max-width: 1440px;
-  margin: 0 auto;
-}
-
-.keywords-list {
+.compact-keywords-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 14px;
+  gap: 8px;
 }
 
 .keyword-tag {
@@ -1183,7 +1194,6 @@ watch(
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .detail-keywords,
   .detail-related {
     padding: 20px 12px;
   }

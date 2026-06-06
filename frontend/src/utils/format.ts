@@ -54,23 +54,25 @@ export function truncate(text: string, maxLength: number): string {
 /**
  * 获取图片 URL
  */
+function getApiBase(): string {
+  return import.meta.env.VITE_API_BASE_URL || ''
+}
+
 export function getImageUrl(path: string | null, baseUrl?: string): string {
   if (!path) return ''
-  const base = baseUrl || import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '/api')
+  const base = baseUrl || getApiBase()
   return `${base}${path.startsWith('/') ? '' : '/'}${path}`
 }
 
 export function getPhotoUrl(photoId: string, type: 'original' | 'thumbnail' | 'compressed' = 'original'): string {
-  // In production, use empty base (relative path) since Nginx handles /api proxy
-  // In development, use full localhost URL
-  const base = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')
+  const base = getApiBase()
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
   const query = token ? `?access_token=${encodeURIComponent(token)}` : ''
   return `${base}/api/v1/photos/${photoId}/image/${type}${query}`
 }
 
 export function getPhotoDownloadUrl(photoId: string): string {
-  const base = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')
+  const base = getApiBase()
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
   const query = token ? `?access_token=${encodeURIComponent(token)}` : ''
   return `${base}/api/v1/photos/${photoId}/download${query}`

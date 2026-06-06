@@ -108,7 +108,7 @@ class TaxonomyValueResponse(BaseModel):
 
 class PhotoClassificationUpdateSchema(BaseModel):
     """Batch update photo classifications: { facet_key: node_id }"""
-    classifications: dict[str, int] = Field(
+    classifications: dict[str, int | list[int]] = Field(
         default_factory=dict,
         description="Mapping of facet_key to node_id",
     )

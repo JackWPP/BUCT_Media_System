@@ -273,11 +273,11 @@
                 <div class="photo-overlay-content">
                   <div class="photo-title">{{ photo.filename }}</div>
                   <div class="photo-meta">
-                    <span v-if="photo.classifications?.season" class="meta-tag">
-                      {{ photo.classifications.season.node_name }}
+                    <span v-if="taxonomyValueName(photo.classifications?.season)" class="meta-tag">
+                      {{ taxonomyValueName(photo.classifications?.season) }}
                     </span>
-                    <span v-if="photo.classifications?.campus" class="meta-tag">
-                      {{ photo.classifications.campus.node_name }}
+                    <span v-if="taxonomyValueName(photo.classifications?.campus)" class="meta-tag">
+                      {{ taxonomyValueName(photo.classifications?.campus) }}
                     </span>
                   </div>
                 </div>
@@ -336,6 +336,7 @@ import MasonryLayout from '../components/common/MasonryLayout.vue'
 import { usePhotoStore } from '../stores/photo'
 import { getPublicTaxonomy, getPublicTaxonomyGuide, type TaxonomyFacet, type TaxonomyGuide } from '../api/taxonomy'
 import type { Photo, PhotoFilters, SearchInterpretation as SearchInterpretationType } from '../types/photo'
+import { taxonomyValueName } from '../types/photo'
 import { interpretSearch } from '../api/photo'
 import SearchInterpretation from '../components/search/SearchInterpretation.vue'
 import PhotoDetail from '../components/photo/PhotoDetail.vue'
@@ -384,13 +385,20 @@ const sortOptions = [
 const facetLabelMap: Record<string, string> = {
   season: '季节',
   campus: '校区',
-  building: '楼宇',
-  gallery_series: '专题',
+  building: '楼宇/景观',
+  gallery_series: '专区',
   gallery_year: '年份',
   award_level: '奖项',
-  photo_type: '照片类型',
+  photo_type: '题材',
   documentary_topic: '纪实主题',
   tag: '标签',
+  source_type: '来源',
+  facility: '设施',
+  landscape: '景观',
+  natural_phenomenon: '自然现象',
+  technique: '表现手法',
+  animal: '动物',
+  plant: '植物',
 }
 
 const facetMap = computed(() =>
@@ -399,7 +407,7 @@ const facetMap = computed(() =>
 
 // 静态筛选字段（始终显示，不需要 taxonomy 数据）
 // 所有筛选字段统一从 taxonomy API 动态获取
-const dynamicFacetKeys = ['gallery_series', 'campus', 'photo_type', 'building', 'gallery_year', 'award_level', 'season', 'documentary_topic', 'tag']
+const dynamicFacetKeys = ['gallery_series', 'campus', 'photo_type', 'source_type', 'building', 'facility', 'landscape', 'gallery_year', 'award_level', 'season', 'natural_phenomenon', 'technique', 'animal', 'plant', 'documentary_topic', 'tag']
 
 const primaryFacetKeys = computed(() => taxonomyGuide.value?.primary || ['gallery_series', 'campus', 'photo_type'])
 
@@ -435,7 +443,7 @@ const guideVisibleFacetKeys = computed(() => {
 const activeFilters = computed(() => {
   const filters = photoStore.filters
   const chips: Array<{ key: keyof PhotoFilters; label: string; value: string }> = []
-  ;(['season', 'campus', 'building', 'gallery_series', 'gallery_year', 'award_level', 'photo_type', 'documentary_topic', 'tag'] as const).forEach((key) => {
+  ;(['gallery_series', 'campus', 'photo_type', 'source_type', 'building', 'facility', 'landscape', 'gallery_year', 'award_level', 'season', 'natural_phenomenon', 'technique', 'animal', 'plant', 'documentary_topic', 'tag'] as const).forEach((key) => {
     const value = filters[key]
     if (value) {
       chips.push({ key, label: facetLabelMap[key], value })
@@ -505,7 +513,9 @@ function facetOptions(key: string): SelectOption[] {
     }
     if (key === 'photo_type') {
       options = [
-        { label: '风光', value: '风光' },
+        { label: '校园风光', value: '校园风光' },
+        { label: '人文纪实', value: '人文纪实' },
+        { label: '自然生态', value: '自然生态' },
       ]
     }
   }
@@ -535,12 +545,12 @@ function getImageUrl(photo: Photo) {
 
 // 向量搜索相关函数
 function getVectorThumbUrl(photoId: string): string {
-  return `/api/v1/photos/${photoId}/image/thumbnail`
+  return getPhotoUrl(photoId, 'thumbnail')
 }
 
 function getVectorItemRatio(result: SearchResult): number {
-  // 向量搜索结果没有宽高信息，默认返回 3:4 比例
-  return 4 / 3
+  // 搜索结果卡片统一 1:1 裁切。
+  return 1
 }
 
 function handleVectorImageLoad(event: Event, result: SearchResult) {
@@ -586,7 +596,7 @@ function handleImageLoad(event: Event, photo: Photo) {
 function buildQuery() {
   const query: Record<string, string> = {}
   const filters = photoStore.filters
-  ;(['season', 'campus', 'building', 'gallery_series', 'gallery_year', 'award_level', 'photo_type', 'documentary_topic', 'tag'] as const).forEach((key) => {
+  ;(['season', 'campus', 'building', 'gallery_series', 'gallery_year', 'award_level', 'photo_type', 'documentary_topic', 'tag', 'source_type', 'facility', 'landscape', 'natural_phenomenon', 'technique', 'animal', 'plant'] as const).forEach((key) => {
     const value = filters[key]
     if (value) query[key] = value
   })
@@ -617,6 +627,13 @@ function applyRouteQuery() {
   photoStore.filters.season = typeof query.season === 'string' ? query.season : null
   photoStore.filters.campus = typeof query.campus === 'string' ? query.campus : null
   photoStore.filters.building = typeof query.building === 'string' ? query.building : null
+  photoStore.filters.facility = typeof query.facility === 'string' ? query.facility : null
+  photoStore.filters.landscape = typeof query.landscape === 'string' ? query.landscape : null
+  photoStore.filters.natural_phenomenon = typeof query.natural_phenomenon === 'string' ? query.natural_phenomenon : null
+  photoStore.filters.technique = typeof query.technique === 'string' ? query.technique : null
+  photoStore.filters.animal = typeof query.animal === 'string' ? query.animal : null
+  photoStore.filters.plant = typeof query.plant === 'string' ? query.plant : null
+  photoStore.filters.source_type = typeof query.source_type === 'string' ? query.source_type : null
   photoStore.filters.gallery_series = typeof query.gallery_series === 'string' ? query.gallery_series : null
   photoStore.filters.gallery_year = typeof query.gallery_year === 'string' ? query.gallery_year : null
   photoStore.filters.award_level = typeof query.award_level === 'string' ? query.award_level : null
@@ -873,14 +890,8 @@ watch(
     if (syncingRoute.value) return
     applyRouteQuery()
     
-    // 检查是否有搜索查询，优先使用向量搜索
-    const searchQueryValue = route.query.search as string
-    if (searchQueryValue && searchQueryValue.trim()) {
-      await performVectorSearch(searchQueryValue)
-    } else {
-      clearVectorSearch()
-      await photoStore.fetchPublicPhotos()
-    }
+    clearVectorSearch()
+    await photoStore.fetchPublicPhotos()
     
     // Display interpretation when navigating to gallery with search (e.g., browser back/forward)
     if (photoStore.searchInterpretation && smartSearchEnabled.value) {
@@ -925,6 +936,7 @@ onMounted(async () => {
   }
 
   applyRouteQuery()
+  clearVectorSearch()
   await Promise.all([photoStore.fetchPublicPhotos(), loadTaxonomy()])
 
   if (photoStore.searchInterpretation && smartSearchEnabled.value) {

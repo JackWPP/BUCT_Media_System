@@ -7,7 +7,7 @@
     </n-page-header>
 
     <n-grid :cols="24" :x-gap="16" responsive="screen" class="workspace-grid">
-      <n-grid-item :span="6">
+      <n-grid-item :span="5">
         <n-card title="任务列表" size="small">
           <n-list v-if="tasks.length">
             <n-list-item
@@ -30,7 +30,7 @@
         </n-card>
       </n-grid-item>
 
-      <n-grid-item :span="18">
+      <n-grid-item :span="19">
         <n-card v-if="selectedItem?.photo" size="small">
           <template #header>
             <n-space justify="space-between" align="center">
@@ -74,9 +74,9 @@
                 </div>
 
                 <div>
-                  <n-text strong>受控分类</n-text>
+                  <n-text strong>核心分类</n-text>
                   <n-form label-placement="top" style="margin-top: 8px">
-                    <n-form-item v-for="facet in taxonomyFacets" :key="facet.key" :label="facet.name">
+                    <n-form-item v-for="facet in singleFacets" :key="facet.key" :label="facet.name">
                       <n-select
                         v-model:value="classificationDraft[facet.key]"
                         :options="facetNodeOptions(facet)"
@@ -85,6 +85,30 @@
                       />
                     </n-form-item>
                   </n-form>
+                </div>
+
+                <div v-if="multiFacets.length">
+                  <n-text strong>细分标签</n-text>
+                  <n-collapse style="margin-top: 8px">
+                    <n-collapse-item
+                      v-for="facet in multiFacets"
+                      :key="facet.key"
+                      :title="facet.name"
+                      :name="facet.key"
+                    >
+                      <n-select
+                        v-model:value="multiClassificationDraft[facet.key]"
+                        :options="facetNodeOptions(facet)"
+                        multiple
+                        clearable
+                        filterable
+                        placeholder="可多选"
+                      />
+                    </n-collapse-item>
+                  </n-collapse>
+                  <div v-if="selectedFineTagCount" class="selected-summary">
+                    已选择 {{ selectedFineTagCount }} 个细分标签
+                  </div>
                 </div>
 
                 <n-input v-model:value="note" type="textarea" :rows="3" placeholder="提交说明（可选）" />
@@ -131,6 +155,7 @@ const tagDraft = ref<string[]>([])
 const tagSearch = ref('')
 const tagSuggestions = ref<TagSuggestion[]>([])
 const classificationDraft = reactive<Record<string, number | null>>({})
+const multiClassificationDraft = reactive<Record<string, number[]>>({})
 const note = ref('')
 
 const selectedItem = computed(() =>
@@ -146,6 +171,18 @@ const itemOptions = computed(() =>
 
 const canSubmit = computed(() =>
   !!selectedItem.value && ['pending', 'submitted', 'rejected'].includes(selectedItem.value.status),
+)
+
+const singleFacets = computed(() =>
+  taxonomyFacets.value.filter((facet) => facet.selection_mode !== 'multiple'),
+)
+
+const multiFacets = computed(() =>
+  taxonomyFacets.value.filter((facet) => facet.selection_mode === 'multiple'),
+)
+
+const selectedFineTagCount = computed(() =>
+  Object.values(multiClassificationDraft).reduce((sum, values) => sum + values.length, 0),
 )
 
 onMounted(async () => {
@@ -181,10 +218,18 @@ function hydrateDraft() {
   const item = selectedItem.value
   tagDraft.value = item?.submitted_tags || item?.photo?.free_tags || item?.photo?.tags || []
   Object.keys(classificationDraft).forEach((key) => delete classificationDraft[key])
+  Object.keys(multiClassificationDraft).forEach((key) => delete multiClassificationDraft[key])
   taxonomyFacets.value.forEach((facet) => {
     const submitted = item?.submitted_classifications?.[facet.key]?.node_id
     const current = item?.photo?.classifications?.[facet.key]?.node_id
-    classificationDraft[facet.key] = submitted || current || null
+    const submittedIds = item?.submitted_classifications?.[facet.key]?.node_ids
+    const currentValue = item?.photo?.classifications?.[facet.key]
+    const currentIds = Array.isArray(currentValue) ? currentValue.map((value) => value.node_id) : []
+    if (facet.selection_mode === 'multiple') {
+      multiClassificationDraft[facet.key] = submittedIds || currentIds || []
+    } else {
+      classificationDraft[facet.key] = submitted || current || null
+    }
   })
   note.value = item?.submitter_note || ''
 }
@@ -214,9 +259,12 @@ async function submitCurrent() {
   if (!selectedItem.value) return
   submitting.value = true
   try {
-    const classifications: Record<string, number> = {}
+    const classifications: Record<string, number | number[]> = {}
     Object.entries(classificationDraft).forEach(([key, value]) => {
       if (value) classifications[key] = value
+    })
+    Object.entries(multiClassificationDraft).forEach(([key, values]) => {
+      if (values.length) classifications[key] = values
     })
     const updated = await submitTaggingItem(selectedItem.value.id, {
       tags: tagDraft.value,
