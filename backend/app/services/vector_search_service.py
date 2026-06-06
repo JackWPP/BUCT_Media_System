@@ -136,13 +136,22 @@ class VectorSearchService:
             # Apply structured filters (season, campus, etc.)
             if filters:
                 skip = False
+                taxonomy_values: dict[str, set[str]] = {}
+                for classification in photo.classifications:
+                    if classification.facet and classification.node:
+                        taxonomy_values.setdefault(classification.facet.key, set()).add(classification.node.name)
                 for key, value in filters.items():
                     if not value:
                         continue
-                    photo_value = getattr(photo, key, None)
-                    if photo_value is None or str(photo_value) != str(value):
-                        skip = True
-                        break
+                    if key in taxonomy_values:
+                        if str(value) not in taxonomy_values[key]:
+                            skip = True
+                            break
+                    else:
+                        photo_value = getattr(photo, key, None)
+                        if photo_value is None or str(photo_value) != str(value):
+                            skip = True
+                            break
                 if skip:
                     continue
 

@@ -1,6 +1,6 @@
 <template>
   <div class="tagging-workspace">
-    <n-page-header title="标注工作台" subtitle="按照片内容完成题材、楼宇和明显可见标签">
+    <n-page-header title="标注工作台" subtitle="完成来源、校区、题材和明显可见内容标签">
       <template #extra>
         <n-space align="center">
           <n-tag v-if="draftState" size="small" :type="draftState === '已保存' ? 'success' : 'warning'">
@@ -108,10 +108,58 @@
           <n-space vertical size="large">
             <section class="question-section">
               <div class="section-head">
-                <strong>1. 内容核心</strong>
+                <strong>1. 核心分类</strong>
                 <n-tag size="small" type="error">必填</n-tag>
               </div>
               <n-form label-placement="top">
+                <n-form-item label="专区">
+                  <n-radio-group v-model:value="classificationDraft.gallery_series">
+                    <n-space vertical size="small">
+                      <n-radio
+                        v-for="option in optionsFor('gallery_series')"
+                        :key="option.value"
+                        :value="option.value"
+                      >
+                        {{ option.label }}
+                      </n-radio>
+                    </n-space>
+                  </n-radio-group>
+                </n-form-item>
+                <n-form-item v-if="selectedSeriesName === '昌平校区摄影大赛'" label="届次/年份">
+                  <n-select
+                    v-model:value="classificationDraft.gallery_year"
+                    :options="optionsFor('gallery_year')"
+                    filterable
+                    clearable
+                    placeholder="选择摄影大赛届次"
+                  />
+                </n-form-item>
+                <n-form-item v-if="selectedSeriesName === '投稿作品'" label="投稿来源">
+                  <n-radio-group v-model:value="classificationDraft.source_type">
+                    <n-space>
+                      <n-radio
+                        v-for="option in optionsFor('source_type')"
+                        :key="option.value"
+                        :value="option.value"
+                      >
+                        {{ option.label }}
+                      </n-radio>
+                    </n-space>
+                  </n-radio-group>
+                </n-form-item>
+                <n-form-item label="校区">
+                  <n-radio-group v-model:value="classificationDraft.campus">
+                    <n-space>
+                      <n-radio
+                        v-for="option in optionsFor('campus')"
+                        :key="option.value"
+                        :value="option.value"
+                      >
+                        {{ option.label }}
+                      </n-radio>
+                    </n-space>
+                  </n-radio-group>
+                </n-form-item>
                 <n-form-item label="题材">
                   <n-radio-group v-model:value="classificationDraft.photo_type">
                     <n-space vertical size="small">
@@ -124,15 +172,6 @@
                       </n-radio>
                     </n-space>
                   </n-radio-group>
-                </n-form-item>
-                <n-form-item label="楼宇/建筑">
-                  <n-select
-                    v-model:value="classificationDraft.landmark"
-                    :options="optionsFor('landmark')"
-                    filterable
-                    clearable
-                    placeholder="能判断就选具体建筑，不能判断选其它"
-                  />
                 </n-form-item>
               </n-form>
               <n-alert v-if="validationMessage" type="warning" :show-icon="false">
@@ -164,8 +203,8 @@
                 <strong>3. 细分标签</strong>
                 <n-tag size="small">只选明显可见项</n-tag>
               </div>
-              <n-input v-model:value="fineSearch" clearable placeholder="搜索设施、景观、动植物等" />
-              <n-collapse :default-expanded-names="['facility', 'landscape']">
+              <n-input v-model:value="fineSearch" clearable placeholder="搜索楼宇、设施、景观、动植物等" />
+              <n-collapse :default-expanded-names="['building', 'facility', 'landscape']">
                 <n-collapse-item
                   v-for="facet in visibleFineFacets"
                   :key="facet.key"
@@ -178,6 +217,7 @@
                         v-for="option in filteredOptionsFor(facet.key)"
                         :key="option.value"
                         :value="option.value"
+                        :disabled="option.disabled"
                       >
                         {{ option.label }}
                       </n-checkbox>
@@ -217,18 +257,15 @@
                 <n-tag size="small">不强制</n-tag>
               </div>
               <div class="reference-grid">
-                <span>专区</span><b>{{ referenceValue('gallery_series') }}</b>
-                <span>届次</span><b>{{ referenceValue('gallery_year') }}</b>
                 <span>奖项</span><b>{{ referenceValue('award_level') }}</b>
-                <span>来源</span><b>{{ referenceValue('source_type') }}</b>
-                <span>校区</span><b>{{ referenceValue('campus') }}</b>
+                <span>原楼宇</span><b>{{ referenceValue('landmark') }}</b>
               </div>
             </section>
 
             <section class="question-section">
               <div class="section-head">
                 <strong>自由标签</strong>
-                <n-tag size="small">辅助可选</n-tag>
+                <n-tag size="small">补充说明</n-tag>
               </div>
               <n-dynamic-tags v-model:value="tagDraft" />
               <n-input
@@ -284,10 +321,10 @@ import {
 } from '../api/taggingTasks'
 import { getPhotoUrl } from '../utils/format'
 
-type SelectOption = { label: string; value: number; searchText: string }
+type SelectOption = { label: string; value: number; searchText: string; disabled?: boolean }
 
-const FINE_FACETS = ['facility', 'landscape', 'natural_phenomenon', 'technique', 'animal', 'plant']
-const REFERENCE_FACETS = ['gallery_series', 'gallery_year', 'award_level', 'source_type', 'campus']
+const FINE_FACETS = ['building', 'facility', 'landscape', 'natural_phenomenon', 'technique', 'animal', 'plant']
+const REFERENCE_FACETS = ['award_level']
 
 const message = useMessage()
 const loading = ref(false)
@@ -337,10 +374,15 @@ const canSubmit = computed(() =>
 )
 
 const validationMessage = computed(() => {
+  if (!classificationDraft.gallery_series) return '请选择专区'
+  if (selectedSeriesName.value === '昌平校区摄影大赛' && !classificationDraft.gallery_year) return '请选择摄影大赛届次'
+  if (selectedSeriesName.value === '投稿作品' && !classificationDraft.source_type) return '请选择投稿来源'
+  if (!classificationDraft.campus) return '请选择校区'
   if (!classificationDraft.photo_type) return '请选择题材'
-  if (!classificationDraft.landmark) return '请选择楼宇/建筑；无法具体判断时请选择“其它”'
   return ''
 })
+
+const selectedSeriesName = computed(() => optionLabel('gallery_series', classificationDraft.gallery_series))
 
 const isDocumentary = computed(() => optionLabel('photo_type', classificationDraft.photo_type) === '人文纪实')
 
@@ -473,8 +515,9 @@ function flattenOptions(nodes: TaxonomyNode[], prefix = ''): SelectOption[] {
   return nodes.flatMap((node) => {
     const label = prefix ? `${prefix} / ${node.name}` : node.name
     const aliases = (node.aliases || []).map((alias) => alias.alias).join(' ')
+    const hasChildren = (node.children || []).length > 0
     return [
-      { label, value: node.id, searchText: `${label} ${aliases}`.toLowerCase() },
+      { label, value: node.id, searchText: `${label} ${aliases}`.toLowerCase(), disabled: hasChildren },
       ...flattenOptions(node.children || [], label),
     ]
   })

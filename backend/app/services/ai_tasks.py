@@ -182,6 +182,15 @@ async def apply_ai_analysis_task(
     for facet_key, raw_value in classifications.items():
         if not raw_value:
             continue
+        if facet_key == "landmark":
+            for candidate_facet in ("building", "landscape"):
+                node = await resolve_taxonomy_node(db, candidate_facet, str(raw_value))
+                if node is not None:
+                    await set_photo_classification(db, photo, candidate_facet, node)
+                    break
+            else:
+                unresolved[facet_key] = str(raw_value)
+            continue
         node = await resolve_taxonomy_node(db, facet_key, str(raw_value))
         if node is None:
             unresolved[facet_key] = str(raw_value)

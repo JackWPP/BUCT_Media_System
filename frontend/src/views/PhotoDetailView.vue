@@ -169,7 +169,7 @@
                   <span class="meta-value">{{ photoLocation }}</span>
                 </div>
                 <div v-if="photoBuilding" class="meta-item">
-                  <span class="meta-label">楼宇/建筑</span>
+                  <span class="meta-label">楼宇</span>
                   <span class="meta-value">{{ photoBuilding }}</span>
                 </div>
                 <div class="meta-item">

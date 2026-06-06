@@ -462,10 +462,11 @@ function facetOptions(key: string): SelectOption[] {
   const facet = facetMap.value[key]
   if (facet && facet.nodes && facet.nodes.length > 0) {
     const flatten = (nodes: TaxonomyFacet['nodes']): SelectOption[] =>
-      nodes.flatMap((node) => [
-        { label: node.name, value: node.name },
-        ...flatten(node.children || []),
-      ])
+      nodes.flatMap((node) => {
+        const children = flatten(node.children || [])
+        if (children.length) return children
+        return [{ label: node.name, value: node.name }]
+      })
     return flatten(facet.nodes)
   }
 
@@ -588,7 +589,7 @@ const handleSearch = useDebounceFn(async (value: string) => {
       for (const [facetKey, nodeValue] of Object.entries(result.facet_filters)) {
         if (facetKey === 'season') filters.season = nodeValue
         else if (facetKey === 'campus') filters.campus = nodeValue
-        else if (facetKey === 'landmark') filters.building = nodeValue
+        else if (facetKey === 'building' || facetKey === 'landmark') filters.building = nodeValue
         else if (facetKey === 'gallery_series') filters.gallery_series = nodeValue
         else if (facetKey === 'gallery_year') filters.gallery_year = nodeValue
         else if (facetKey === 'photo_type') filters.photo_type = nodeValue
@@ -634,7 +635,7 @@ async function handleRemoveFacet(facetKey: string) {
   for (const [key, value] of Object.entries(newFilters)) {
     if (key === 'season') filters.season = value
     else if (key === 'campus') filters.campus = value
-    else if (key === 'landmark') filters.building = value
+    else if (key === 'building' || key === 'landmark') filters.building = value
     else if (key === 'gallery_series') filters.gallery_series = value
     else if (key === 'gallery_year') filters.gallery_year = value
     else if (key === 'photo_type') filters.photo_type = value

@@ -377,8 +377,8 @@ const classificationSuggestions = computed(() => {
   const labelMap: Record<string, string> = {
     season: '季节',
     campus: '校区',
-    building: '楼宇/建筑',
-    landmark: '楼宇/建筑',
+    building: '楼宇',
+    landmark: '楼宇',
     gallery_series: '专区',
     gallery_year: '届次/年份',
     source_type: '来源',

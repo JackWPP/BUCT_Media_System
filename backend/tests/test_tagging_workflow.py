@@ -121,6 +121,17 @@ def test_taxonomy_seed_and_public_guide(tagging_client):
     assert facet_names["gallery_series"] == "专区"
     assert facet_names["award_level"] == "奖项"
     assert facet_names["documentary_topic"] == "纪实主题"
+    assert facet_names["building"] == "楼宇"
+    assert "landmark" not in facet_names
+    building_nodes = {
+        node["name"]
+        for facet in taxonomy.json() if facet["key"] == "building"
+        for node in flatten_nodes(facet["nodes"])
+    }
+    assert "昌平校区楼宇" in building_nodes
+    assert "图书馆" in building_nodes
+    assert "昌平校区" not in building_nodes
+    assert "其它" not in building_nodes
     assert guide.status_code == 200
     assert guide.json()["dependencies"]["photo_type"]["人文纪实"] == ["documentary_topic"]
 
@@ -248,7 +259,11 @@ def test_tagger_can_submit_and_admin_approval_writes_photo_data(tagging_client):
 
     taxonomy = client.get("/api/v1/taxonomy/public").json()
     type_node = find_taxonomy_node(taxonomy, "photo_type", "校园风光")
-    landmark_node = find_taxonomy_node(taxonomy, "landmark", "图书馆")
+    series_node = find_taxonomy_node(taxonomy, "gallery_series", "投稿作品")
+    source_node = find_taxonomy_node(taxonomy, "source_type", "学生投稿")
+    campus_node = find_taxonomy_node(taxonomy, "campus", "昌平校区")
+    building_node = find_taxonomy_node(taxonomy, "building", "图书馆")
+    building_group_node = find_taxonomy_node(taxonomy, "building", "昌平校区楼宇")
     phenomenon_nodes = [
         node
         for facet in taxonomy if facet["key"] == "natural_phenomenon"
@@ -284,7 +299,24 @@ def test_tagger_can_submit_and_admin_approval_writes_photo_data(tagging_client):
         },
     )
     assert invalid_response.status_code == 400
-    assert "楼宇/建筑" in invalid_response.json()["detail"]
+    assert "专区" in invalid_response.json()["detail"]
+
+    invalid_group_response = client.post(
+        f"/api/v1/tagging-tasks/items/{item_id}/submit",
+        headers=headers(tokens["tagger"]),
+        json={
+            "tags": [],
+            "classifications": {
+                "gallery_series": series_node["id"],
+                "source_type": source_node["id"],
+                "campus": campus_node["id"],
+                "photo_type": type_node["id"],
+                "building": [building_group_node["id"]],
+            },
+        },
+    )
+    assert invalid_group_response.status_code == 400
+    assert "group nodes" in invalid_group_response.json()["detail"]
 
     submit_response = client.post(
         f"/api/v1/tagging-tasks/items/{item_id}/submit",
@@ -292,8 +324,11 @@ def test_tagger_can_submit_and_admin_approval_writes_photo_data(tagging_client):
         json={
             "tags": [" 图书馆 ", "Library"],
             "classifications": {
+                "gallery_series": series_node["id"],
+                "source_type": source_node["id"],
+                "campus": campus_node["id"],
                 "photo_type": type_node["id"],
-                "landmark": landmark_node["id"],
+                "building": [building_node["id"]],
                 "natural_phenomenon": [node["id"] for node in phenomenon_nodes],
             },
             "note": "已调整",
@@ -316,9 +351,13 @@ def test_tagger_can_submit_and_admin_approval_writes_photo_data(tagging_client):
             classifications = (await session.execute(select(PhotoClassification))).scalars().all()
             assert "图书馆" in tags
             assert "library" in tags
-            assert len(classifications) == 4
+            assert len(classifications) == 7
 
     asyncio.run(assert_written())
+
+    filtered = client.get("/api/v1/photos/public?building=图书馆")
+    assert filtered.status_code == 200
+    assert filtered.json()["total"] == 1
 
 
 def test_batch_review_only_processes_submitted_items_and_updates_stats(tagging_client):
@@ -338,7 +377,9 @@ def test_batch_review_only_processes_submitted_items_and_updates_stats(tagging_c
 
     taxonomy = client.get("/api/v1/taxonomy/public").json()
     type_node = find_taxonomy_node(taxonomy, "photo_type", "人文纪实")
-    landmark_node = find_taxonomy_node(taxonomy, "landmark", "其它")
+    series_node = find_taxonomy_node(taxonomy, "gallery_series", "投稿作品")
+    source_node = find_taxonomy_node(taxonomy, "source_type", "学生投稿")
+    campus_node = find_taxonomy_node(taxonomy, "campus", "昌平校区")
 
     submitted = client.post(
         f"/api/v1/tagging-tasks/items/{item_id}/submit",
@@ -346,8 +387,10 @@ def test_batch_review_only_processes_submitted_items_and_updates_stats(tagging_c
         json={
             "tags": [],
             "classifications": {
+                "gallery_series": series_node["id"],
+                "source_type": source_node["id"],
+                "campus": campus_node["id"],
                 "photo_type": type_node["id"],
-                "landmark": landmark_node["id"],
             },
         },
     )

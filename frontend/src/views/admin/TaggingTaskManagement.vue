@@ -14,7 +14,7 @@
           <div class="task-header">
             <div>
               <strong>{{ task.title }}</strong>
-              <p>{{ task.description || '完整标签体系任务：题材、楼宇/建筑和明显可见细分标签' }}</p>
+              <p>{{ task.description || '完整标签体系任务：来源、校区、题材和明显可见细分标签' }}</p>
             </div>
             <n-space>
               <n-tag>{{ assigneeLabel(task.assignee_id) }}</n-tag>
@@ -95,7 +95,7 @@
     <n-modal v-model:show="showCreate" preset="card" title="批量新建标注任务" class="create-modal">
       <n-space vertical size="large">
         <n-alert type="info" :show-icon="false">
-          新任务默认覆盖完整标签体系，标注同学主要判断题材、楼宇/建筑和明显可见的内容标签。
+          新任务默认覆盖完整标签体系，标注同学主要确认来源、校区、题材，并补充明显可见的内容标签。
         </n-alert>
         <n-form :model="form" label-placement="left" label-width="90">
           <n-form-item label="任务名称">

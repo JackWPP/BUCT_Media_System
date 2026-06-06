@@ -23,7 +23,7 @@ DEFAULT_RESULT = {
     "classifications": {
         "season": None,
         "campus": None,
-        "landmark": None,
+        "building": None,
         "gallery_series": None,
         "gallery_year": None,
         "award_level": None,

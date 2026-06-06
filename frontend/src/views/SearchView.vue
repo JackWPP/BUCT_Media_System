@@ -83,7 +83,9 @@
             <n-text depth="3" style="font-size: 12px;">
               <span v-if="taxonomyValueName(result.classifications.season)">{{ taxonomyValueName(result.classifications.season) }}</span>
               <span v-if="taxonomyValueName(result.classifications.campus)"> · {{ taxonomyValueName(result.classifications.campus) }}</span>
-              <span v-if="taxonomyValueName(result.classifications.landmark)"> · {{ taxonomyValueName(result.classifications.landmark) }}</span>
+              <span v-if="taxonomyValueName(result.classifications.building) || taxonomyValueName(result.classifications.landmark)">
+                · {{ taxonomyValueName(result.classifications.building) || taxonomyValueName(result.classifications.landmark) }}
+              </span>
             </n-text>
           </div>
         </div>

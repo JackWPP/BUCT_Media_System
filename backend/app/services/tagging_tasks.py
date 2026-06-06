@@ -274,6 +274,22 @@ def _has_classification(payload: dict[str, object], facet_key: str) -> bool:
     return False
 
 
+def _single_node_name(payload: dict[str, object], facet_key: str) -> str | None:
+    value = payload.get(facet_key)
+    if isinstance(value, dict) and value.get("node_name"):
+        return str(value["node_name"])
+    return None
+
+
+async def _node_has_active_children(db: AsyncSession, node: TaxonomyNode) -> bool:
+    result = await db.execute(
+        select(TaxonomyNode.id)
+        .where(TaxonomyNode.parent_id == node.id, TaxonomyNode.is_active.is_(True))
+        .limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
 async def _serialize_submission_classifications(
     db: AsyncSession,
     classifications: dict[str, int | list[int]],
@@ -291,6 +307,8 @@ async def _serialize_submission_classifications(
                 raise ValueError(f"Unknown node id: {node_id}")
             if node.facet_id != facet.id:
                 raise ValueError(f"Node {node_id} does not belong to facet: {facet_key}")
+            if await _node_has_active_children(db, node):
+                raise ValueError(f"Taxonomy group nodes cannot be submitted: {node.name}")
             nodes_payload.append({"node_id": node.id, "node_name": node.name})
         if isinstance(value, list):
             submitted_classifications[facet_key] = {
@@ -333,10 +351,21 @@ async def submit_item(
         raise ValueError("Photo not found")
 
     submitted_classifications = await _serialize_submission_classifications(db, classifications)
+    if not _has_classification(submitted_classifications, "gallery_series"):
+        raise ValueError("专区为必填项")
+    gallery_series = _single_node_name(submitted_classifications, "gallery_series")
+    if gallery_series == "昌平校区摄影大赛":
+        if not _has_classification(submitted_classifications, "gallery_year"):
+            raise ValueError("摄影大赛作品必须选择届次/年份")
+    elif gallery_series == "投稿作品":
+        if not _has_classification(submitted_classifications, "source_type"):
+            raise ValueError("投稿作品必须选择教职工投稿或学生投稿")
+    else:
+        raise ValueError("专区必须为昌平校区摄影大赛或投稿作品")
+    if not _has_classification(submitted_classifications, "campus"):
+        raise ValueError("校区为必填项")
     if not _has_classification(submitted_classifications, "photo_type"):
         raise ValueError("题材为必填项")
-    if not _has_classification(submitted_classifications, "landmark"):
-        raise ValueError("楼宇/建筑为必填项，无法具体判断时请选择“其它”")
 
     item.original_tags = [tag.name for tag in await photo_crud.get_photo_tags(db, photo.id)]
     item.original_classifications = serialize_classifications(photo)

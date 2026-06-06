@@ -87,11 +87,11 @@ const displayTags = computed<DisplayTag[]>(() => {
     const facetNameMap: Record<string, string> = {
       season: '季节',
       campus: '校区',
-      landmark: '楼宇/建筑',
+      landmark: '楼宇',
       gallery_series: '专区',
       gallery_year: '届次/年份',
       photo_type: '题材',
-      building: '楼宇/建筑',
+      building: '楼宇',
       source_type: '来源',
       facility: '设施',
       landscape: '景观',

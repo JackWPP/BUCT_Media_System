@@ -385,7 +385,7 @@ const sortOptions = [
 const facetLabelMap: Record<string, string> = {
   season: '季节',
   campus: '校区',
-  building: '楼宇/景观',
+  building: '楼宇',
   gallery_series: '专区',
   gallery_year: '年份',
   award_level: '奖项',
@@ -418,7 +418,7 @@ const dependentFacetKeys = computed(() => {
     const selected = photoStore.filters[parentKey as keyof PhotoFilters]
     if (!selected) return
     const children = byValue[selected as string] || []
-    children.forEach((key) => keys.push(key === 'landmark' ? 'building' : key))
+    children.forEach((key) => keys.push(key))
   })
   return keys
 })
@@ -487,14 +487,15 @@ function facetOptions(key: string): SelectOption[] {
   let options: SelectOption[] = []
 
   // 优先从 taxonomy API 动态获取
-  const taxonomyKey = key === 'building' ? 'landmark' : key
+  const taxonomyKey = key
   const facet = facetMap.value[taxonomyKey]
   if (facet && facet.nodes && facet.nodes.length > 0) {
     const flatten = (nodes: TaxonomyFacet['nodes']): SelectOption[] =>
-      nodes.flatMap((node) => [
-        { label: node.name, value: node.name },
-        ...flatten(node.children || []),
-      ])
+      nodes.flatMap((node) => {
+        const children = flatten(node.children || [])
+        if (children.length) return children
+        return [{ label: node.name, value: node.name }]
+      })
     options = flatten(facet.nodes)
   } else {
     // 降级：taxonomy 未返回时，使用与后端一致的硬编码选项
@@ -508,7 +509,9 @@ function facetOptions(key: string): SelectOption[] {
     }
     if (key === 'campus') {
       options = [
+        { label: '朝阳校区', value: '朝阳校区' },
         { label: '昌平校区', value: '昌平校区' },
+        { label: '海淀校区', value: '海淀校区' },
       ]
     }
     if (key === 'photo_type') {
@@ -771,7 +774,7 @@ function applyInterpretation(interpretation: SearchInterpretationType) {
     for (const [facetKey, nodeValue] of Object.entries(interpretation.facet_filters)) {
       if (facetKey === 'season') filters.season = nodeValue
       else if (facetKey === 'campus') filters.campus = nodeValue
-      else if (facetKey === 'landmark') filters.building = nodeValue
+      else if (facetKey === 'building' || facetKey === 'landmark') filters.building = nodeValue
       else if (facetKey === 'gallery_series') filters.gallery_series = nodeValue
       else if (facetKey === 'gallery_year') filters.gallery_year = nodeValue
       else if (facetKey === 'award_level') filters.award_level = nodeValue
@@ -832,7 +835,7 @@ async function handleRemoveFacet(facetKey: string) {
   for (const [key, value] of Object.entries(newFilters)) {
     if (key === 'season') filters.season = value
     else if (key === 'campus') filters.campus = value
-    else if (key === 'landmark') filters.building = value
+    else if (key === 'building' || key === 'landmark') filters.building = value
     else if (key === 'gallery_series') filters.gallery_series = value
     else if (key === 'gallery_year') filters.gallery_year = value
     else if (key === 'award_level') filters.award_level = value

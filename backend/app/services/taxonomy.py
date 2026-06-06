@@ -41,6 +41,13 @@ CHANGPING_BUILDINGS = [
     "杏坛苑/青教公寓", "杏坛苑/短租公寓",
 ]
 
+CHAOYANG_BUILDINGS = [
+    "教学楼（朝阳校区）", "行政楼", "高精尖大厦", "科技大厦", "逸夫图书馆",
+    "会议中心", "科学会堂", "母校之光", "运动场（朝阳校区）",
+]
+
+HAIDIAN_BUILDINGS = ["教学楼（海淀校区）", "军乐厅", "荣茂图书馆"]
+
 DEFAULT_TAXONOMY = [
     {
         "key": "season",
@@ -68,22 +75,25 @@ DEFAULT_TAXONOMY = [
         },
     },
     {
-        "key": "landmark",
-        "name": "楼宇/建筑",
+        "key": "building",
+        "name": "楼宇",
+        "selection_mode": "multiple",
         "is_system": True,
         "sort_order": 30,
-        "nodes": ["朝阳校区", {"name": "昌平校区", "children": CHANGPING_BUILDINGS}, "海淀校区", "其它"],
+        "nodes": [
+            {"name": "朝阳校区楼宇", "children": CHAOYANG_BUILDINGS},
+            {"name": "昌平校区楼宇", "children": CHANGPING_BUILDINGS},
+            {"name": "海淀校区楼宇", "children": HAIDIAN_BUILDINGS},
+        ],
         "aliases": {
             "图书馆": ["北化图书馆", "新图书馆"],
             "大学生活动中心": ["学生活动中心", "活动中心", "学生中心"],
-            "柳湖": ["湖", "校园湖", "学校湖"],
             "第一教学楼": ["一教"],
             "第二教学楼": ["二教"],
             "实验楼": ["实验中心", "综合实验楼"],
             "体育馆": ["体育中心", "室内体育馆"],
             "运动场": ["操场", "体育场"],
             "学生公寓": ["宿舍", "学生宿舍", "樱花苑学生公寓", "樱花苑", "樱花苑公寓"],
-            "其它": ["其他", "三教", "第三教学楼", "行政楼", "主楼", "科技大厦", "樱花大道", "校门", "主楼广场"],
         },
     },
     {
@@ -232,19 +242,17 @@ DEFAULT_TAXONOMY = [
 ]
 
 LEGACY_NODE_MERGES = {
-    "landmark": {
+    "building": {
         "一教": "第一教学楼",
         "二教": "第二教学楼",
-        "三教": "其它",
-        "行政楼": "其它",
-        "主楼": "其它",
-        "科技大厦": "其它",
+        "三教": None,
+        "主楼": None,
         "樱花苑学生公寓": "学生公寓",
         "学生活动中心": "大学生活动中心",
-        "樱花大道": "其它",
+        "樱花大道": None,
         "操场": "运动场",
-        "校门": "其它",
-        "主楼广场": "其它",
+        "校门": None,
+        "主楼广场": None,
     },
     "gallery_series": {
         "摄影大赛": "昌平校区摄影大赛",
@@ -283,7 +291,11 @@ LEGACY_NODE_MERGES = {
 TAXONOMY_GUIDE = {
     "primary": ["gallery_series", "campus", "photo_type"],
     "dependencies": {
-        "campus": {"昌平校区": ["landmark", "facility", "landscape"]},
+        "campus": {
+            "朝阳校区": ["building", "facility", "landscape"],
+            "昌平校区": ["building", "facility", "landscape"],
+            "海淀校区": ["building", "facility", "landscape"],
+        },
         "gallery_series": {
             "昌平校区摄影大赛": ["gallery_year", "award_level"],
             "投稿作品": ["source_type"],
@@ -294,7 +306,7 @@ TAXONOMY_GUIDE = {
             "自然生态": ["season", "natural_phenomenon", "animal", "plant"],
         },
     },
-    "legacy_query_aliases": {"building": "landmark"},
+    "legacy_query_aliases": {"landmark": "building"},
 }
 
 

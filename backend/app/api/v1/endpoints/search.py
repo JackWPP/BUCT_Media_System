@@ -50,7 +50,7 @@ async def search_photos(
     season: Optional[str] = Query(None, description="季节 filter (e.g. 秋季)"),
     campus: Optional[str] = Query(None, description="校区 filter (e.g. 昌平校区)"),
     category: Optional[str] = Query(None, description="Category filter (e.g. landscape)"),
-    landmark: Optional[str] = Query(None, description="地标 filter"),
+    landmark: Optional[str] = Query(None, description="Legacy 楼宇/地标 filter"),
     building: Optional[str] = Query(None, description="楼宇/建筑 filter"),
     gallery_series: Optional[str] = Query(None, description="专区 filter"),
     gallery_year: Optional[str] = Query(None, description="届次/年份 filter"),
@@ -69,7 +69,7 @@ async def search_photos(
 
     The search combines:
     - **Vector similarity**: semantic matching of query text against photo embeddings
-    - **Structured filters**: exact matching on season, campus, category, landmark
+    - **Structured filters**: exact matching on season, campus, category, building
 
     Returns approved photos only, sorted by relevance score (descending).
     """
@@ -83,10 +83,10 @@ async def search_photos(
         filters["campus"] = campus
     if category:
         filters["category"] = category
-    if landmark:
-        filters["landmark"] = landmark
+    if landmark and not building:
+        filters["building"] = landmark
     if building:
-        filters["landmark"] = building
+        filters["building"] = building
     for key, value in {
         "gallery_series": gallery_series,
         "gallery_year": gallery_year,

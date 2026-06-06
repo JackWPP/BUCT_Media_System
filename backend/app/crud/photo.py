@@ -179,7 +179,7 @@ async def get_photos(
         interpreted_facet_keys = set(interpretation.facet_filters.keys())
 
     facet_filters = {
-        "landmark": building,
+        "building": building,
         "source_type": source_type,
         "facility": facility,
         "landscape": landscape,
