@@ -9,9 +9,17 @@ SUDO_PASS="mt01@buct"
 
 log() { echo -e "\033[0;32m[DEPLOY]\033[0m $1"; }
 
+pull_latest() {
+    if [ "${SKIP_GIT_PULL:-0}" = "1" ]; then
+        log "Skipping git pull because SKIP_GIT_PULL=1"
+        return
+    fi
+    git pull origin master --ff-only
+}
+
 deploy_backend() {
     log "Pulling latest code..."
-    git pull origin master --ff-only
+    pull_latest
 
     log "Installing Python dependencies..."
     cd "$PROJECT_DIR/backend"
@@ -31,7 +39,7 @@ deploy_backend() {
 
 deploy_frontend() {
     log "Pulling latest code..."
-    git pull origin master --ff-only
+    pull_latest
 
     log "Installing npm dependencies..."
     cd "$PROJECT_DIR/frontend"
