@@ -6,7 +6,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Iterable
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -17,7 +17,14 @@ from app.models.tag import PhotoTag, Tag
 from app.models.taxonomy import PhotoClassification, TaxonomyFacet, TaxonomyNode
 from app.models.tagging_task import TaggingTask, TaggingTaskItem
 from app.models.user import User
-from app.services.taxonomy import get_facet_by_key, get_node_by_id, serialize_classifications, set_photo_classifications
+from app.services.taxonomy import (
+    TAXONOMY_GUIDE,
+    get_facet_by_key,
+    get_node_by_id,
+    serialize_classifications,
+    set_photo_classifications,
+    validate_selectable_node,
+)
 
 
 def _is_reviewer(user: User) -> bool:
@@ -49,6 +56,58 @@ def _item_photo_load():
         selectinload(Photo.tags),
         selectinload(Photo.uploader),
     )
+
+
+def _facet_exists(facet_key: str):
+    return (
+        select(PhotoClassification.photo_id)
+        .join(TaxonomyFacet, TaxonomyFacet.id == PhotoClassification.facet_id)
+        .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
+        .where(
+            PhotoClassification.photo_id == Photo.id,
+            TaxonomyFacet.key == facet_key,
+            TaxonomyFacet.is_active.is_(True),
+            TaxonomyNode.is_active.is_(True),
+            TaxonomyNode.is_selectable.is_(True),
+        )
+        .exists()
+    )
+
+
+def _facet_value_exists(facet_key: str, node_name: str):
+    return (
+        select(PhotoClassification.photo_id)
+        .join(TaxonomyFacet, TaxonomyFacet.id == PhotoClassification.facet_id)
+        .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
+        .where(
+            PhotoClassification.photo_id == Photo.id,
+            TaxonomyFacet.key == facet_key,
+            TaxonomyFacet.is_active.is_(True),
+            TaxonomyNode.is_active.is_(True),
+            TaxonomyNode.is_selectable.is_(True),
+            TaxonomyNode.name == node_name,
+        )
+        .exists()
+    )
+
+
+def _missing_core_filter():
+    core_facets = TAXONOMY_GUIDE.get("primary", ["gallery_series", "campus", "photo_type"])
+    filters = [~_facet_exists(str(facet_key)) for facet_key in core_facets]
+    filters.append(_dependency_missing_filter())
+    return or_(*filters)
+
+
+def _dependency_missing_filter():
+    contest_missing_year = and_(
+        _facet_value_exists("gallery_series", "昌平校区摄影大赛"),
+        ~_facet_exists("gallery_year"),
+    )
+    submission_missing_source = and_(
+        _facet_value_exists("gallery_series", "投稿作品"),
+        ~_facet_exists("source_type"),
+    )
+    return or_(contest_missing_year, submission_missing_source)
 
 
 async def get_task(db: AsyncSession, task_id: str) -> TaggingTask | None:
@@ -125,6 +184,7 @@ def _photo_candidate_query(
     status: str | None = "approved",
     search: str | None = None,
     photo_type: str | None = None,
+    facet_key: str | None = None,
 ):
     query = select(Photo)
     count_query = select(func.count(Photo.id.distinct()))
@@ -137,6 +197,23 @@ def _photo_candidate_query(
         tag_exists = select(PhotoTag.photo_id).where(PhotoTag.photo_id == Photo.id).exists()
         query = query.where(~tag_exists)
         count_query = count_query.where(~tag_exists)
+
+    if selection_mode == "missing_core":
+        missing_core_filter = _missing_core_filter()
+        query = query.where(missing_core_filter)
+        count_query = count_query.where(missing_core_filter)
+
+    if selection_mode == "missing_facet":
+        if not facet_key:
+            raise ValueError("facet_key is required for missing_facet selection")
+        missing_facet_filter = ~_facet_exists(facet_key)
+        query = query.where(missing_facet_filter)
+        count_query = count_query.where(missing_facet_filter)
+
+    if selection_mode == "dependency_missing":
+        dependency_filter = _dependency_missing_filter()
+        query = query.where(dependency_filter)
+        count_query = count_query.where(dependency_filter)
 
     if photo_type:
         legacy_categories = {
@@ -183,10 +260,11 @@ async def list_photo_candidates(
     status: str | None = "approved",
     search: str | None = None,
     photo_type: str | None = None,
+    facet_key: str | None = None,
     skip: int = 0,
     limit: int = 60,
 ) -> tuple[list[Photo], int]:
-    query, count_query = _photo_candidate_query(selection_mode, status, search, photo_type)
+    query, count_query = _photo_candidate_query(selection_mode, status, search, photo_type, facet_key)
     result = await db.execute(
         query.options(
             selectinload(Photo.classifications).selectinload(PhotoClassification.facet),
@@ -209,9 +287,10 @@ async def list_photo_candidate_ids(
     status: str | None,
     search: str | None,
     photo_type: str | None,
+    facet_key: str | None,
     max_photos: int,
 ) -> list[str]:
-    query, _ = _photo_candidate_query(selection_mode, status, search, photo_type)
+    query, _ = _photo_candidate_query(selection_mode, status, search, photo_type, facet_key)
     result = await db.execute(query.with_only_columns(Photo.id).order_by(Photo.created_at.desc()).limit(max_photos))
     return list(result.scalars().all())
 
@@ -281,15 +360,6 @@ def _single_node_name(payload: dict[str, object], facet_key: str) -> str | None:
     return None
 
 
-async def _node_has_active_children(db: AsyncSession, node: TaxonomyNode) -> bool:
-    result = await db.execute(
-        select(TaxonomyNode.id)
-        .where(TaxonomyNode.parent_id == node.id, TaxonomyNode.is_active.is_(True))
-        .limit(1)
-    )
-    return result.scalar_one_or_none() is not None
-
-
 async def _serialize_submission_classifications(
     db: AsyncSession,
     classifications: dict[str, int | list[int]],
@@ -307,8 +377,7 @@ async def _serialize_submission_classifications(
                 raise ValueError(f"Unknown node id: {node_id}")
             if node.facet_id != facet.id:
                 raise ValueError(f"Node {node_id} does not belong to facet: {facet_key}")
-            if await _node_has_active_children(db, node):
-                raise ValueError(f"Taxonomy group nodes cannot be submitted: {node.name}")
+            validate_selectable_node(node, facet_key)
             nodes_payload.append({"node_id": node.id, "node_name": node.name})
         if isinstance(value, list):
             submitted_classifications[facet_key] = {

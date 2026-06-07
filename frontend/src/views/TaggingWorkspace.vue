@@ -119,6 +119,7 @@
                         v-for="option in optionsFor('gallery_series')"
                         :key="option.value"
                         :value="option.value"
+                        :disabled="option.disabled"
                       >
                         {{ option.label }}
                       </n-radio>
@@ -141,6 +142,7 @@
                         v-for="option in optionsFor('source_type')"
                         :key="option.value"
                         :value="option.value"
+                        :disabled="option.disabled"
                       >
                         {{ option.label }}
                       </n-radio>
@@ -154,6 +156,7 @@
                         v-for="option in optionsFor('campus')"
                         :key="option.value"
                         :value="option.value"
+                        :disabled="option.disabled"
                       >
                         {{ option.label }}
                       </n-radio>
@@ -167,6 +170,7 @@
                         v-for="option in optionsFor('photo_type')"
                         :key="option.value"
                         :value="option.value"
+                        :disabled="option.disabled"
                       >
                         {{ option.label }}
                       </n-radio>
@@ -320,8 +324,15 @@ import {
   type TaggingTaskItem,
 } from '../api/taggingTasks'
 import { getPhotoUrl } from '../utils/format'
+import {
+  findTaxonomyNode,
+  flattenTaxonomyOptions,
+  isNodeSelectable,
+  sanitizeTaxonomySelection,
+  type TaxonomyOption,
+} from '../utils/taxonomy'
 
-type SelectOption = { label: string; value: number; searchText: string; disabled?: boolean }
+type SelectOption = TaxonomyOption<number>
 
 const FINE_FACETS = ['building', 'facility', 'landscape', 'natural_phenomenon', 'technique', 'animal', 'plant']
 const REFERENCE_FACETS = ['award_level']
@@ -488,8 +499,16 @@ function hydrateDraft() {
     if (!facet || !value) return
     if (facet.selection_mode === 'multiple') {
       multiClassificationDraft[facetKey] = extractNodeIds(value)
+        .filter((nodeId) => {
+          const node = findTaxonomyNode(facet, nodeId)
+          return node ? isNodeSelectable(node) : false
+        })
     } else {
-      classificationDraft[facetKey] = extractNodeIds(value)[0] || null
+      const nodeId = extractNodeIds(value).find((item) => {
+        const node = findTaxonomyNode(facet, item)
+        return node ? isNodeSelectable(node) : false
+      })
+      classificationDraft[facetKey] = nodeId || null
     }
   })
   note.value = item?.submitter_note || item?.draft_note || ''
@@ -512,15 +531,8 @@ function filteredOptionsFor(facetKey: string): SelectOption[] {
 }
 
 function flattenOptions(nodes: TaxonomyNode[], prefix = ''): SelectOption[] {
-  return nodes.flatMap((node) => {
-    const label = prefix ? `${prefix} / ${node.name}` : node.name
-    const aliases = (node.aliases || []).map((alias) => alias.alias).join(' ')
-    const hasChildren = (node.children || []).length > 0
-    return [
-      { label, value: node.id, searchText: `${label} ${aliases}`.toLowerCase(), disabled: hasChildren },
-      ...flattenOptions(node.children || [], label),
-    ]
-  })
+  const parentPath = prefix ? prefix.split(' / ') : []
+  return flattenTaxonomyOptions(nodes, (node) => node.id, parentPath)
 }
 
 function extractNodeIds(value: any): number[] {
@@ -552,7 +564,7 @@ function buildClassifications() {
   Object.entries(multiClassificationDraft).forEach(([key, values]) => {
     if (values.length) classifications[key] = values
   })
-  return classifications
+  return sanitizeTaxonomySelection(taxonomyFacets.value, classifications)
 }
 
 function scheduleDraftSave() {

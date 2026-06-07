@@ -21,6 +21,7 @@ export const useUploadStore = defineStore('upload', () => {
         season: null as string | null,
         category: null as string | null,
         campus: null as string | null,
+        classifications: {} as Record<string, number | number[]>,
         description: null as string | null,
     })
 
@@ -71,6 +72,7 @@ export const useUploadStore = defineStore('upload', () => {
             season: null,
             category: null,
             campus: null,
+            classifications: {},
             description: null,
         }
         uploading.value = false
@@ -107,6 +109,9 @@ export const useUploadStore = defineStore('upload', () => {
             if (metadata.value.season) metadataToSend.season = metadata.value.season
             if (metadata.value.category) metadataToSend.category = metadata.value.category
             if (metadata.value.campus) metadataToSend.campus = metadata.value.campus
+            if (Object.keys(metadata.value.classifications).length) {
+                metadataToSend.classifications = metadata.value.classifications
+            }
             if (metadata.value.description) metadataToSend.description = metadata.value.description
 
             // Pass progress callback

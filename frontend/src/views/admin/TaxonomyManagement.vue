@@ -109,6 +109,9 @@
         <n-form-item label="别名">
           <n-dynamic-tags v-model:value="nodeForm.aliases" />
         </n-form-item>
+        <n-form-item label="可提交">
+          <n-switch v-model:value="nodeForm.is_selectable" />
+        </n-form-item>
       </n-form>
     </n-modal>
   </div>
@@ -145,6 +148,7 @@ const facetForm = reactive({
 const nodeForm = reactive({
   key: '',
   name: '',
+  is_selectable: true,
   aliases: [] as string[],
 })
 
@@ -214,6 +218,14 @@ function columnsForFacet(facet: TaxonomyFacet): DataTableColumns<TaxonomyNode & 
       },
     },
     {
+      title: '可提交',
+      key: 'is_selectable',
+      width: 100,
+      render(row) {
+        return h(NTag, { type: row.is_selectable === false ? 'default' : 'success', size: 'small' }, { default: () => (row.is_selectable === false ? '分组' : '可选') })
+      },
+    },
+    {
       title: '操作',
       key: 'actions',
       width: 120,
@@ -245,6 +257,7 @@ function openNodeModal(facet: TaxonomyFacet) {
   selectedFacet.value = facet
   nodeForm.key = ''
   nodeForm.name = ''
+  nodeForm.is_selectable = true
   nodeForm.aliases = []
   showNodeModal.value = true
 }
@@ -275,6 +288,7 @@ async function handleCreateNode() {
     await createTaxonomyNode(selectedFacet.value.id, {
       key: nodeForm.key,
       name: nodeForm.name,
+      is_selectable: nodeForm.is_selectable,
       aliases: nodeForm.aliases,
     })
     message.success('节点已创建')

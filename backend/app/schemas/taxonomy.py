@@ -45,6 +45,7 @@ class TaxonomyNodeBase(BaseModel):
     parent_id: Optional[int] = None
     sort_order: int = 0
     is_active: bool = True
+    is_selectable: bool = True
     aliases: list[str] = Field(default_factory=list)
 
 
@@ -59,6 +60,7 @@ class TaxonomyNodeUpdate(BaseModel):
     parent_id: Optional[int] = None
     sort_order: Optional[int] = None
     is_active: Optional[bool] = None
+    is_selectable: Optional[bool] = None
     aliases: Optional[list[str]] = None
 
     model_config = ConfigDict(extra="forbid")
@@ -73,6 +75,7 @@ class TaxonomyNodeResponse(BaseModel):
     description: Optional[str]
     sort_order: int
     is_active: bool
+    is_selectable: bool
     created_at: datetime
     updated_at: datetime
     aliases: list[TaxonomyAliasResponse] = Field(default_factory=list)

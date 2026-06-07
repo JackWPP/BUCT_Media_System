@@ -17,6 +17,7 @@ from app.services.storage import ensure_upload_dirs
 from app.services.image_processing import process_uploaded_image
 from app.crud import photo as photo_crud
 from app.crud import tag as tag_crud
+from app.services.taxonomy import ensure_default_taxonomy, resolve_legacy_photo_classifications, set_photo_classifications
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,7 @@ async def import_photos(
     
     # 确保上传目录存在
     originals_dir, thumbnails_dir = ensure_upload_dirs()
+    await ensure_default_taxonomy(db)
     
     # 处理每条照片数据
     for photo_data in photos_data:
@@ -158,11 +160,21 @@ async def import_photos(
                 'description': photo_data.get('description'),
                 'season': season,
                 'category': category,
+                'campus': photo_data.get('campus'),
                 'status': 'pending',  # 导入的照片默认待审核
                 'processing_status': 'manual'  # 已经打过标,不需要 AI 处理
             }
             
             photo = await photo_crud.create_photo(db, new_photo_data, str(current_user.id))
+            taxonomy_updates = await resolve_legacy_photo_classifications(
+                db,
+                season=season,
+                category=category,
+                campus=photo_data.get("campus"),
+            )
+            if taxonomy_updates:
+                await set_photo_classifications(db, photo, taxonomy_updates)
+                await db.commit()
             
             # 处理标签
             if keywords:

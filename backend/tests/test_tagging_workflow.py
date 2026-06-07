@@ -132,6 +132,8 @@ def test_taxonomy_seed_and_public_guide(tagging_client):
     assert "图书馆" in building_nodes
     assert "昌平校区" not in building_nodes
     assert "其它" not in building_nodes
+    assert find_taxonomy_node(taxonomy.json(), "building", "昌平校区楼宇")["is_selectable"] is False
+    assert find_taxonomy_node(taxonomy.json(), "building", "图书馆")["is_selectable"] is True
     assert guide.status_code == 200
     assert guide.json()["dependencies"]["photo_type"]["人文纪实"] == ["documentary_topic"]
 

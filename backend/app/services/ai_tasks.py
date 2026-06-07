@@ -186,8 +186,11 @@ async def apply_ai_analysis_task(
             for candidate_facet in ("building", "landscape"):
                 node = await resolve_taxonomy_node(db, candidate_facet, str(raw_value))
                 if node is not None:
-                    await set_photo_classification(db, photo, candidate_facet, node)
-                    break
+                    try:
+                        await set_photo_classification(db, photo, candidate_facet, node)
+                        break
+                    except ValueError:
+                        continue
             else:
                 unresolved[facet_key] = str(raw_value)
             continue
@@ -195,7 +198,10 @@ async def apply_ai_analysis_task(
         if node is None:
             unresolved[facet_key] = str(raw_value)
             continue
-        await set_photo_classification(db, photo, facet_key, node)
+        try:
+            await set_photo_classification(db, photo, facet_key, node)
+        except ValueError:
+            unresolved[facet_key] = str(raw_value)
 
     suggested_tags = (task.result_json or {}).get("free_tags") or []
     existing_tags = [tag.name for tag in await photo_crud.get_photo_tags(db, photo.id)]

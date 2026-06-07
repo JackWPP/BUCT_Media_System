@@ -65,6 +65,7 @@ export function uploadPhoto(
     season?: string
     category?: string
     campus?: string
+    classifications?: Record<string, number | number[]>
   } = {},
   onProgress?: (progressEvent: any) => void,
 ): Promise<PhotoUploadResponse> {
@@ -74,6 +75,9 @@ export function uploadPhoto(
   if (metadata.season) formData.append('season', metadata.season)
   if (metadata.category) formData.append('category', metadata.category)
   if (metadata.campus) formData.append('campus', metadata.campus)
+  if (metadata.classifications && Object.keys(metadata.classifications).length) {
+    formData.append('classifications', JSON.stringify(metadata.classifications))
+  }
 
   return request({
     url: '/api/v1/photos/upload',

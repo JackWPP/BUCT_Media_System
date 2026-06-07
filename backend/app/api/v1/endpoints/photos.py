@@ -1,6 +1,7 @@
 """
 Photo API endpoints.
 """
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -42,7 +43,13 @@ from app.services.runtime_settings import get_runtime_settings
 from app.services.search_interpreter import get_search_interpreter
 from app.services.storage import cleanup_staged_files, get_storage, stage_photo_upload
 from app.services.task_dispatcher import dispatch_ai_analysis_task
-from app.services.taxonomy import ensure_default_taxonomy, serialize_classifications
+from app.services.taxonomy import (
+    delete_photo_classification,
+    ensure_default_taxonomy,
+    resolve_legacy_photo_classifications,
+    serialize_classifications,
+    set_photo_classifications,
+)
 from app.services.audit import log_audit
 from app.services.notification import notify_user as send_notification
 
@@ -126,6 +133,7 @@ async def list_public_photos(
     category: Optional[str] = None,
     campus: Optional[str] = None,
     building: Optional[str] = None,
+    landmark: Optional[str] = None,
     source_type: Optional[str] = None,
     facility: Optional[str] = None,
     landscape: Optional[str] = None,
@@ -188,6 +196,7 @@ async def list_public_photos(
         category=category,
         campus=campus,
         building=building,
+        landmark=landmark,
         source_type=source_type,
         facility=facility,
         landscape=landscape,
@@ -315,16 +324,30 @@ async def upload_photo(
     season: Optional[str] = Form(None),
     category: Optional[str] = Form(None),
     campus: Optional[str] = Form(None),
+    classifications: Optional[str] = Form(None),
     enable_ai: bool = Form(True),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
-    if season and season not in ["Spring", "Summer", "Autumn", "Winter"]:
-        raise HTTPException(status_code=400, detail="Season must be one of: Spring, Summer, Autumn, Winter")
-    if category and category not in ["Landscape", "Portrait", "Activity", "Documentary"]:
-        raise HTTPException(status_code=400, detail="Category must be one of: Landscape, Portrait, Activity, Documentary")
+    if season and season not in ["Spring", "Summer", "Autumn", "Winter", "春季", "夏季", "秋季", "冬季"]:
+        raise HTTPException(status_code=400, detail="Season must be a known legacy or taxonomy season")
+    if category and category not in [
+        "Landscape", "Portrait", "Activity", "Documentary",
+        "风光", "风光类", "校园风光", "纪实", "纪实类", "活动", "人文纪实", "自然生态", "人像",
+    ]:
+        raise HTTPException(status_code=400, detail="Category must be a known legacy category")
+
+    parsed_classifications: dict[str, int | list[int]] = {}
+    if classifications:
+        try:
+            parsed = json.loads(classifications)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail="classifications must be valid JSON") from exc
+        if not isinstance(parsed, dict):
+            raise HTTPException(status_code=400, detail="classifications must be a JSON object")
+        parsed_classifications = parsed
 
     staged_original_path = None
     staged_thumb_path = None
@@ -365,6 +388,19 @@ async def upload_photo(
             str(current_user.id),
         )
         await ensure_default_taxonomy(db)
+        legacy_classifications = await resolve_legacy_photo_classifications(
+            db,
+            season=season,
+            category=category,
+            campus=campus,
+        )
+        taxonomy_updates: dict[str, int | list[int]] = {**legacy_classifications, **parsed_classifications}
+        if taxonomy_updates:
+            try:
+                await set_photo_classifications(db, photo, taxonomy_updates)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            await db.commit()
 
         if enable_ai and runtime_settings.ai_enabled:
             task = await create_ai_analysis_task(
@@ -386,6 +422,9 @@ async def upload_photo(
             status=photo.status,
             message="Photo uploaded successfully",
         )
+    except HTTPException:
+        cleanup_staged_files(staged_original_path, staged_thumb_path)
+        raise
     except Exception as exc:  # noqa: BLE001
         cleanup_staged_files(staged_original_path, staged_thumb_path)
         raise HTTPException(status_code=500, detail=f"Failed to upload photo: {exc}") from exc
@@ -404,6 +443,7 @@ async def list_photos(
     category: Optional[str] = None,
     campus: Optional[str] = None,
     building: Optional[str] = None,
+    landmark: Optional[str] = None,
     source_type: Optional[str] = None,
     facility: Optional[str] = None,
     landscape: Optional[str] = None,
@@ -431,6 +471,7 @@ async def list_photos(
         category=category,
         campus=campus,
         building=building,
+        landmark=landmark,
         source_type=source_type,
         facility=facility,
         landscape=landscape,
@@ -513,6 +554,20 @@ async def update_photo(
     if photo.uploader_id != current_user.id and not is_reviewer(current_user):
         raise HTTPException(status_code=403, detail="Not authorized to update this photo")
     updated_photo = await photo_crud.update_photo(db, photo, photo_update)
+    legacy_fields = {"season", "category", "campus"} & photo_update.model_fields_set
+    if legacy_fields:
+        await ensure_default_taxonomy(db)
+        taxonomy_updates = await resolve_legacy_photo_classifications(
+            db,
+            season=updated_photo.season if "season" in legacy_fields else None,
+            category=updated_photo.category if "category" in legacy_fields else None,
+            campus=updated_photo.campus if "campus" in legacy_fields else None,
+        )
+        if "category" in legacy_fields and updated_photo.category in {"Portrait", "人像"}:
+            await delete_photo_classification(db, updated_photo, "photo_type")
+        if taxonomy_updates:
+            await set_photo_classifications(db, updated_photo, taxonomy_updates)
+        await db.commit()
     return await serialize_photo(db, updated_photo)
 
 

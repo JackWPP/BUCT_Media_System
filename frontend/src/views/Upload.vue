@@ -149,30 +149,48 @@
                 label-placement="left"
                 label-width="100"
               >
-                <n-form-item label="季节">
+                <n-form-item
+                  v-for="field in taxonomyMetadataFields"
+                  :key="field.key"
+                  :label="field.label"
+                >
                   <n-select
-                    v-model:value="metadata.season"
-                    :options="seasonOptions"
+                    v-model:value="metadata.classifications[field.key]"
+                    :options="classificationOptions(field.key)"
+                    :multiple="isMultipleFacet(field.key)"
                     clearable
-                    placeholder="为所有照片设置季节"
+                    filterable
+                    :placeholder="`为所有照片设置${field.label}`"
                   />
                 </n-form-item>
-                <n-form-item label="类别">
-                  <n-select
-                    v-model:value="metadata.category"
-                    :options="categoryOptions"
-                    clearable
-                    placeholder="为所有照片设置类别"
-                  />
-                </n-form-item>
-                <n-form-item label="校区">
-                  <n-select
-                    v-model:value="metadata.campus"
-                    :options="campusOptions"
-                    clearable
-                    placeholder="为所有照片设置校区"
-                  />
-                </n-form-item>
+                <n-collapse>
+                  <n-collapse-item title="旧字段兼容" name="legacy">
+                    <n-form-item label="旧季节">
+                      <n-select
+                        v-model:value="metadata.season"
+                        :options="seasonOptions"
+                        clearable
+                        placeholder="兼容旧 season 字段"
+                      />
+                    </n-form-item>
+                    <n-form-item label="旧类别">
+                      <n-select
+                        v-model:value="metadata.category"
+                        :options="categoryOptions"
+                        clearable
+                        placeholder="兼容旧 category 字段"
+                      />
+                    </n-form-item>
+                    <n-form-item label="旧校区">
+                      <n-select
+                        v-model:value="metadata.campus"
+                        :options="campusOptions"
+                        clearable
+                        placeholder="兼容旧 campus 字段"
+                      />
+                    </n-form-item>
+                  </n-collapse-item>
+                </n-collapse>
                 <n-form-item label="描述">
                   <n-input
                     v-model:value="metadata.description"
@@ -232,20 +250,40 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { storeToRefs } from 'pinia'
 import { CloudUploadOutline, ImageOutline, SyncOutline, CheckmarkOutline, CloseOutline, ArrowBackOutline, ImagesOutline } from '@vicons/ionicons5'
 import type { UploadCustomRequestOptions } from 'naive-ui'
 import { useUploadStore } from '../stores/upload'
-import { useAuthStore } from '../stores/auth'
+import { getPublicTaxonomy, type TaxonomyFacet } from '../api/taxonomy'
+import { FACET_LABELS, flattenTaxonomyOptions, sanitizeTaxonomySelection } from '../utils/taxonomy'
 
 const router = useRouter()
 const message = useMessage()
 const uploadStore = useUploadStore()
-const authStore = useAuthStore()
 const { fileList, uploading, metadata, pendingCount, successCount, errorCount, canUpload } = storeToRefs(uploadStore)
+const taxonomyFacets = ref<TaxonomyFacet[]>([])
+
+const taxonomyMetadataKeys = [
+  'gallery_series',
+  'source_type',
+  'campus',
+  'photo_type',
+  'building',
+  'facility',
+  'landscape',
+  'season',
+  'animal',
+  'plant',
+] as const
+
+const taxonomyMetadataFields = computed(() =>
+  taxonomyMetadataKeys
+    .filter((key) => classificationOptions(key).length)
+    .map((key) => ({ key, label: FACET_LABELS[key] || key })),
+)
 
 function handleBack() {
   if (router.options.history.state.back === '/my-submissions') {
@@ -272,6 +310,27 @@ const seasonOptions = SEASON_OPTIONS
 const categoryOptions = CATEGORY_OPTIONS
 
 const campusOptions = CAMPUS_OPTIONS
+
+onMounted(async () => {
+  try {
+    taxonomyFacets.value = await getPublicTaxonomy()
+  } catch (error) {
+    console.error('加载分类失败:', error)
+  }
+})
+
+function facetByKey(facetKey: string) {
+  return taxonomyFacets.value.find((facet) => facet.key === facetKey)
+}
+
+function classificationOptions(facetKey: string) {
+  const facet = facetByKey(facetKey)
+  return facet ? flattenTaxonomyOptions(facet.nodes, (node) => node.id) : []
+}
+
+function isMultipleFacet(facetKey: string) {
+  return facetByKey(facetKey)?.selection_mode === 'multiple'
+}
 
 function handleBeforeUpload(options: { file: File }) {
   const { file } = options
@@ -309,6 +368,9 @@ function clearAll() {
 }
 
 async function startUpload() {
+  if (taxonomyFacets.value.length) {
+    metadata.value.classifications = sanitizeTaxonomySelection(taxonomyFacets.value, metadata.value.classifications)
+  }
   await uploadStore.startUpload(message)
 }
 

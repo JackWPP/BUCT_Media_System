@@ -21,9 +21,13 @@ class TaggingTaskBatchCreate(BaseModel):
     description: Optional[str] = None
     assignee_ids: list[str] = Field(default_factory=list, min_length=1)
     photo_ids: list[str] = Field(default_factory=list)
-    selection_mode: str = Field(default="manual", pattern="^(manual|all|zero_tags)$")
+    selection_mode: str = Field(
+        default="manual",
+        pattern="^(manual|selected|all|zero_tags|missing_core|missing_facet|dependency_missing|search)$",
+    )
     status: Optional[str] = "approved"
     search: Optional[str] = None
+    facet_key: Optional[str] = None
     photo_type: Optional[str] = Field(default=None, pattern="^(风光类|纪实类|校园风光|人文纪实|自然生态)$")
     max_photos: int = Field(default=5000, ge=1, le=20000)
 

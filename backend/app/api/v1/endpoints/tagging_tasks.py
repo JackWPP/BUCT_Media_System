@@ -115,25 +115,33 @@ async def list_photo_candidates(
     status: str | None = "approved",
     search: str | None = None,
     photo_type: str | None = None,
+    facet_key: str | None = None,
     skip: int = 0,
     limit: int = 60,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_auditor_user),
 ):
-    if selection_mode not in {"all", "zero_tags"}:
-        raise HTTPException(status_code=400, detail="selection_mode must be all or zero_tags")
+    allowed_modes = {"all", "zero_tags", "missing_core", "missing_facet", "dependency_missing", "search", "selected"}
+    if selection_mode not in allowed_modes:
+        raise HTTPException(status_code=400, detail=f"selection_mode must be one of: {', '.join(sorted(allowed_modes))}")
+    if selection_mode == "missing_facet" and not facet_key:
+        raise HTTPException(status_code=400, detail="facet_key is required for missing_facet")
     if photo_type and photo_type not in {"风光类", "纪实类", "校园风光", "人文纪实", "自然生态"}:
         raise HTTPException(status_code=400, detail="photo_type must be a known photo type")
     limit = min(limit, 120)
-    photos, total = await tagging_service.list_photo_candidates(
-        db,
-        selection_mode=selection_mode,
-        status=status,
-        search=search,
-        photo_type=photo_type,
-        skip=skip,
-        limit=limit,
-    )
+    try:
+        photos, total = await tagging_service.list_photo_candidates(
+            db,
+            selection_mode=selection_mode,
+            status=status,
+            search=search,
+            photo_type=photo_type,
+            facet_key=facet_key,
+            skip=skip,
+            limit=limit,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return TaggingPhotoCandidateListResponse(
         total=total,
         items=[await serialize_photo(db, photo) for photo in photos],
@@ -174,15 +182,23 @@ async def create_tagging_task_batch(
         assignees.append(assignee)
 
     photo_ids = payload.photo_ids
-    if not photo_ids or payload.selection_mode != "manual":
-        photo_ids = await tagging_service.list_photo_candidate_ids(
-            db,
-            selection_mode="zero_tags" if payload.selection_mode == "zero_tags" else "all",
-            status=payload.status,
-            search=payload.search,
-            photo_type=payload.photo_type,
-            max_photos=payload.max_photos,
-        )
+    if payload.selection_mode == "missing_facet" and not payload.facet_key:
+        raise HTTPException(status_code=400, detail="facet_key is required for missing_facet")
+    if payload.selection_mode in {"manual", "selected"} and not photo_ids:
+        raise HTTPException(status_code=400, detail="photo_ids is required for selected tasks")
+    if not photo_ids or payload.selection_mode not in {"manual", "selected"}:
+        try:
+            photo_ids = await tagging_service.list_photo_candidate_ids(
+                db,
+                selection_mode=payload.selection_mode,
+                status=payload.status,
+                search=payload.search,
+                photo_type=payload.photo_type,
+                facet_key=payload.facet_key,
+                max_photos=payload.max_photos,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     if not photo_ids:
         raise HTTPException(status_code=400, detail="No photos matched the assignment criteria")
 

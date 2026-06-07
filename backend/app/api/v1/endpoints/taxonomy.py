@@ -207,6 +207,7 @@ async def create_taxonomy_node(
         parent_id=node_in.parent_id,
         sort_order=node_in.sort_order,
         is_active=node_in.is_active,
+        is_selectable=node_in.is_selectable,
     )
     db.add(node)
     await db.flush()

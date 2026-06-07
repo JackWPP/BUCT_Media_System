@@ -70,6 +70,7 @@ async def get_photos(
     sort_order: str = "desc",
     campus: Optional[str] = None,
     building: Optional[str] = None,
+    landmark: Optional[str] = None,
     source_type: Optional[str] = None,
     facility: Optional[str] = None,
     landscape: Optional[str] = None,
@@ -104,6 +105,7 @@ async def get_photos(
                 TaxonomyFacet.key == "season",
                 TaxonomyFacet.is_active.is_(True),
                 TaxonomyNode.is_active.is_(True),
+                TaxonomyNode.is_selectable.is_(True),
                 TaxonomyNode.name == season,
             )
         )
@@ -123,6 +125,7 @@ async def get_photos(
                 TaxonomyFacet.key == "campus",
                 TaxonomyFacet.is_active.is_(True),
                 TaxonomyNode.is_active.is_(True),
+                TaxonomyNode.is_selectable.is_(True),
                 TaxonomyNode.name == campus,
             )
         )
@@ -207,6 +210,7 @@ async def get_photos(
                 TaxonomyFacet.key == facet_key,
                 TaxonomyFacet.is_active.is_(True),
                 TaxonomyNode.is_active.is_(True),
+                TaxonomyNode.is_selectable.is_(True),
                 or_(
                     TaxonomyNode.name == facet_value,
                     TaxonomyNode.key == normalized_key,
@@ -215,6 +219,26 @@ async def get_photos(
         )
         query = query.where(Photo.id.in_(classification_subquery))
         count_query = count_query.where(Photo.id.in_(classification_subquery))
+
+    if landmark:
+        normalized_key = landmark.lower().replace(" ", "-")
+        legacy_landmark_subquery = (
+            select(PhotoClassification.photo_id)
+            .join(TaxonomyFacet, TaxonomyFacet.id == PhotoClassification.facet_id)
+            .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
+            .where(
+                TaxonomyFacet.key.in_(("building", "landscape")),
+                TaxonomyFacet.is_active.is_(True),
+                TaxonomyNode.is_active.is_(True),
+                TaxonomyNode.is_selectable.is_(True),
+                or_(
+                    TaxonomyNode.name == landmark,
+                    TaxonomyNode.key == normalized_key,
+                ),
+            )
+        )
+        query = query.where(Photo.id.in_(legacy_landmark_subquery))
+        count_query = count_query.where(Photo.id.in_(legacy_landmark_subquery))
 
     total_result = await db.execute(count_query)
     total = total_result.scalar_one()
@@ -303,6 +327,7 @@ def _build_facet_classification_filter(interpretation: "SearchInterpretation"):
                 TaxonomyFacet.key == facet_key,
                 TaxonomyFacet.is_active.is_(True),
                 TaxonomyNode.is_active.is_(True),
+                TaxonomyNode.is_selectable.is_(True),
                 or_(
                     TaxonomyNode.name == node_name,
                     TaxonomyNode.key == normalized_key,
@@ -332,6 +357,7 @@ def _build_keyword_filter(keywords: list[str]):
             .where(
                 TaxonomyFacet.is_active.is_(True),
                 TaxonomyNode.is_active.is_(True),
+                TaxonomyNode.is_selectable.is_(True),
                 TaxonomyNode.name.ilike(pattern),
             )
         )
@@ -343,6 +369,7 @@ def _build_keyword_filter(keywords: list[str]):
             .where(
                 TaxonomyFacet.is_active.is_(True),
                 TaxonomyNode.is_active.is_(True),
+                TaxonomyNode.is_selectable.is_(True),
                 TaxonomyAlias.alias.ilike(pattern),
             )
         )
@@ -374,6 +401,7 @@ def _build_text_search_filter(search: str):
         .where(
             TaxonomyFacet.is_active.is_(True),
             TaxonomyNode.is_active.is_(True),
+            TaxonomyNode.is_selectable.is_(True),
             TaxonomyNode.name.ilike(search_pattern),
         )
     )
@@ -385,6 +413,7 @@ def _build_text_search_filter(search: str):
         .where(
             TaxonomyFacet.is_active.is_(True),
             TaxonomyNode.is_active.is_(True),
+            TaxonomyNode.is_selectable.is_(True),
             TaxonomyAlias.alias.ilike(search_pattern),
         )
     )

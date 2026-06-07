@@ -214,6 +214,8 @@ import {
 import type { Photo } from '@/types/photo'
 import type { User } from '@/types/user'
 import { getPhotoUrl } from '@/utils/format'
+import { getPublicTaxonomy, type TaxonomyFacet } from '@/api/taxonomy'
+import { FACET_LABELS, facetLabel, findTaxonomyNode } from '@/utils/taxonomy'
 
 type DiffRow = { field: string; original: string; submitted: string; changed: boolean }
 
@@ -225,6 +227,7 @@ const showCreate = ref(false)
 const showDetail = ref(false)
 const tasks = ref<TaggingTask[]>([])
 const users = ref<User[]>([])
+const taxonomyFacets = ref<TaxonomyFacet[]>([])
 const candidates = ref<Photo[]>([])
 const candidateLoading = ref(false)
 const candidateTotal = ref(0)
@@ -329,13 +332,18 @@ const diffRows = computed<DiffRow[]>(() => {
     ...Object.keys(item.submitted_classifications || {}),
   ])
   const rows = [...fields].map((field) => {
-    const original = classificationValue(item.original_classifications?.[field] || item.photo?.classifications?.[field])
-    const submitted = classificationValue(item.submitted_classifications?.[field])
-    return { field, original, submitted, changed: original !== submitted }
+    const original = classificationValue(field, item.original_classifications?.[field] || item.photo?.classifications?.[field])
+    const submitted = classificationValue(field, item.submitted_classifications?.[field])
+    return { field: facetLabel(field, taxonomyFacets.value), original, submitted, changed: original !== submitted }
   })
-  const originalTags = (item.original_tags || item.photo?.free_tags || item.photo?.tags || []).join('、')
-  const submittedTags = (item.submitted_tags || []).join('、')
-  rows.unshift({ field: '自由标签', original: originalTags, submitted: submittedTags, changed: originalTags !== submittedTags })
+  const originalTagList = item.original_tags || item.photo?.free_tags || item.photo?.tags || []
+  const submittedTagList = item.submitted_tags || []
+  rows.unshift({
+    field: FACET_LABELS.tag,
+    original: originalTagList.join('、'),
+    submitted: tagDiffSummary(originalTagList, submittedTagList),
+    changed: sortedText(originalTagList) !== sortedText(submittedTagList),
+  })
   return rows
 })
 
@@ -344,12 +352,14 @@ onMounted(loadData)
 async function loadData() {
   loading.value = true
   try {
-    const [taskResponse, userResponse] = await Promise.all([
+    const [taskResponse, userResponse, facets] = await Promise.all([
       getTaggingTasks({ limit: 100 }),
       getTaggingAssignees(),
+      getPublicTaxonomy(),
     ])
     tasks.value = taskResponse.items
     users.value = userResponse
+    taxonomyFacets.value = facets
     tasks.value.forEach((task) => {
       checkedRowsByTask[task.id] = checkedRowsByTask[task.id] || []
     })
@@ -503,16 +513,62 @@ async function batchReview(task: TaggingTask, approved: boolean) {
 function classificationSummary(value: Record<string, any> | null) {
   if (!value) return ''
   return Object.entries(value)
-    .map(([key, item]) => `${key}：${classificationValue(item)}`)
+    .map(([key, item]) => `${facetLabel(key, taxonomyFacets.value)}：${classificationValue(key, item)}`)
     .filter((item) => !item.endsWith('：'))
     .join('；')
 }
 
-function classificationValue(value: any) {
+function classificationValue(facetKey: string, value: any): string {
   if (!value) return ''
-  if (Array.isArray(value)) return value.map((item) => item.node_name).filter(Boolean).join('、')
-  if (Array.isArray(value.nodes)) return value.nodes.map((item: any) => item.node_name).filter(Boolean).join('、')
-  return value.node_name || ''
+  const values = Array.isArray(value)
+    ? value
+    : Array.isArray(value.nodes)
+      ? value.nodes
+      : Array.isArray(value.node_ids)
+        ? value.node_ids
+        : [value]
+  return values.map((item) => classificationItemLabel(facetKey, item)).filter(Boolean).join('、')
+}
+
+function classificationItemLabel(facetKey: string, value: any): string {
+  if (typeof value === 'number') return nodePathLabel(facetKey, value)
+  if (typeof value === 'string') return value
+  const nodeId = value?.node_id || value?.id
+  if (nodeId) return value.path?.length ? value.path.join(' / ') : nodePathLabel(facetKey, nodeId) || value.node_name || ''
+  if (Array.isArray(value?.path) && value.path.length) return value.path.join(' / ')
+  return value?.node_name || value?.name || ''
+}
+
+function nodePathLabel(facetKey: string, nodeId: number): string {
+  const facet = taxonomyFacets.value.find((item) => item.key === facetKey)
+  const node = findTaxonomyNode(facet, nodeId)
+  if (!node) return ''
+  const optionPath: string[] = []
+  let current = node
+  while (current) {
+    optionPath.unshift(current.name)
+    const parentId = current.parent_id
+    if (!parentId) break
+    const parent = findTaxonomyNode(facet, parentId)
+    if (!parent) break
+    current = parent
+  }
+  return optionPath.join(' / ')
+}
+
+function sortedText(values: string[]) {
+  return [...values].sort().join('、')
+}
+
+function tagDiffSummary(original: string[], submitted: string[]) {
+  const originalSet = new Set(original)
+  const submittedSet = new Set(submitted)
+  const added = submitted.filter((tag) => !originalSet.has(tag))
+  const removed = original.filter((tag) => !submittedSet.has(tag))
+  const parts = [submitted.join('、') || '-']
+  if (added.length) parts.push(`新增：${added.join('、')}`)
+  if (removed.length) parts.push(`移除：${removed.join('、')}`)
+  return parts.join('；')
 }
 
 function statusLabel(status: string) {

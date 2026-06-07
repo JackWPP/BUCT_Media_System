@@ -221,7 +221,7 @@ Deployment-sensitive rules:
 - Production deploy also applies `backend/constraints-prod.txt` to avoid accidental package drift.
 - When production packages intentionally change, regenerate or update `backend/constraints-prod.txt` from the verified server environment.
 - If new code changes schema, add an Alembic migration; production deploy runs `alembic upgrade head`.
-- If new code changes taxonomy assumptions, verify `backend/scripts/migrate_taxonomy_2026.py --apply` still succeeds; production deploy runs it.
+- If new code changes taxonomy assumptions, run `backend/scripts/audit_taxonomy_2026.py` first, then verify `backend/scripts/migrate_taxonomy_2026.py` dry-run output. Production deploy skips taxonomy migration unless `--taxonomy-dry-run` or confirmed `--taxonomy-apply` is explicitly passed.
 - If new code touches vector search, verify `/api/v1/search` locally with the Milvus tunnel and on production after deploy.
 - If new code touches media access, verify a thumbnail/original image endpoint locally with the MinIO tunnel.
 

@@ -33,6 +33,31 @@ LEGACY_PHOTO_TYPE_MAP = {
     "自然生态": "Landscape",
 }
 
+LEGACY_CATEGORY_TO_PHOTO_TYPE = {
+    "Landscape": "校园风光",
+    "风光": "校园风光",
+    "风光类": "校园风光",
+    "校园风光": "校园风光",
+    "Documentary": "人文纪实",
+    "Activity": "人文纪实",
+    "纪实": "人文纪实",
+    "纪实类": "人文纪实",
+    "活动": "人文纪实",
+    "人文纪实": "人文纪实",
+    "自然生态": "自然生态",
+}
+
+LEGACY_SEASON_TO_TAXONOMY = {
+    "Spring": "春季",
+    "Summer": "夏季",
+    "Autumn": "秋季",
+    "Winter": "冬季",
+    "春季": "春季",
+    "夏季": "夏季",
+    "秋季": "秋季",
+    "冬季": "冬季",
+}
+
 CHANGPING_BUILDINGS = [
     "第一教学楼", "体育馆", "图书馆", "实验楼", "文理楼", "第二教学楼",
     "大学生活动中心", "校史博物馆", "工程训练中心", "机电信息楼A座",
@@ -337,9 +362,11 @@ async def _upsert_seed_nodes(
         if isinstance(seed, dict):
             node_name = seed["name"]
             children = seed.get("children", [])
+            is_selectable = bool(seed.get("is_selectable", False))
         else:
             node_name = str(seed)
             children = []
+            is_selectable = True
 
         node = existing_nodes.get(node_name)
         if node is None:
@@ -350,6 +377,7 @@ async def _upsert_seed_nodes(
                 name=node_name,
                 sort_order=index,
                 is_active=True,
+                is_selectable=is_selectable,
             )
             db.add(node)
             await db.flush()
@@ -365,6 +393,9 @@ async def _upsert_seed_nodes(
                 changed = True
             if not node.is_active:
                 node.is_active = True
+                changed = True
+            if node.is_selectable != is_selectable:
+                node.is_selectable = is_selectable
                 changed = True
 
         if children:
@@ -556,6 +587,15 @@ async def get_node_by_id(db: AsyncSession, node_id: int) -> Optional[TaxonomyNod
     return result.scalar_one_or_none()
 
 
+def validate_selectable_node(node: TaxonomyNode, facet_key: str | None = None) -> None:
+    if not node.is_active:
+        raise ValueError(f"Inactive taxonomy node cannot be assigned: {node.name}")
+    if not node.is_selectable:
+        raise ValueError(f"Taxonomy group nodes cannot be submitted: {node.name}")
+    if facet_key and node.facet and node.facet.key != facet_key:
+        raise ValueError(f"Node {node.id} does not belong to facet: {facet_key}")
+
+
 async def replace_node_aliases(db: AsyncSession, node: TaxonomyNode, aliases: list[str]) -> None:
     await db.execute(TaxonomyAlias.__table__.delete().where(TaxonomyAlias.node_id == node.id))
     for alias in aliases:
@@ -610,20 +650,47 @@ async def resolve_taxonomy_node(
     return result.scalar_one_or_none()
 
 
+async def resolve_legacy_photo_classifications(
+    db: AsyncSession,
+    *,
+    season: str | None = None,
+    category: str | None = None,
+    campus: str | None = None,
+) -> dict[str, int]:
+    """Resolve legacy photo fields into canonical taxonomy node ids.
+
+    Portrait is intentionally skipped: it remains a compatibility/access-control
+    value in photos.category and is not a new photo_type.
+    """
+    resolved: dict[str, int] = {}
+    legacy_values = {
+        "season": LEGACY_SEASON_TO_TAXONOMY.get(season or "", season),
+        "campus": campus,
+        "photo_type": LEGACY_CATEGORY_TO_PHOTO_TYPE.get(category or ""),
+    }
+    for facet_key, raw_value in legacy_values.items():
+        if not raw_value:
+            continue
+        node = await resolve_taxonomy_node(db, facet_key, str(raw_value))
+        if node is None:
+            continue
+        validate_selectable_node(node, facet_key)
+        resolved[facet_key] = node.id
+    return resolved
+
+
 async def set_photo_classification(
     db: AsyncSession,
     photo: Photo,
     facet_key: str,
     node: TaxonomyNode,
 ) -> None:
-    if not node.is_active:
-        raise ValueError(f"Inactive taxonomy node cannot be assigned: {node.name}")
-
     facet = await get_facet_by_key(db, facet_key)
     if facet is None:
         raise ValueError(f"Unknown facet: {facet_key}")
     if node.facet_id != facet.id:
         raise ValueError(f"Node {node.id} does not belong to facet: {facet_key}")
+    validate_selectable_node(node, facet_key)
 
     now = datetime.utcnow()
     if facet.selection_mode == "single":
@@ -765,7 +832,11 @@ def serialize_classifications(photo: Photo) -> dict[str, dict[str, object]]:
     for classification in getattr(photo, "classifications", []) or []:
         if not classification.facet or not classification.node:
             continue
-        if not classification.facet.is_active or not classification.node.is_active:
+        if (
+            not classification.facet.is_active
+            or not classification.node.is_active
+            or not classification.node.is_selectable
+        ):
             continue
         payload = {
             "facet_key": classification.facet.key,

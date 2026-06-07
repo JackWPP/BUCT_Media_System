@@ -39,6 +39,8 @@ class SearchResponse(BaseModel):
     total: int = Field(..., ge=0, description="Number of results returned")
     query_time_ms: float = Field(..., ge=0, description="Query execution time in milliseconds")
     search_mode: str = Field("vector", description="Search mode used: vector, keyword, or hybrid")
+    fallback_reason: Optional[str] = Field(None, description="Reason vector search fell back to keyword mode")
+    index_version: Optional[str] = Field(None, description="Milvus collection used for vector search")
 
 
 # ---- Endpoint ----
@@ -83,8 +85,8 @@ async def search_photos(
         filters["campus"] = campus
     if category:
         filters["category"] = category
-    if landmark and not building:
-        filters["building"] = landmark
+    if landmark:
+        filters["landmark"] = landmark
     if building:
         filters["building"] = building
     for key, value in {
@@ -104,7 +106,7 @@ async def search_photos(
             filters[key] = value
 
     service = get_vector_search_service()
-    results = await service.search(
+    outcome = await service.search(
         db=db,
         query_text=q,
         filters=filters or None,
@@ -121,9 +123,11 @@ async def search_photos(
                 tags=r.tags,
                 classifications=r.classifications,
             )
-            for r in results
+            for r in outcome.results
         ],
-        total=len(results),
+        total=len(outcome.results),
         query_time_ms=round(elapsed_ms, 2),
-        search_mode="vector",
+        search_mode=outcome.search_mode,
+        fallback_reason=outcome.fallback_reason,
+        index_version=outcome.index_version,
     )

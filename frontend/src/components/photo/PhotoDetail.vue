@@ -300,6 +300,7 @@ import { usePhotoStore } from '../../stores/photo'
 import type { Photo, PhotoUpdate, TaxonomyValue } from '../../types/photo'
 import { getPhotoUrl, getPhotoDownloadUrl } from '../../utils/format'
 import { getPublicTaxonomy, type TaxonomyFacet } from '../../api/taxonomy'
+import { findTaxonomyNode, flattenTaxonomyOptions, isNodeSelectable } from '../../utils/taxonomy'
 
 interface Props {
   photoId?: string | null
@@ -660,12 +661,7 @@ async function handleAddTag() {
 function getFacetNodeOptions(facetKey: string) {
   const facet = taxonomyFacets.value.find((f) => f.key === facetKey)
   if (!facet) return []
-  const flatten = (nodes: TaxonomyFacet['nodes']): Array<{ label: string; value: number }> =>
-    nodes.flatMap((node) => [
-      { label: node.name, value: node.id },
-      ...flatten(node.children || []),
-    ])
-  return flatten(facet.nodes)
+  return flattenTaxonomyOptions(facet.nodes, (node) => node.id)
 }
 
 function getUnclassifiedFacets() {
@@ -680,6 +676,12 @@ function getUnclassifiedFacets() {
 
 async function handleChangeClassification(facetKey: string, nodeId: number) {
   if (!photo.value) return
+  const facet = taxonomyFacets.value.find((item) => item.key === facetKey)
+  const node = findTaxonomyNode(facet, nodeId)
+  if (!node || !isNodeSelectable(node)) {
+    message.warning('请选择可提交的分类节点')
+    return
+  }
   try {
     const updatedPhoto = await updatePhotoClassifications(photo.value.id, {
       [facetKey]: nodeId,

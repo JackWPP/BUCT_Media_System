@@ -64,6 +64,13 @@ class Settings(BaseSettings):
     AI_SEARCH_PROVIDER: str | None = None
     AI_SEARCH_MODEL_ID: str | None = None
     AI_SEARCH_TIMEOUT: int = 15
+
+    # 向量搜索 / Milvus 配置
+    MILVUS_HOST: str = "localhost"
+    MILVUS_PORT: int = 19530
+    MILVUS_COLLECTION_NAME: str = "photo_vectors_v2"
+    MILVUS_LEGACY_COLLECTION_NAME: str = "photo_vectors"
+    MILVUS_EMBEDDING_DIM: int = 512
     
     # SSO/OAuth 预留配置（对接学校统一身份认证）
     # 认证流程类似 Google OAuth: authorize → callback → token → userinfo

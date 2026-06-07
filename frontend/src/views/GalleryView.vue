@@ -103,8 +103,8 @@
                   v-for="opt in getVisibleOptions(facetKey)"
                   :key="opt.value"
                   class="tag-pill"
-                  :class="{ active: photoStore.filters[facetKey] === opt.value }"
-                  @click="toggleFilter(facetKey as keyof PhotoFilters, opt.value as string)"
+                  :class="{ active: photoStore.filters[facetKey] === opt.value, disabled: opt.disabled }"
+                  @click="!opt.disabled && toggleFilter(facetKey as keyof PhotoFilters, opt.value as string)"
                 >
                   {{ opt.label }}
                 </span>
@@ -335,6 +335,7 @@ import type { SelectOption } from 'naive-ui'
 import MasonryLayout from '../components/common/MasonryLayout.vue'
 import { usePhotoStore } from '../stores/photo'
 import { getPublicTaxonomy, getPublicTaxonomyGuide, type TaxonomyFacet, type TaxonomyGuide } from '../api/taxonomy'
+import { getPublicTags } from '../api/tag'
 import type { Photo, PhotoFilters, SearchInterpretation as SearchInterpretationType } from '../types/photo'
 import { taxonomyValueName } from '../types/photo'
 import { interpretSearch } from '../api/photo'
@@ -343,6 +344,11 @@ import PhotoDetail from '../components/photo/PhotoDetail.vue'
 import { getPhotoUrl } from '../utils/format'
 import { useAuthStore } from '../stores/auth'
 import { searchPhotos, type SearchResult } from '../api/search'
+import {
+  FACET_LABELS,
+  GALLERY_FILTER_KEYS,
+  flattenTaxonomyOptions,
+} from '../utils/taxonomy'
 
 const router = useRouter()
 const route = useRoute()
@@ -351,6 +357,7 @@ const authStore = useAuthStore()
 
 const taxonomyFacets = ref<TaxonomyFacet[]>([])
 const taxonomyGuide = ref<TaxonomyGuide | null>(null)
+const publicTagOptions = ref<SelectOption[]>([])
 const taxonomyLoading = ref(false)
 const taxonomyError = ref(false)
 const syncingRoute = ref(false)
@@ -382,24 +389,7 @@ const sortOptions = [
   { label: '最近发布', value: 'published_at' },
 ]
 
-const facetLabelMap: Record<string, string> = {
-  season: '季节',
-  campus: '校区',
-  building: '楼宇',
-  gallery_series: '专区',
-  gallery_year: '年份',
-  award_level: '奖项',
-  photo_type: '题材',
-  documentary_topic: '纪实主题',
-  tag: '标签',
-  source_type: '来源',
-  facility: '设施',
-  landscape: '景观',
-  natural_phenomenon: '自然现象',
-  technique: '表现手法',
-  animal: '动物',
-  plant: '植物',
-}
+const facetLabelMap: Record<string, string> = FACET_LABELS
 
 const facetMap = computed(() =>
   Object.fromEntries(taxonomyFacets.value.map((facet) => [facet.key, facet])),
@@ -407,7 +397,7 @@ const facetMap = computed(() =>
 
 // 静态筛选字段（始终显示，不需要 taxonomy 数据）
 // 所有筛选字段统一从 taxonomy API 动态获取
-const dynamicFacetKeys = ['gallery_series', 'campus', 'photo_type', 'source_type', 'building', 'facility', 'landscape', 'gallery_year', 'award_level', 'season', 'natural_phenomenon', 'technique', 'animal', 'plant', 'documentary_topic', 'tag']
+const dynamicFacetKeys = GALLERY_FILTER_KEYS
 
 const primaryFacetKeys = computed(() => taxonomyGuide.value?.primary || ['gallery_series', 'campus', 'photo_type'])
 
@@ -443,10 +433,10 @@ const guideVisibleFacetKeys = computed(() => {
 const activeFilters = computed(() => {
   const filters = photoStore.filters
   const chips: Array<{ key: keyof PhotoFilters; label: string; value: string }> = []
-  ;(['gallery_series', 'campus', 'photo_type', 'source_type', 'building', 'facility', 'landscape', 'gallery_year', 'award_level', 'season', 'natural_phenomenon', 'technique', 'animal', 'plant', 'documentary_topic', 'tag'] as const).forEach((key) => {
+  GALLERY_FILTER_KEYS.forEach((key) => {
     const value = filters[key]
     if (value) {
-      chips.push({ key, label: facetLabelMap[key], value })
+      chips.push({ key, label: facetLabelMap[key], value: filterValueLabel(key, value) })
     }
   })
   return chips
@@ -486,17 +476,15 @@ const masonryPageSizes = computed(() => {
 function facetOptions(key: string): SelectOption[] {
   let options: SelectOption[] = []
 
+  if (key === 'tag') {
+    return publicTagOptions.value
+  }
+
   // 优先从 taxonomy API 动态获取
   const taxonomyKey = key
   const facet = facetMap.value[taxonomyKey]
   if (facet && facet.nodes && facet.nodes.length > 0) {
-    const flatten = (nodes: TaxonomyFacet['nodes']): SelectOption[] =>
-      nodes.flatMap((node) => {
-        const children = flatten(node.children || [])
-        if (children.length) return children
-        return [{ label: node.name, value: node.name }]
-      })
-    options = flatten(facet.nodes)
+    options = flattenTaxonomyOptions(facet.nodes, (node) => node.name)
   } else {
     // 降级：taxonomy 未返回时，使用与后端一致的硬编码选项
     if (key === 'season') {
@@ -526,6 +514,10 @@ function facetOptions(key: string): SelectOption[] {
   // 过滤掉需要隐藏的标签
   const hidden = hiddenTags[key] || []
   return options.filter((opt) => !hidden.includes(opt.value as string))
+}
+
+function filterValueLabel(key: string, value: string) {
+  return facetOptions(key).find((option) => option.value === value)?.label || value
 }
 
 function shouldShowMore(key: string): boolean {
@@ -599,7 +591,7 @@ function handleImageLoad(event: Event, photo: Photo) {
 function buildQuery() {
   const query: Record<string, string> = {}
   const filters = photoStore.filters
-  ;(['season', 'campus', 'building', 'gallery_series', 'gallery_year', 'award_level', 'photo_type', 'documentary_topic', 'tag', 'source_type', 'facility', 'landscape', 'natural_phenomenon', 'technique', 'animal', 'plant'] as const).forEach((key) => {
+  GALLERY_FILTER_KEYS.forEach((key) => {
     const value = filters[key]
     if (value) query[key] = value
   })
@@ -775,6 +767,13 @@ function applyInterpretation(interpretation: SearchInterpretationType) {
       if (facetKey === 'season') filters.season = nodeValue
       else if (facetKey === 'campus') filters.campus = nodeValue
       else if (facetKey === 'building' || facetKey === 'landmark') filters.building = nodeValue
+      else if (facetKey === 'source_type') filters.source_type = nodeValue
+      else if (facetKey === 'facility') filters.facility = nodeValue
+      else if (facetKey === 'landscape') filters.landscape = nodeValue
+      else if (facetKey === 'natural_phenomenon') filters.natural_phenomenon = nodeValue
+      else if (facetKey === 'technique') filters.technique = nodeValue
+      else if (facetKey === 'animal') filters.animal = nodeValue
+      else if (facetKey === 'plant') filters.plant = nodeValue
       else if (facetKey === 'gallery_series') filters.gallery_series = nodeValue
       else if (facetKey === 'gallery_year') filters.gallery_year = nodeValue
       else if (facetKey === 'award_level') filters.award_level = nodeValue
@@ -836,6 +835,13 @@ async function handleRemoveFacet(facetKey: string) {
     if (key === 'season') filters.season = value
     else if (key === 'campus') filters.campus = value
     else if (key === 'building' || key === 'landmark') filters.building = value
+    else if (key === 'source_type') filters.source_type = value
+    else if (key === 'facility') filters.facility = value
+    else if (key === 'landscape') filters.landscape = value
+    else if (key === 'natural_phenomenon') filters.natural_phenomenon = value
+    else if (key === 'technique') filters.technique = value
+    else if (key === 'animal') filters.animal = value
+    else if (key === 'plant') filters.plant = value
     else if (key === 'gallery_series') filters.gallery_series = value
     else if (key === 'gallery_year') filters.gallery_year = value
     else if (key === 'award_level') filters.award_level = value
@@ -876,9 +882,18 @@ async function loadTaxonomy() {
   taxonomyLoading.value = true
   taxonomyError.value = false
   try {
-    const [facets, guide] = await Promise.all([getPublicTaxonomy(), getPublicTaxonomyGuide()])
+    const [facets, guide, tags] = await Promise.all([
+      getPublicTaxonomy(),
+      getPublicTaxonomyGuide(),
+      getPublicTags({ limit: 60 }),
+    ])
     taxonomyFacets.value = facets
     taxonomyGuide.value = guide
+    publicTagOptions.value = tags.items.map((tag) => ({
+      label: tag.name,
+      value: tag.name,
+      disabled: false,
+    }))
   } catch (error) {
     console.error('加载分类失败:', error)
     taxonomyError.value = true
@@ -1081,6 +1096,11 @@ onUnmounted(() => {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+
+.tag-pill.disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
 }
 
 .filter-empty-hint {

@@ -14,6 +14,7 @@ export interface TaxonomyNode {
   name: string
   description: string | null
   sort_order: number
+  is_selectable?: boolean
   is_active: boolean
   created_at: string
   updated_at: string
@@ -76,6 +77,7 @@ export interface TaxonomyNodeCreate {
   description?: string
   parent_id?: number | null
   sort_order?: number
+  is_selectable?: boolean
   is_active?: boolean
   aliases?: string[]
 }

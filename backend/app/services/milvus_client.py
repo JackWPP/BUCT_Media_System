@@ -16,19 +16,16 @@ import logging
 import time
 from typing import Any, Optional
 
+from app.core.config import get_settings
+
 logger = logging.getLogger(__name__)
 
-# Milvus connection settings
-_MILVUS_HOST = "localhost"
-_MILVUS_PORT = 19530
-
 # Collection settings
-_COLLECTION_NAME = "photo_vectors"
-_EMBEDDING_DIM = 512  # bge-small-zh-v1.5 dimensionality
 _INDEX_TYPE = "HNSW"
 _METRIC_TYPE = "COSINE"
 _INDEX_PARAMS = {"M": 16, "efConstruction": 200}
 _SEARCH_PARAMS = {"ef": 256}
+_CONNECTION_ALIAS = "visual_buct_default"
 
 
 class MilvusSearchClient:
@@ -38,7 +35,12 @@ class MilvusSearchClient:
     attempt to connect, and failures are logged (never raised).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, collection_name: Optional[str] = None) -> None:
+        settings = get_settings()
+        self.collection_name = collection_name or settings.MILVUS_COLLECTION_NAME
+        self.host = settings.MILVUS_HOST
+        self.port = settings.MILVUS_PORT
+        self.embedding_dim = settings.MILVUS_EMBEDDING_DIM
         self._connected = False
         self._collection: Optional[Any] = None  # pymilvus.Collection
 
@@ -57,33 +59,32 @@ class MilvusSearchClient:
             from pymilvus import connections, Collection, utility  # noqa: F811
 
             # Connect (idempotent — pymilvus deduplicates by alias)
-            alias = "visual_buct_default"
             try:
                 connections.connect(
-                    alias=alias,
-                    host=_MILVUS_HOST,
-                    port=_MILVUS_PORT,
+                    alias=_CONNECTION_ALIAS,
+                    host=self.host,
+                    port=self.port,
                 )
             except Exception:
                 # May already be connected — try to proceed
                 pass
 
             # Check if collection exists
-            if not utility.has_collection(_COLLECTION_NAME, using=alias):
+            if not utility.has_collection(self.collection_name, using=_CONNECTION_ALIAS):
                 logger.warning(
                     "MilvusSearchClient: collection '%s' does not exist yet. "
                     "Run setup_photo_vectors() to create it.",
-                    _COLLECTION_NAME,
+                    self.collection_name,
                 )
                 self._connected = False
                 return False
 
-            self._collection = Collection(_COLLECTION_NAME, using=alias)
+            self._collection = Collection(self.collection_name, using=_CONNECTION_ALIAS)
             self._collection.load()
             self._connected = True
             logger.info(
                 "MilvusSearchClient: connected, collection '%s' loaded (%d entities)",
-                _COLLECTION_NAME,
+                self.collection_name,
                 self._collection.num_entities,
             )
             return True
@@ -103,13 +104,13 @@ class MilvusSearchClient:
     # ------------------------------------------------------------------
 
     def setup_collection(self) -> bool:
-        """Create the ``photo_vectors`` collection if it doesn't exist.
+        """Create the configured photo-level collection if it doesn't exist.
 
         Schema:
         - photo_id:  VARCHAR (primary key, max 64)
-        - vector:    FLOAT_VECTOR[1024]
-        - tag_text:  VARCHAR (max 500)
-        - category:  VARCHAR (max 100)
+        - vector:    FLOAT_VECTOR[512]
+        - embedding_text: VARCHAR (max 4096)
+        - source_fields:  VARCHAR (max 500)
         - created_at: INT64 (unix timestamp)
 
         Returns ``True`` on success.
@@ -124,25 +125,24 @@ class MilvusSearchClient:
                 utility,
             )
 
-            alias = "visual_buct_default"
             try:
-                connections.connect(alias=alias, host=_MILVUS_HOST, port=_MILVUS_PORT)
+                connections.connect(alias=_CONNECTION_ALIAS, host=self.host, port=self.port)
             except Exception:
                 pass
 
-            if utility.has_collection(_COLLECTION_NAME, using=alias):
-                logger.info("MilvusSearchClient: collection '%s' already exists", _COLLECTION_NAME)
+            if utility.has_collection(self.collection_name, using=_CONNECTION_ALIAS):
+                logger.info("MilvusSearchClient: collection '%s' already exists", self.collection_name)
                 return True
 
             fields = [
                 FieldSchema(name="photo_id", dtype=DataType.VARCHAR, max_length=64, is_primary=True),
-                FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=_EMBEDDING_DIM),
-                FieldSchema(name="tag_text", dtype=DataType.VARCHAR, max_length=500),
-                FieldSchema(name="category", dtype=DataType.VARCHAR, max_length=100),
+                FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=self.embedding_dim),
+                FieldSchema(name="embedding_text", dtype=DataType.VARCHAR, max_length=4096),
+                FieldSchema(name="source_fields", dtype=DataType.VARCHAR, max_length=500),
                 FieldSchema(name="created_at", dtype=DataType.INT64),
             ]
-            schema = CollectionSchema(fields=fields, description="Photo vector embeddings for visual-buct")
-            collection = Collection(name=_COLLECTION_NAME, schema=schema, using=alias)
+            schema = CollectionSchema(fields=fields, description="Photo-level vector embeddings for visual-buct")
+            collection = Collection(name=self.collection_name, schema=schema, using=_CONNECTION_ALIAS)
 
             # Create HNSW index on vector field
             collection.create_index(
@@ -153,11 +153,21 @@ class MilvusSearchClient:
                     "params": _INDEX_PARAMS,
                 },
             )
-            logger.info("MilvusSearchClient: collection '%s' created with HNSW index", _COLLECTION_NAME)
+            logger.info("MilvusSearchClient: collection '%s' created with HNSW index", self.collection_name)
             return True
         except Exception as exc:
             logger.error("MilvusSearchClient: setup_collection failed — %s", exc)
             return False
+
+    def entity_count(self) -> Optional[int]:
+        """Return entity count for the configured collection, or None if unavailable."""
+        if not self._ensure_connection():
+            return None
+        try:
+            return int(self._collection.num_entities)
+        except Exception as exc:
+            logger.warning("MilvusSearchClient: entity_count failed — %s", exc)
+            return None
 
     # ------------------------------------------------------------------
     # Sync core operations (called via asyncio.to_thread)
@@ -170,8 +180,9 @@ class MilvusSearchClient:
     ) -> bool:
         """Insert one or more vector records for a photo.
 
-        Each item in *vectors* should be a dict with keys:
-        ``vector`` (list[float]), ``tag_text`` (str), ``category`` (str).
+        Each item in *vectors* should be a dict with ``vector`` plus optional
+        ``embedding_text`` and ``source_fields``. Legacy ``tag_text`` and
+        ``category`` keys are still accepted for old callers.
 
         The ``created_at`` field is set to the current unix timestamp.
         """
@@ -184,8 +195,8 @@ class MilvusSearchClient:
                 rows.append({
                     "photo_id": photo_id,
                     "vector": item["vector"],
-                    "tag_text": item.get("tag_text", ""),
-                    "category": item.get("category", ""),
+                    "embedding_text": item.get("embedding_text", item.get("tag_text", "")),
+                    "source_fields": item.get("source_fields", item.get("category", "")),
                     "created_at": now_ts,
                 })
 
@@ -206,12 +217,12 @@ class MilvusSearchClient:
         """Perform a vector similarity search.
 
         Args:
-            query_vector: The 1024-dim query embedding.
+            query_vector: The configured-dim query embedding.
             limit:        Max results to return.
             filters:      Optional Milvus boolean expression
-                          (e.g. ``'category == "landscape"'``).
+                          for fields present in the configured collection.
 
-        Returns a list of dicts: ``{photo_id, score, tag_text, category, created_at}``.
+        Returns a list of dicts: ``{photo_id, score, embedding_text, source_fields, created_at}``.
         """
         if not self._ensure_connection():
             return []
@@ -220,7 +231,7 @@ class MilvusSearchClient:
                 "metric_type": _METRIC_TYPE,
                 "params": _SEARCH_PARAMS,
             }
-            output_fields = ["photo_id", "tag_text", "category", "created_at"]
+            output_fields = ["photo_id", "embedding_text", "source_fields", "created_at"]
 
             results = self._collection.search(
                 data=[query_vector],
@@ -237,8 +248,8 @@ class MilvusSearchClient:
                 hits.append({
                     "photo_id": entity.get("photo_id"),
                     "score": float(hit.distance),
-                    "tag_text": entity.get("tag_text", ""),
-                    "category": entity.get("category", ""),
+                    "embedding_text": entity.get("embedding_text", ""),
+                    "source_fields": entity.get("source_fields", ""),
                     "created_at": entity.get("created_at", 0),
                 })
             return hits
@@ -279,6 +290,10 @@ class MilvusSearchClient:
     async def delete_by_photo(self, photo_id: str) -> bool:
         """Delete all vectors for a photo (async)."""
         return await asyncio.to_thread(self._delete_sync, photo_id)
+
+    async def get_entity_count(self) -> Optional[int]:
+        """Return entity count for the configured collection (async)."""
+        return await asyncio.to_thread(self.entity_count)
 
 
 # ---- Module-level singleton ----
