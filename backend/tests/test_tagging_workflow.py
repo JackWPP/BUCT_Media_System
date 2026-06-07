@@ -197,6 +197,25 @@ def test_taxonomy_seed_converges_legacy_nodes_to_new_scheme(tagging_client):
                     sort_order=99,
                 )
             )
+            landmark_facet = TaxonomyFacet(
+                key="landmark",
+                name="旧地标",
+                selection_mode="single",
+                is_system=True,
+                is_active=True,
+                sort_order=35,
+            )
+            session.add(landmark_facet)
+            await session.flush()
+            session.add(
+                TaxonomyNode(
+                    facet_id=landmark_facet.id,
+                    key="library",
+                    name="图书馆",
+                    is_active=True,
+                    sort_order=1,
+                )
+            )
 
             await session.commit()
 
@@ -216,6 +235,10 @@ def test_taxonomy_seed_converges_legacy_nodes_to_new_scheme(tagging_client):
             assert node_states[("gallery_series", "摄影大赛")] is False
             assert node_states[("gallery_year", "2018")] is False
             assert node_states[("photo_type", "校园风光")] is True
+            landmark_facet = (
+                await session.execute(select(TaxonomyFacet).where(TaxonomyFacet.key == "landmark"))
+            ).scalar_one()
+            assert landmark_facet.is_active is False
 
             classification = (
                 await session.execute(

@@ -410,6 +410,7 @@ async def ensure_default_taxonomy(db: AsyncSession) -> None:
     Uses flush instead of commit so the caller controls the transaction boundary.
     """
     created = False
+    active_seed_keys = {facet_seed["key"] for facet_seed in DEFAULT_TAXONOMY}
     for facet_seed in DEFAULT_TAXONOMY:
         result = await db.execute(select(TaxonomyFacet).where(TaxonomyFacet.key == facet_seed["key"]))
         facet = result.scalar_one_or_none()
@@ -473,6 +474,17 @@ async def ensure_default_taxonomy(db: AsyncSession) -> None:
 
         if await reconcile_facet_to_seed(db, facet, facet_seed):
             created = True
+
+    legacy_facets_result = await db.execute(
+        select(TaxonomyFacet).where(
+            TaxonomyFacet.is_system.is_(True),
+            TaxonomyFacet.is_active.is_(True),
+            TaxonomyFacet.key.notin_(active_seed_keys),
+        )
+    )
+    for legacy_facet in legacy_facets_result.scalars().all():
+        legacy_facet.is_active = False
+        created = True
 
     if created:
         await db.flush()
