@@ -50,40 +50,12 @@
           <n-grid-item>
             <n-space vertical size="large">
               <n-descriptions :column="1" bordered size="small">
-                <n-descriptions-item label="文件名">{{ photo.filename }}</n-descriptions-item>
-                <n-descriptions-item label="尺寸">{{ photo.width }} x {{ photo.height }}</n-descriptions-item>
-                <n-descriptions-item label="文件大小">{{ formatFileSize(photo.file_size) }}</n-descriptions-item>
-                <n-descriptions-item label="上传时间">{{ formatDate(photo.created_at) }}</n-descriptions-item>
-                <n-descriptions-item v-if="photo.captured_at" label="拍摄时间">{{ formatDate(photo.captured_at) }}</n-descriptions-item>
-                <n-descriptions-item label="状态">
-                  <n-tag :type="getStatusType(photo.status)">{{ getStatusText(photo.status) }}</n-tag>
-                </n-descriptions-item>
+                <n-descriptions-item label="作品名称">{{ photo.title || parsedTitle || photo.filename }}</n-descriptions-item>
+                <n-descriptions-item label="作者">{{ photo.author || parsedAuthor || '未知' }}</n-descriptions-item>
+                <n-descriptions-item label="来源">{{ displaySource }}</n-descriptions-item>
+                <n-descriptions-item label="地点">{{ displayCampus }}</n-descriptions-item>
+                <n-descriptions-item label="版权声明">© 北京化工大学 版权所有</n-descriptions-item>
               </n-descriptions>
-
-              <n-form :model="formData">
-                <n-form-item label="季节">
-                  <n-select v-model:value="formData.season" :options="seasonOptions" clearable />
-                </n-form-item>
-                <n-form-item label="校区">
-                  <n-select v-model:value="formData.campus" :options="campusOptions" clearable />
-                </n-form-item>
-                <n-form-item label="题材">
-                  <n-select v-model:value="formData.category" :options="categoryOptions" clearable />
-                </n-form-item>
-                <n-form-item label="描述">
-                  <n-input v-model:value="formData.description" type="textarea" :rows="3" placeholder="输入照片描述..." />
-                </n-form-item>
-              </n-form>
-
-              <div>
-                <n-text strong>自由标签</n-text>
-                <n-space style="margin-top: 8px;" wrap>
-                  <n-tag v-for="tag in photo.tags" :key="tag" closable @close="handleRemoveTag(tag)">
-                    {{ tag }}
-                  </n-tag>
-                  <n-button size="small" @click="showAddTag = true">+ 添加标签</n-button>
-                </n-space>
-              </div>
 
               <div v-if="photo && adminMode">
                 <n-text strong>受控分类</n-text>
@@ -189,13 +161,6 @@
                         </n-space>
                       </div>
 
-                      <div v-if="aiTask.result_json.free_tags?.length">
-                        <n-text depth="3">候选自由标签</n-text>
-                        <n-space style="margin-top: 8px;" wrap>
-                          <n-tag v-for="tag in aiTask.result_json.free_tags" :key="tag" size="small">{{ tag }}</n-tag>
-                        </n-space>
-                      </div>
-
                       <div v-if="aiTask.result_json.quality_flags?.length">
                         <n-text depth="3">质量提示</n-text>
                         <n-space style="margin-top: 8px;" wrap>
@@ -253,7 +218,7 @@
       </div>
     </n-spin>
 
-    <template #footer>
+    <template v-if="adminMode" #footer>
       <n-space justify="space-between">
         <n-popconfirm @positive-click="handleDelete">
           <template #trigger>
@@ -298,6 +263,7 @@ import { incrementView } from '../../api/stats'
 import { SEASON_OPTIONS, CATEGORY_OPTIONS } from '../../constants/options'
 import { usePhotoStore } from '../../stores/photo'
 import type { Photo, PhotoUpdate, TaxonomyValue } from '../../types/photo'
+import { taxonomyValueName } from '../../types/photo'
 import { getPhotoUrl, getPhotoDownloadUrl } from '../../utils/format'
 import { getPublicTaxonomy, type TaxonomyFacet } from '../../api/taxonomy'
 import { findTaxonomyNode, flattenTaxonomyOptions, isNodeSelectable } from '../../utils/taxonomy'
@@ -400,6 +366,24 @@ const classificationSuggestions = computed(() => {
 const classificationList = computed<TaxonomyValue[]>(() => {
   if (!photo.value?.classifications) return []
   return Object.values(photo.value.classifications).flatMap((value) => Array.isArray(value) ? value : [value])
+})
+
+const parsedTitle = computed(() => parsedDescriptionPart(0))
+const parsedAuthor = computed(() => {
+  const part = parsedDescriptionPart(1)
+  return part.replace(/^作者[:：]\s*/, '')
+})
+
+const displayCampus = computed(() => {
+  const campus = photo.value?.classifications?.campus
+  return taxonomyValueName(campus) || photo.value?.campus || '未知'
+})
+
+const displaySource = computed(() => {
+  const series = taxonomyValueName(photo.value?.classifications?.gallery_series)
+  if (series === '昌平校区摄影大赛') return '获奖作品'
+  if (series === '投稿作品') return '投稿作品'
+  return series || '未知'
 })
 
 function handleKeydown(event: KeyboardEvent) {
@@ -662,6 +646,13 @@ function getFacetNodeOptions(facetKey: string) {
   const facet = taxonomyFacets.value.find((f) => f.key === facetKey)
   if (!facet) return []
   return flattenTaxonomyOptions(facet.nodes, (node) => node.id)
+}
+
+function parsedDescriptionPart(index: number): string {
+  return (photo.value?.description || '')
+    .split('|')
+    .map((part) => part.trim())
+    .filter(Boolean)[index] || ''
 }
 
 function getUnclassifiedFacets() {

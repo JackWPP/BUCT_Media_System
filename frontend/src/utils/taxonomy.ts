@@ -13,7 +13,7 @@ export const FACET_LABELS: Record<string, string> = {
   gallery_series: '专区',
   source_type: '来源',
   campus: '校区',
-  photo_type: '类别',
+  photo_type: '题材',
   building: '楼宇',
   facility: '设施',
   landscape: '景观',

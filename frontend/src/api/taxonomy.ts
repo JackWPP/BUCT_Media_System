@@ -60,6 +60,7 @@ export interface TaxonomyGuide {
   dependencies: Record<string, Record<string, string[]>>
   legacy_query_aliases: Record<string, string>
   campus_category_tree?: Record<string, Record<string, TaxonomyGuideGroup[]>>
+  gallery_filter_tree?: TaxonomyGuideGroup[]
 }
 
 export interface TaxonomyGuideGroup {

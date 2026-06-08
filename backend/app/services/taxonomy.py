@@ -102,16 +102,41 @@ CHANGPING_BUILDING_PHASE_2 = [
     "杏坛苑/短租公寓",
 ]
 
-CHANGPING_FACILITY_GROUPS = {
-    "室外设施": ["运动场/风雨操场", "第二运动场", "足球场", "篮球场", "网球场", "排球场", "素质拓展基地"],
-    "教学设施": ["教室（第一教学楼）", "教室（第二教学楼）", "求真讲堂（第二教学楼）", "励学讲堂（第二教学楼）", "教研室（大学生活动中心）"],
-    "体育设施": ["比赛主场馆（体育馆）", "健身房（体育馆）", "篮球训练馆（体育馆）", "网球馆（体育馆）", "羽毛球馆（体育馆）", "乒乓球馆（体育馆）", "游泳馆（体育馆）", "健美操室（体育馆）", "舞蹈室（体育馆）", "跆拳道室（体育馆）", "形体室（体育馆）", "体测室（体育馆）"],
-    "美育设施": ["蓝晒美育工坊（实验楼）", "人因工学美育工坊（实验楼）", "掐丝珐琅美育工坊（实验楼）", "滴胶艺术坊（实验楼）", "陶艺拉坯美育工坊（实验楼）", "陶艺彩绘美育工坊（实验楼）", "情绪串珠美育工坊（实验楼）", "永生绒花美育工坊（实验楼）", "木艺工坊（实验楼）"],
-    "实验设施": ["数字化智能教学未来中心（实验楼）", "思政学习创新中心（实验楼）", "实践教学与创新培养未来中心（实验楼）"],
-    "办公设施": ["一站式服务大厅（图书馆）", "马克思主义学院（文理楼）", "数理学院（文理楼）", "文法学院（文理楼）", "经济管理学院（文理楼）"],
-    "会议设施": ["网络视频会议室（图书馆）", "共享研讨空间（图书馆）", "第一会议室（图书馆）", "第二会议室（图书馆）", "学术报告厅（图书馆）", "共享办公空间（图书馆）", "多功能厅（体育馆）", "会议室（第二教学楼）", "会议室（后勤服务楼）", "贵宾室（体育馆）", "贵宾室（第二教学楼）", "会议室（校史博物馆）"],
-    "其他设施": ["小剧场（大学生活动中心）", "主题摄影展（图书馆）", "212大型视听室（图书馆）", "校史馆临时展厅（图书馆）", "智慧教学运行中心（第二教学楼）", "艺术展厅（大学生活动中心）", "琴房（大学生活动中心）", "活动室（大学生活动中心）", "排练厅（大学生活动中心）", "创享商圈（大学生活动中心）", "主题展厅（校史博物馆）", "藏品修复室（校史博物馆）", "数控仿真室（工程训练中心）", "创客空间（工程训练中心）", "游戏设计工坊（工程训练中心）", "寓建生活工坊（学生公寓）"],
-}
+CHANGPING_FACILITY_TREE = [
+    {"title": "室外设施", "facet_key": "facility", "nodes": ["运动场/风雨操场", "第二运动场", "足球场", "篮球场", "网球场", "排球场", "素质拓展基地"]},
+    {
+        "title": "室内设施",
+        "facet_key": "facility",
+        "groups": [
+            {"title": "教学设施", "facet_key": "facility", "nodes": ["教室（第一教学楼）", "教室（第二教学楼）", "求真讲堂（第二教学楼）", "励学讲堂（第二教学楼）", "教研室（大学生活动中心）"]},
+            {"title": "体育设施", "facet_key": "facility", "nodes": ["比赛主场馆（体育馆）", "健身房（体育馆）", "篮球训练馆（体育馆）", "网球馆（体育馆）", "羽毛球馆（体育馆）", "乒乓球馆（体育馆）", "游泳馆（体育馆）", "健美操室（体育馆）", "舞蹈室（体育馆）", "跆拳道室（体育馆）", "形体室（体育馆）", "体测室（体育馆）"]},
+            {"title": "美育设施", "facet_key": "facility", "nodes": ["蓝晒美育工坊（实验楼）", "人因工学美育工坊（实验楼）", "掐丝珐琅美育工坊（实验楼）", "滴胶艺术坊（实验楼）", "陶艺拉坯美育工坊（实验楼）", "陶艺彩绘美育工坊（实验楼）", "情绪串珠美育工坊（实验楼）", "永生绒花美育工坊（实验楼）", "木艺工坊（实验楼）"]},
+            {"title": "实验设施", "facet_key": "facility", "nodes": ["数字化智能教学未来中心（实验楼）", "思政学习创新中心（实验楼）", "实践教学与创新培养未来中心（实验楼）"]},
+            {"title": "办公设施", "facet_key": "facility", "nodes": ["一站式服务大厅（图书馆）", "马克思主义学院（文理楼）", "数理学院（文理楼）", "文法学院（文理楼）", "经济管理学院（文理楼）"]},
+            {"title": "会议设施", "facet_key": "facility", "nodes": ["网络视频会议室（图书馆）", "共享研讨空间（图书馆）", "第一会议室（图书馆）", "第二会议室（图书馆）", "学术报告厅（图书馆）", "共享办公空间（图书馆）", "多功能厅（体育馆）", "会议室（第二教学楼）", "第一会议室（后勤服务楼）", "第二会议室（后勤服务楼）", "第三会议室（后勤服务楼）", "共享办公空间（后勤服务楼）", "贵宾室“宏德”（体育馆）", "贵宾室“博学”（体育馆）", "贵宾室“化育”（体育馆）", "贵宾室“天工”（体育馆）", "贵宾室（第二教学楼）", "会议室（校史博物馆）", "贵宾室（校史博物馆）"]},
+            {"title": "其他设施", "facet_key": "facility", "nodes": ["小剧场（大学生活动中心）", "主题摄影展（图书馆）", "212大型视听室（图书馆）", "校史馆临时展厅（图书馆）", "智慧教学运行中心（第二教学楼）", "艺术展厅（大学生活动中心）", "琴房（大学生活动中心）", "活动室（大学生活动中心）", "排练厅（大学生活动中心）", "创享商圈（大学生活动中心）", "主题展厅（校史博物馆）", "藏品修复室（校史博物馆）", "数控仿真室（工程训练中心）", "创客空间（工程训练中心）", "游戏设计工坊（工程训练中心）", "寓建生活工坊（学生公寓）"]},
+        ],
+    },
+]
+
+
+def _group_nodes(groups: list[dict]) -> list[dict]:
+    return [
+        {
+            "name": group["title"],
+            "is_selectable": False,
+            "children": _group_nodes(group.get("groups", [])) + list(group.get("nodes", [])),
+        }
+        for group in groups
+    ]
+
+
+def _collect_group_nodes(groups: list[dict]) -> list[str]:
+    names: list[str] = []
+    for group in groups:
+        names.extend(group.get("nodes", []))
+        names.extend(_collect_group_nodes(group.get("groups", [])))
+    return names
 
 CHANGPING_NATURAL_ECOLOGY = {
     "季节": ["春季", "夏季", "秋季", "冬季"],
@@ -225,7 +250,7 @@ DEFAULT_TAXONOMY = [
     },
     {
         "key": "photo_type",
-        "name": "类别",
+        "name": "题材",
         "is_system": True,
         "sort_order": 60,
         "nodes": ["建筑楼宇", "校区设施", "自然生态"],
@@ -243,13 +268,7 @@ DEFAULT_TAXONOMY = [
         "sort_order": 80,
         "nodes": [
             {"name": "室外设施", "children": ["运动场/风雨操场", "第二运动场", "足球场", "篮球场", "网球场", "排球场", "素质拓展基地"]},
-            {"name": "教学设施", "children": ["教室（第一教学楼）", "教室（第二教学楼）", "求真讲堂（第二教学楼）", "励学讲堂（第二教学楼）", "教研室（大学生活动中心）"]},
-            {"name": "体育设施", "children": ["比赛主场馆（体育馆）", "健身房（体育馆）", "篮球训练馆（体育馆）", "网球馆（体育馆）", "羽毛球馆（体育馆）", "乒乓球馆（体育馆）", "游泳馆（体育馆）", "健美操室（体育馆）", "舞蹈室（体育馆）", "跆拳道室（体育馆）", "形体室（体育馆）", "体测室（体育馆）"]},
-            {"name": "美育设施", "children": ["蓝晒美育工坊（实验楼）", "人因工学美育工坊（实验楼）", "掐丝珐琅美育工坊（实验楼）", "滴胶艺术坊（实验楼）", "陶艺拉坯美育工坊（实验楼）", "陶艺彩绘美育工坊（实验楼）", "情绪串珠美育工坊（实验楼）", "永生绒花美育工坊（实验楼）", "木艺工坊（实验楼）"]},
-            {"name": "实验设施", "children": ["数字化智能教学未来中心（实验楼）", "思政学习创新中心（实验楼）", "实践教学与创新培养未来中心（实验楼）"]},
-            {"name": "办公设施", "children": ["一站式服务大厅（图书馆）", "马克思主义学院（文理楼）", "数理学院（文理楼）", "文法学院（文理楼）", "经济管理学院（文理楼）"]},
-            {"name": "会议设施", "children": ["网络视频会议室（图书馆）", "共享研讨空间（图书馆）", "第一会议室（图书馆）", "第二会议室（图书馆）", "学术报告厅（图书馆）", "共享办公空间（图书馆）", "多功能厅（体育馆）", "会议室（第二教学楼）", "会议室（后勤服务楼）", "贵宾室（体育馆）", "贵宾室（第二教学楼）", "会议室（校史博物馆）"]},
-            {"name": "其他设施", "children": ["小剧场（大学生活动中心）", "主题摄影展（图书馆）", "212大型视听室（图书馆）", "校史馆临时展厅（图书馆）", "智慧教学运行中心（第二教学楼）", "艺术展厅（大学生活动中心）", "琴房（大学生活动中心）", "活动室（大学生活动中心）", "排练厅（大学生活动中心）", "创享商圈（大学生活动中心）", "主题展厅（校史博物馆）", "藏品修复室（校史博物馆）", "数控仿真室（工程训练中心）", "创客空间（工程训练中心）", "游戏设计工坊（工程训练中心）", "寓建生活工坊（学生公寓）"]},
+            *_group_nodes(CHANGPING_FACILITY_TREE[1:]),
         ],
         "aliases": {},
     },
@@ -371,6 +390,33 @@ LEGACY_NODE_MERGES = {
 
 TAXONOMY_GUIDE = {
     "primary": ["gallery_series", "campus", "photo_type"],
+    "gallery_filter_tree": [
+        {
+            "title": "专区",
+            "facet_key": "gallery_series",
+            "groups": [
+                {
+                    "title": "昌平校区摄影大赛",
+                    "facet_key": "gallery_series",
+                    "nodes": ["昌平校区摄影大赛"],
+                    "groups": [
+                        {"title": "届次", "facet_key": "gallery_year", "nodes": [
+                            "第一届获奖作品（2018年）",
+                            "第二届获奖作品（2019年）",
+                            "第三届获奖作品（2020年）",
+                            "第四届获奖作品（2021年）",
+                            "第五届获奖作品（2022年）",
+                            "第六届获奖作品（2023年）",
+                            "第七届获奖作品（2024年）",
+                            "第八届获奖作品（2025年）",
+                        ]},
+                    ],
+                },
+                {"title": "投稿作品", "facet_key": "gallery_series", "nodes": ["投稿作品"]},
+            ],
+        },
+        {"title": "校区", "facet_key": "campus", "nodes": ["朝阳校区", "昌平校区", "海淀校区"]},
+    ],
     "dependencies": {
         "campus": {
             "朝阳校区": ["building", "facility", "landscape"],
@@ -382,9 +428,9 @@ TAXONOMY_GUIDE = {
             "投稿作品": [],
         },
         "photo_type": {
-            "建筑楼宇": ["building", "landscape", "season", "technique"],
-            "校区设施": ["facility", "landscape", "season", "technique"],
-            "自然生态": ["season", "natural_phenomenon", "landscape", "animal", "plant", "technique"],
+            "建筑楼宇": ["building"],
+            "校区设施": ["facility"],
+            "自然生态": ["season", "landscape", "natural_phenomenon", "animal", "plant"],
         },
     },
     "campus_structure": {
@@ -393,7 +439,7 @@ TAXONOMY_GUIDE = {
                 "一期项目": CHANGPING_BUILDING_PHASE_1,
                 "二期项目": CHANGPING_BUILDING_PHASE_2,
             },
-            "facility": CHANGPING_FACILITY_GROUPS,
+            "facility": {"校区设施": _collect_group_nodes(CHANGPING_FACILITY_TREE)},
             "natural_ecology": CHANGPING_NATURAL_ECOLOGY,
             "landscape": {
                 "景观维持": CHANGPING_LANDSCAPE_MAINTENANCE,
@@ -412,18 +458,19 @@ TAXONOMY_GUIDE = {
                 {"title": "一期项目", "facet_key": "building", "nodes": CHANGPING_BUILDING_PHASE_1},
                 {"title": "二期项目", "facet_key": "building", "nodes": CHANGPING_BUILDING_PHASE_2},
             ],
-            "校区设施": [
-                {"title": title, "facet_key": "facility", "nodes": nodes}
-                for title, nodes in CHANGPING_FACILITY_GROUPS.items()
-            ] + [
-                {"title": "景观", "facet_key": "landscape", "nodes": CHANGPING_LANDSCAPE_MAINTENANCE},
-            ],
+            "校区设施": CHANGPING_FACILITY_TREE,
             "自然生态": [
-                {"title": "季节", "facet_key": "season", "nodes": CHANGPING_NATURAL_ECOLOGY["季节"]},
+                {"title": "四季变化", "facet_key": "season", "nodes": CHANGPING_NATURAL_ECOLOGY["季节"]},
+                {
+                    "title": "校园生态",
+                    "facet_key": "landscape",
+                    "groups": [
+                        {"title": "景观", "facet_key": "landscape", "nodes": CHANGPING_LANDSCAPE_MAINTENANCE},
+                        {"title": "动物", "facet_key": "animal", "nodes": CHANGPING_NATURAL_ECOLOGY["动物"]},
+                        {"title": "植物", "facet_key": "plant", "nodes": CHANGPING_NATURAL_ECOLOGY["植物"]},
+                    ],
+                },
                 {"title": "自然现象", "facet_key": "natural_phenomenon", "nodes": CHANGPING_NATURAL_ECOLOGY["自然现象"]},
-                {"title": "动物", "facet_key": "animal", "nodes": CHANGPING_NATURAL_ECOLOGY["动物"]},
-                {"title": "植物", "facet_key": "plant", "nodes": CHANGPING_NATURAL_ECOLOGY["植物"]},
-                {"title": "景观", "facet_key": "landscape", "nodes": CHANGPING_LANDSCAPE_MAINTENANCE},
             ],
         },
         "朝阳校区": {
@@ -726,6 +773,89 @@ def validate_selectable_node(node: TaxonomyNode, facet_key: str | None = None) -
         raise ValueError(f"Node {node.id} does not belong to facet: {facet_key}")
 
 
+def _names_for_campus_facet(campus: str, facet_key: str) -> set[str]:
+    if facet_key == "building":
+        if campus == "昌平校区":
+            return set(CHANGPING_BUILDINGS)
+        if campus == "朝阳校区":
+            return set(CHAOYANG_BUILDINGS)
+        if campus == "海淀校区":
+            return set(HAIDIAN_BUILDINGS)
+    if facet_key == "facility":
+        return set(_collect_group_nodes(CHANGPING_FACILITY_TREE)) if campus == "昌平校区" else set()
+    if facet_key == "landscape":
+        return set(CHANGPING_LANDSCAPE_MAINTENANCE) if campus == "昌平校区" else set()
+    return set()
+
+
+def validate_classification_context_payload(
+    submitted: dict[str, dict[str, object]],
+    *,
+    require_core: bool = False,
+) -> None:
+    """Validate cross-facet taxonomy semantics for a pending write.
+
+    This keeps the Fix_68 display tree and the stored classifications aligned:
+    campus scopes detailed nodes, and photo_type scopes detailed facets.
+    """
+    def has(facet_key: str) -> bool:
+        value = submitted.get(facet_key)
+        return bool(value and (value.get("node_id") or value.get("node_ids")))
+
+    def single_name(facet_key: str) -> str | None:
+        value = submitted.get(facet_key)
+        if isinstance(value, dict) and value.get("node_name"):
+            return str(value["node_name"])
+        return None
+
+    def node_names(facet_key: str) -> list[str]:
+        value = submitted.get(facet_key)
+        if not isinstance(value, dict):
+            return []
+        if value.get("node_name"):
+            return [str(value["node_name"])]
+        nodes = value.get("nodes")
+        if isinstance(nodes, list):
+            return [str(node["node_name"]) for node in nodes if isinstance(node, dict) and node.get("node_name")]
+        return []
+
+    if require_core:
+        if not has("gallery_series"):
+            raise ValueError("专区为必填项")
+        gallery_series = single_name("gallery_series")
+        if gallery_series == "昌平校区摄影大赛":
+            if not has("gallery_year"):
+                raise ValueError("摄影大赛作品必须选择届次/年份")
+        elif gallery_series != "投稿作品":
+            raise ValueError("专区必须为昌平校区摄影大赛或投稿作品")
+        if not has("campus"):
+            raise ValueError("校区为必填项")
+        if not has("photo_type"):
+            raise ValueError("题材为必填项")
+
+    campus = single_name("campus")
+    photo_type = single_name("photo_type")
+    disallowed_by_type = {
+        "建筑楼宇": {"facility"},
+        "校区设施": {"building"},
+    }
+    if photo_type in disallowed_by_type:
+        for facet_key in disallowed_by_type[photo_type]:
+            value = submitted.get(facet_key)
+            if value and (value.get("node_id") or value.get("node_ids")):
+                raise ValueError(f"{photo_type} 不允许提交 {facet_key} 分类")
+
+    if campus:
+        for facet_key in ("building", "facility", "landscape"):
+            names = node_names(facet_key)
+            if not names:
+                continue
+            allowed = _names_for_campus_facet(campus, facet_key)
+            invalid = [name for name in names if name not in allowed]
+            if invalid:
+                raise ValueError(f"{campus} 不允许提交 {facet_key}：{', '.join(invalid)}")
+
+
 async def replace_node_aliases(db: AsyncSession, node: TaxonomyNode, aliases: list[str]) -> None:
     await db.execute(TaxonomyAlias.__table__.delete().where(TaxonomyAlias.node_id == node.id))
     for alias in aliases:
@@ -907,12 +1037,74 @@ async def set_photo_classification_nodes(
             await db.delete(classification)
 
 
+async def serialize_classification_selection(
+    db: AsyncSession,
+    classifications: dict[str, int | list[int]],
+) -> dict[str, dict[str, object]]:
+    payload: dict[str, dict[str, object]] = {}
+    for facet_key, value in classifications.items():
+        facet = await get_facet_by_key(db, facet_key)
+        if facet is None or not facet.is_active:
+            raise ValueError(f"Unknown facet: {facet_key}")
+        node_ids = value if isinstance(value, list) else [value]
+        nodes_payload = []
+        for node_id in node_ids:
+            if not node_id:
+                continue
+            node = await get_node_by_id(db, int(node_id))
+            if node is None:
+                raise ValueError(f"Unknown node id: {node_id}")
+            if node.facet_id != facet.id:
+                raise ValueError(f"Node {node_id} does not belong to facet: {facet_key}")
+            validate_selectable_node(node, facet_key)
+            nodes_payload.append({"node_id": node.id, "node_name": node.name})
+        if isinstance(value, list):
+            payload[facet_key] = {
+                "node_ids": [node["node_id"] for node in nodes_payload],
+                "nodes": nodes_payload,
+            }
+        elif nodes_payload:
+            payload[facet_key] = nodes_payload[0]
+    return payload
+
+
+async def serialize_photo_classifications_for_validation(
+    db: AsyncSession,
+    photo: Photo,
+) -> dict[str, dict[str, object]]:
+    result = await db.execute(
+        select(PhotoClassification)
+        .options(
+            selectinload(PhotoClassification.facet),
+            selectinload(PhotoClassification.node),
+        )
+        .where(PhotoClassification.photo_id == photo.id)
+    )
+    values: dict[str, dict[str, object]] = {}
+    for classification in result.scalars().all():
+        facet = classification.facet
+        node = classification.node
+        if not facet or not node or not facet.is_active or not node.is_active or not node.is_selectable:
+            continue
+        if facet.selection_mode == "multiple":
+            current = values.setdefault(facet.key, {"node_ids": [], "nodes": []})
+            current["node_ids"].append(node.id)
+            current["nodes"].append({"node_id": node.id, "node_name": node.name})
+        else:
+            values[facet.key] = {"node_id": node.id, "node_name": node.name}
+    return values
+
+
 async def set_photo_classifications(
     db: AsyncSession,
     photo: Photo,
     classifications: dict[str, int | list[int]],
 ) -> None:
     """Batch set classifications for a photo: { facet_key: node_id | node_ids }."""
+    existing = await serialize_photo_classifications_for_validation(db, photo)
+    submitted = dict(existing)
+    submitted.update(await serialize_classification_selection(db, classifications))
+    validate_classification_context_payload(submitted)
     for facet_key, value in classifications.items():
         if isinstance(value, list):
             await set_photo_classification_nodes(db, photo, facet_key, value)

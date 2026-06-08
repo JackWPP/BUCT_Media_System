@@ -46,7 +46,7 @@
           <span v-if="photoStore.filters.search && !isVectorSearch" class="search-term">
             "{{ photoStore.filters.search }}"
           </span>
-          <span v-else>按专区、校区和类别筛选图片</span>
+          <span v-else>按专区、校区和题材筛选图片</span>
         </div>
 
         <div class="toolbar-actions">
@@ -147,7 +147,7 @@
                   v-model:value="standardTagSearch"
                   size="small"
                   clearable
-                  placeholder="在当前校区和类别下搜索标准标签"
+                  placeholder="在当前校区和题材下搜索标准标签"
                   class="standard-tag-search"
                 >
                   <template #prefix>
@@ -461,11 +461,9 @@ const facetMap = computed(() =>
   Object.fromEntries(taxonomyFacets.value.map((facet) => [facet.key, facet])),
 )
 
-// 静态筛选字段（始终显示，不需要 taxonomy 数据）
-// 所有筛选字段统一从 taxonomy API 动态获取
-const dynamicFacetKeys = GALLERY_FILTER_KEYS
+const QUERY_FILTER_KEYS = GALLERY_FILTER_KEYS
 
-const primaryFacetKeys = computed(() => taxonomyGuide.value?.primary || ['gallery_series', 'campus', 'photo_type'])
+const primaryFacetKeys = computed(() => ['gallery_series', 'gallery_year', 'campus', 'photo_type'])
 
 const campusCategoryFacetKeys = computed(() => {
   const keys = new Set<string>()
@@ -473,21 +471,9 @@ const campusCategoryFacetKeys = computed(() => {
   return keys
 })
 
-const dependentFacetKeys = computed(() => {
-  const keys: string[] = []
-  const dependencies = taxonomyGuide.value?.dependencies || {}
-  Object.entries(dependencies).forEach(([parentKey, byValue]) => {
-    const selected = photoStore.filters[parentKey as keyof PhotoFilters]
-    if (!selected) return
-    const children = byValue[selected as string] || []
-    children.forEach((key) => keys.push(key))
-  })
-  return keys
-})
-
 const visibleFacetKeys = computed(() => {
   const visible: string[] = []
-  dynamicFacetKeys.forEach((key) => {
+  primaryFacetKeys.value.forEach((key) => {
     if (campusCategoryFacetKeys.value.has(key)) return
     if (facetOptions(key).length > 0) {
       visible.push(key)
@@ -499,22 +485,21 @@ const visibleFacetKeys = computed(() => {
 const hasAnyFacets = computed(() => visibleFacetKeys.value.length > 0)
 
 const guideVisibleFacetKeys = computed(() => {
-  const preferred = [
-    'gallery_series',
-    'gallery_year',
-    'award_level',
-    'campus',
-    'photo_type',
-    ...dependentFacetKeys.value,
-  ]
-  const keys = [...preferred, ...primaryFacetKeys.value]
-  return [...new Set(keys)].filter((key) => visibleFacetKeys.value.includes(key))
+  const keys = ['gallery_series']
+  if (photoStore.filters.gallery_series === '昌平校区摄影大赛') {
+    keys.push('gallery_year')
+  }
+  keys.push('campus')
+  if (photoStore.filters.campus) {
+    keys.push('photo_type')
+  }
+  return keys.filter((key) => visibleFacetKeys.value.includes(key))
 })
 
 const activeFilters = computed(() => {
   const filters = photoStore.filters
   const chips: Array<{ key: keyof PhotoFilters; label: string; value: string }> = []
-  GALLERY_FILTER_KEYS.forEach((key) => {
+  QUERY_FILTER_KEYS.forEach((key) => {
     const value = filters[key]
     if (value) {
       chips.push({ key, label: facetLabelMap[key], value: filterValueLabel(key, value) })
@@ -592,7 +577,7 @@ function filterValueLabel(key: string, value: string) {
     const normalized = Object.prototype.hasOwnProperty.call(legacyPhotoTypeDisplayMap, value)
       ? legacyPhotoTypeDisplayMap[value]
       : value
-    if (!normalized) return '待补充类别'
+    if (!normalized) return '待补充题材'
     return facetOptions(key).find((option) => option.value === normalized)?.label || normalized
   }
   return facetOptions(key).find((option) => option.value === value)?.label || value
@@ -635,6 +620,59 @@ const campusCategoryGroups = computed(() => {
   if (!groups?.length) return []
   return collectGuideGroups(groups)
 })
+
+const currentAllowedFineValues = computed(() => {
+  const allowed = new Map<string, Set<string>>()
+  campusCategoryGroups.value.forEach((group) => {
+    const values = allowed.get(group.facetKey) || new Set<string>()
+    group.options.forEach((option) => values.add(String(option.value)))
+    allowed.set(group.facetKey, values)
+  })
+  return allowed
+})
+
+const fineFilterKeys: Array<keyof PhotoFilters> = [
+  'building',
+  'facility',
+  'landscape',
+  'season',
+  'natural_phenomenon',
+  'technique',
+  'animal',
+  'plant',
+  'documentary_topic',
+]
+
+function normalizeDependentFilters(next: Partial<PhotoFilters>) {
+  if (Object.prototype.hasOwnProperty.call(next, 'gallery_series')) {
+    const series = next.gallery_series ?? photoStore.filters.gallery_series
+    if (series !== '昌平校区摄影大赛') {
+      next.gallery_year = null
+      next.award_level = null
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(next, 'campus')) {
+    next.photo_type = null
+    fineFilterKeys.forEach((key) => { next[key] = null })
+  }
+  if (Object.prototype.hasOwnProperty.call(next, 'photo_type')) {
+    fineFilterKeys.forEach((key) => { next[key] = null })
+  }
+  return next
+}
+
+function pruneInvalidFineFilters() {
+  if (!taxonomyGuide.value) return
+  const allowed = currentAllowedFineValues.value
+  const updates: Partial<PhotoFilters> = {}
+  fineFilterKeys.forEach((key) => {
+    const value = photoStore.filters[key]
+    if (!value) return
+    const values = allowed.get(key)
+    if (!values || !values.has(value)) updates[key] = null
+  })
+  if (Object.keys(updates).length) photoStore.setFilters(updates)
+}
 
 function normalizeFacetFilterValue(key: string, value: string): string | null {
   if (key !== 'photo_type') return value
@@ -719,7 +757,7 @@ function handleImageLoad(event: Event, photo: Photo) {
 function buildQuery() {
   const query: Record<string, string> = {}
   const filters = photoStore.filters
-  GALLERY_FILTER_KEYS.forEach((key) => {
+  QUERY_FILTER_KEYS.forEach((key) => {
     const value = filters[key]
     if (value) query[key] = value
   })
@@ -768,12 +806,23 @@ function applyRouteQuery() {
   photoStore.currentPage = query.page ? Number(query.page) || 1 : 1
   photoStore.pageSize = query.page_size ? Number(query.page_size) || masonryPageSizes.value[0] : masonryPageSizes.value[0]
   searchKeyword.value = photoStore.filters.search
+  if (photoStore.filters.gallery_series !== '昌平校区摄影大赛') {
+    photoStore.filters.gallery_year = null
+    photoStore.filters.award_level = null
+  }
+  if (!photoStore.filters.campus) photoStore.filters.photo_type = null
+  if (!photoStore.filters.campus || !photoStore.filters.photo_type) {
+    fineFilterKeys.forEach((key) => { photoStore.filters[key] = null })
+  }
+  pruneInvalidFineFilters()
   syncingRoute.value = false
 }
 
 async function toggleFilter(key: keyof PhotoFilters, value: string) {
   const current = photoStore.filters[key]
-  photoStore.setFilters({ [key]: current === value ? null : value } as Partial<PhotoFilters>)
+  const next = normalizeDependentFilters({ [key]: current === value ? null : value } as Partial<PhotoFilters>)
+  photoStore.setFilters(next)
+  pruneInvalidFineFilters()
   await syncQueryAndFetch()
 }
 
@@ -790,7 +839,9 @@ async function submitGallerySearch() {
 }
 
 async function removeFilter(key: keyof PhotoFilters) {
-  photoStore.setFilters({ [key]: null } as Partial<PhotoFilters>)
+  const next = normalizeDependentFilters({ [key]: null } as Partial<PhotoFilters>)
+  photoStore.setFilters(next)
+  pruneInvalidFineFilters()
   await syncQueryAndFetch()
 }
 
@@ -894,6 +945,8 @@ async function handleSmartToggle(enabled: boolean) {
 }
 
 async function handleCompactFilterChange(key: keyof PhotoFilters) {
+  photoStore.setFilters(normalizeDependentFilters({ [key]: photoStore.filters[key] } as Partial<PhotoFilters>))
+  pruneInvalidFineFilters()
   photoStore.setPage(1)
   await syncQueryAndFetch()
 }
@@ -1087,9 +1140,10 @@ onMounted(async () => {
     filterMode.value = savedFilterMode
   }
 
-  applyRouteQuery()
   clearVectorSearch()
-  await Promise.all([photoStore.fetchPublicPhotos(), loadTaxonomy()])
+  await loadTaxonomy()
+  applyRouteQuery()
+  await photoStore.fetchPublicPhotos()
 
   if (photoStore.searchInterpretation && smartSearchEnabled.value) {
     applyInterpretation(photoStore.searchInterpretation)

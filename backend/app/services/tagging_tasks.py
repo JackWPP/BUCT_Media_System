@@ -21,10 +21,10 @@ from app.services.taxonomy import (
     PHOTO_TYPE_COMPAT_VALUES,
     TAXONOMY_GUIDE,
     get_facet_by_key,
-    get_node_by_id,
+    serialize_classification_selection,
     serialize_classifications,
     set_photo_classifications,
-    validate_selectable_node,
+    validate_classification_context_payload,
 )
 
 
@@ -381,29 +381,7 @@ async def _serialize_submission_classifications(
     db: AsyncSession,
     classifications: dict[str, int | list[int]],
 ) -> dict[str, dict[str, object]]:
-    submitted_classifications = {}
-    for facet_key, value in classifications.items():
-        facet = await get_facet_by_key(db, facet_key)
-        if facet is None or not facet.is_active:
-            raise ValueError(f"Unknown facet: {facet_key}")
-        node_ids = value if isinstance(value, list) else [value]
-        nodes_payload = []
-        for node_id in node_ids:
-            node = await get_node_by_id(db, int(node_id))
-            if node is None or not node.is_active:
-                raise ValueError(f"Unknown node id: {node_id}")
-            if node.facet_id != facet.id:
-                raise ValueError(f"Node {node_id} does not belong to facet: {facet_key}")
-            validate_selectable_node(node, facet_key)
-            nodes_payload.append({"node_id": node.id, "node_name": node.name})
-        if isinstance(value, list):
-            submitted_classifications[facet_key] = {
-                "node_ids": [node["node_id"] for node in nodes_payload],
-                "nodes": nodes_payload,
-            }
-        elif nodes_payload:
-            submitted_classifications[facet_key] = nodes_payload[0]
-    return submitted_classifications
+    return await serialize_classification_selection(db, classifications)
 
 
 async def save_draft(
@@ -453,18 +431,7 @@ async def submit_item(
     item.submitted_title = metadata["draft_title"]
     item.submitted_author = metadata["draft_author"]
     submitted_classifications = await _serialize_submission_classifications(db, classifications)
-    if not _has_classification(submitted_classifications, "gallery_series"):
-        raise ValueError("专区为必填项")
-    gallery_series = _single_node_name(submitted_classifications, "gallery_series")
-    if gallery_series == "昌平校区摄影大赛":
-        if not _has_classification(submitted_classifications, "gallery_year"):
-            raise ValueError("摄影大赛作品必须选择届次/年份")
-    elif gallery_series != "投稿作品":
-        raise ValueError("专区必须为昌平校区摄影大赛或投稿作品")
-    if not _has_classification(submitted_classifications, "campus"):
-        raise ValueError("校区为必填项")
-    if not _has_classification(submitted_classifications, "photo_type"):
-        raise ValueError("类别为必填项")
+    validate_classification_context_payload(submitted_classifications, require_core=True)
 
     item.original_tags = [tag.name for tag in await photo_crud.get_photo_tags(db, photo.id)]
     item.original_classifications = serialize_classifications(photo)

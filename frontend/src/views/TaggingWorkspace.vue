@@ -1,6 +1,6 @@
 <template>
   <div class="tagging-workspace">
-    <n-page-header title="标注工作台" subtitle="补全作品信息，选择专区、校区、类别和明显可见的标准标签">
+          <n-page-header title="标注工作台" subtitle="补全作品信息，选择专区、校区、题材和明显可见的标准标签">
       <template #extra>
         <n-space align="center">
           <n-tag v-if="draftState" size="small" :type="draftState === '已保存' ? 'success' : 'warning'">
@@ -160,7 +160,7 @@
                     </n-space>
                   </n-radio-group>
                 </n-form-item>
-                <n-form-item label="类别">
+                <n-form-item label="题材">
                   <n-radio-group v-model:value="classificationDraft.photo_type">
                     <n-space vertical size="small">
                       <n-radio
@@ -204,25 +204,25 @@
                 <strong>4. 标准细分标签</strong>
                 <n-tag size="small">只选明显可见项</n-tag>
               </div>
-              <n-input v-model:value="fineSearch" clearable placeholder="在当前校区和类别下搜索标准标签" />
+              <n-input v-model:value="fineSearch" clearable placeholder="在当前校区和题材下搜索标准标签" />
               <n-empty
-                v-if="classificationDraft.campus && classificationDraft.photo_type && !visibleFineFacets.length"
-                description="当前校区和类别暂无可选细分标签"
+                v-if="classificationDraft.campus && classificationDraft.photo_type && !visibleFineGroups.length"
+                description="当前校区和题材暂无可选细分标签"
               />
               <n-alert v-else-if="!classificationDraft.campus || !classificationDraft.photo_type" type="info" :show-icon="false">
-                先选择校区和类别，再补充对应的具体标签。
+                先选择校区和题材，再补充对应的具体标签。
               </n-alert>
-              <n-collapse v-else :default-expanded-names="visibleFineFacets.map((facet) => facet.key)">
+              <n-collapse v-else :default-expanded-names="visibleFineGroups.map((group) => group.key)">
                 <n-collapse-item
-                  v-for="facet in visibleFineFacets"
-                  :key="facet.key"
-                  :title="facet.name"
-                  :name="facet.key"
+                  v-for="group in visibleFineGroups"
+                  :key="group.key"
+                  :title="group.name"
+                  :name="group.key"
                 >
-                  <n-checkbox-group v-model:value="multiClassificationDraft[facet.key]">
+                  <n-checkbox-group v-model:value="multiClassificationDraft[group.facetKey]">
                     <div class="check-grid">
                       <n-checkbox
-                        v-for="option in filteredOptionsFor(facet.key)"
+                        v-for="option in group.options"
                         :key="option.value"
                         :value="option.value"
                         :disabled="option.disabled"
@@ -367,7 +367,7 @@ const validationMessage = computed(() => {
   if (!classificationDraft.gallery_series) return '请选择专区'
   if (selectedSeriesName.value === '昌平校区摄影大赛' && !classificationDraft.gallery_year) return '请选择摄影大赛届次'
   if (!classificationDraft.campus) return '请选择校区'
-  if (!classificationDraft.photo_type) return '请选择类别'
+  if (!classificationDraft.photo_type) return '请选择题材'
   return ''
 })
 
@@ -380,15 +380,25 @@ const guideFineGroups = computed(() => {
   return collectGuideGroups(taxonomyGuide.value?.campus_category_tree?.[campusName]?.[categoryName])
 })
 
-const guideFineFacetKeys = computed(() =>
-  new Set(guideFineGroups.value.map((group) => group.facetKey).filter((key) => FINE_FACETS.includes(key))),
-)
-
-const visibleFineFacets = computed(() => {
-  const keys = guideFineFacetKeys.value
-  if (keys.size) return taxonomyFacets.value.filter((facet) => keys.has(facet.key))
-  if (!classificationDraft.campus || !classificationDraft.photo_type) return []
-  return taxonomyFacets.value.filter((facet) => FINE_FACETS.includes(facet.key))
+const visibleFineGroups = computed(() => {
+  const query = fineSearch.value.trim().toLowerCase()
+  return guideFineGroups.value
+    .filter((group) => FINE_FACETS.includes(group.facetKey))
+    .map((group) => {
+      const options = optionsFor(group.facetKey).filter((option) => {
+        if (group.nodeNames.length && !group.nodeNames.includes(option.label) && !group.nodeNames.includes(option.node.name)) {
+          return false
+        }
+        return !query || option.searchText.includes(query) || String(option.label).toLowerCase().includes(query)
+      })
+      return {
+        key: `${group.facetKey}-${group.title}`,
+        name: group.title,
+        facetKey: group.facetKey,
+        options,
+      }
+    })
+    .filter((group) => group.options.length)
 })
 
 const existingClassificationSummary = computed(() => {

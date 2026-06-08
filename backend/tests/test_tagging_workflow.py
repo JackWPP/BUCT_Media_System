@@ -125,7 +125,7 @@ def test_taxonomy_seed_and_public_guide(tagging_client):
     assert facet_names["award_level"] == "奖项"
     assert facet_names["documentary_topic"] == "纪实主题"
     assert facet_names["building"] == "楼宇"
-    assert facet_names["photo_type"] == "类别"
+    assert facet_names["photo_type"] == "题材"
     assert "landmark" not in facet_names
     building_nodes = {
         node["name"]
@@ -145,8 +145,9 @@ def test_taxonomy_seed_and_public_guide(tagging_client):
         for node in flatten_nodes(facet["nodes"])
     }
     assert photo_type_nodes == {"建筑楼宇", "校区设施", "自然生态"}
-    assert guide.json()["dependencies"]["photo_type"]["建筑楼宇"] == ["building", "landscape", "season", "technique"]
-    assert guide.json()["dependencies"]["photo_type"]["校区设施"] == ["facility", "landscape", "season", "technique"]
+    assert guide.json()["dependencies"]["photo_type"]["建筑楼宇"] == ["building"]
+    assert guide.json()["dependencies"]["photo_type"]["校区设施"] == ["facility"]
+    assert guide.json()["dependencies"]["photo_type"]["自然生态"] == ["season", "landscape", "natural_phenomenon", "animal", "plant"]
     assert guide.json()["dependencies"]["gallery_series"]["投稿作品"] == []
     campus_guide = guide.json()["campus_structure"]
     assert campus_guide["昌平校区"]["building"]["二期项目"][0] == "实验楼"
@@ -158,6 +159,52 @@ def test_taxonomy_seed_and_public_guide(tagging_client):
 
     animal_node = find_taxonomy_node(taxonomy.json(), "animal", "雌性绿头鸭")
     assert any(alias["alias"] == "麻鸭" for alias in animal_node["aliases"])
+
+
+def test_public_guide_for_changping_buildings_excludes_chaoyang_buildings(tagging_client):
+    client, _, _ = tagging_client
+
+    guide = client.get("/api/v1/taxonomy/public/guide")
+
+    assert guide.status_code == 200
+    building_sections = guide.json()["campus_category_tree"]["昌平校区"]["建筑楼宇"]
+    building_nodes = {node for section in building_sections for node in section["nodes"]}
+    assert "图书馆" in building_nodes
+    assert "教学楼（朝阳校区）" not in building_nodes
+
+
+def test_public_guide_for_changping_facilities_uses_facility_facet_only(tagging_client):
+    client, _, _ = tagging_client
+
+    guide = client.get("/api/v1/taxonomy/public/guide")
+
+    assert guide.status_code == 200
+    facility_sections = guide.json()["campus_category_tree"]["昌平校区"]["校区设施"]
+    assert facility_sections
+    assert all(section["facet_key"] == "facility" for section in facility_sections)
+
+
+def test_public_guide_lists_all_eight_competition_editions(tagging_client):
+    client, _, _ = tagging_client
+
+    taxonomy = client.get("/api/v1/taxonomy/public")
+
+    assert taxonomy.status_code == 200
+    gallery_year_nodes = [
+        node["name"]
+        for facet in taxonomy.json() if facet["key"] == "gallery_year"
+        for node in flatten_nodes(facet["nodes"])
+    ]
+    assert gallery_year_nodes == [
+        "第一届获奖作品（2018年）",
+        "第二届获奖作品（2019年）",
+        "第三届获奖作品（2020年）",
+        "第四届获奖作品（2021年）",
+        "第五届获奖作品（2022年）",
+        "第六届获奖作品（2023年）",
+        "第七届获奖作品（2024年）",
+        "第八届获奖作品（2025年）",
+    ]
 
 
 def test_taxonomy_seed_converges_legacy_nodes_to_new_scheme(tagging_client):
@@ -545,6 +592,108 @@ def test_tagger_can_submit_and_admin_approval_writes_photo_data(tagging_client):
     filtered = client.get("/api/v1/photos/public?building=图书馆")
     assert filtered.status_code == 200
     assert filtered.json()["total"] == 1
+
+
+def test_submit_rejects_building_from_other_campus(tagging_client):
+    client, tokens, _ = tagging_client
+
+    create_response = client.post(
+        "/api/v1/tagging-tasks",
+        headers=headers(tokens["admin"]),
+        json={
+            "title": "跨校区楼宇校验",
+            "assignee_id": "tagger-user",
+            "photo_ids": ["photo-1"],
+        },
+    )
+    assert create_response.status_code == 201
+    item_id = create_response.json()["items"][0]["id"]
+
+    taxonomy = client.get("/api/v1/taxonomy/public").json()
+    submit_response = client.post(
+        f"/api/v1/tagging-tasks/items/{item_id}/submit",
+        headers=headers(tokens["tagger"]),
+        json={
+            "tags": [],
+            "classifications": {
+                "gallery_series": find_taxonomy_node(taxonomy, "gallery_series", "投稿作品")["id"],
+                "campus": find_taxonomy_node(taxonomy, "campus", "昌平校区")["id"],
+                "photo_type": find_taxonomy_node(taxonomy, "photo_type", "建筑楼宇")["id"],
+                "building": [find_taxonomy_node(taxonomy, "building", "教学楼（朝阳校区）")["id"]],
+            },
+        },
+    )
+
+    assert submit_response.status_code == 400
+    assert "校区" in submit_response.json()["detail"]
+
+
+def test_submit_rejects_facility_for_building_photo_type(tagging_client):
+    client, tokens, _ = tagging_client
+
+    create_response = client.post(
+        "/api/v1/tagging-tasks",
+        headers=headers(tokens["admin"]),
+        json={
+            "title": "建筑楼宇设施校验",
+            "assignee_id": "tagger-user",
+            "photo_ids": ["photo-1"],
+        },
+    )
+    assert create_response.status_code == 201
+    item_id = create_response.json()["items"][0]["id"]
+
+    taxonomy = client.get("/api/v1/taxonomy/public").json()
+    submit_response = client.post(
+        f"/api/v1/tagging-tasks/items/{item_id}/submit",
+        headers=headers(tokens["tagger"]),
+        json={
+            "tags": [],
+            "classifications": {
+                "gallery_series": find_taxonomy_node(taxonomy, "gallery_series", "投稿作品")["id"],
+                "campus": find_taxonomy_node(taxonomy, "campus", "昌平校区")["id"],
+                "photo_type": find_taxonomy_node(taxonomy, "photo_type", "建筑楼宇")["id"],
+                "facility": [find_taxonomy_node(taxonomy, "facility", "一站式服务大厅（图书馆）")["id"]],
+            },
+        },
+    )
+
+    assert submit_response.status_code == 400
+    assert "建筑楼宇" in submit_response.json()["detail"]
+
+
+def test_submit_rejects_building_for_facility_photo_type(tagging_client):
+    client, tokens, _ = tagging_client
+
+    create_response = client.post(
+        "/api/v1/tagging-tasks",
+        headers=headers(tokens["admin"]),
+        json={
+            "title": "校区设施楼宇校验",
+            "assignee_id": "tagger-user",
+            "photo_ids": ["photo-1"],
+        },
+    )
+    assert create_response.status_code == 201
+    item_id = create_response.json()["items"][0]["id"]
+
+    taxonomy = client.get("/api/v1/taxonomy/public").json()
+    submit_response = client.post(
+        f"/api/v1/tagging-tasks/items/{item_id}/submit",
+        headers=headers(tokens["tagger"]),
+        json={
+            "tags": [],
+            "classifications": {
+                "gallery_series": find_taxonomy_node(taxonomy, "gallery_series", "投稿作品")["id"],
+                "campus": find_taxonomy_node(taxonomy, "campus", "昌平校区")["id"],
+                "photo_type": find_taxonomy_node(taxonomy, "photo_type", "校区设施")["id"],
+                "building": [find_taxonomy_node(taxonomy, "building", "图书馆")["id"]],
+            },
+        },
+    )
+
+    assert submit_response.status_code == 400
+    assert "校区设施" in submit_response.json()["detail"]
 
 
 def test_batch_review_only_processes_submitted_items_and_updates_stats(tagging_client):
