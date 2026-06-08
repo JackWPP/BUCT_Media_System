@@ -103,45 +103,38 @@
             <n-icon size="32" color="white" :component="ChevronForwardOutline" />
           </div>
 
-          <!-- 底部操作栏 -->
-          <div class="stage-bottom-bar">
-            <n-button-group>
-              <n-button tertiary size="small" @click="downloadImage">
-                <template #icon>
-                  <n-icon :component="DownloadOutline" />
-                </template>
-                下载
-              </n-button>
-              <n-button
-                tertiary
-                size="small"
-                :loading="loadingOriginal"
-                @click="loadOriginal"
-              >
-                <template #icon>
-                  <n-icon :component="showOriginal ? ExpandOutline : ExpandOutline" />
-                </template>
-                {{ showOriginal ? '查看压缩图' : '查看原图' }}
-              </n-button>
-              <n-button tertiary size="small" @click="shareImage">
-                <template #icon>
-                  <n-icon :component="ShareSocialOutline" />
-                </template>
-                分享
-              </n-button>
-            </n-button-group>
-          </div>
         </div>
 
         <!-- 右侧：信息面板 -->
         <div class="detail-info-section">
           <div class="info-panel">
+            <div class="detail-actions">
+              <n-button type="primary" strong @click="downloadImage">
+                <template #icon>
+                  <n-icon :component="DownloadOutline" />
+                </template>
+                下载
+              </n-button>
+              <n-button strong :loading="loadingOriginal" @click="loadOriginal">
+                <template #icon>
+                  <n-icon :component="ExpandOutline" />
+                </template>
+                {{ showOriginal ? '查看压缩图' : '查看原图' }}
+              </n-button>
+              <n-button strong @click="shareImage">
+                <template #icon>
+                  <n-icon :component="ShareSocialOutline" />
+                </template>
+                分享
+              </n-button>
+            </div>
+
             <!-- 图片信息 -->
             <div class="meta-section">
-              <h3 class="meta-title">图片信息</h3>
+              <h3 class="meta-title">作品信息</h3>
               <div class="meta-list">
                 <div class="meta-item">
-                  <span class="meta-label">名称</span>
+                  <span class="meta-label">作品名称</span>
                   <span class="meta-value">{{ photoTitle }}</span>
                 </div>
                 <div class="meta-item">
@@ -152,25 +145,9 @@
                   <span class="meta-label">来源</span>
                   <span class="meta-value">{{ photoSource }}</span>
                 </div>
-                <div v-if="photo.width && photo.height" class="meta-item">
-                  <span class="meta-label">尺寸</span>
-                  <span class="meta-value">{{ photoDimensions }}</span>
-                </div>
-                <div class="meta-item">
-                  <span class="meta-label">存储大小</span>
-                  <span class="meta-value">{{ formatFileSize(photo.file_size) }}</span>
-                </div>
-                <div class="meta-item">
-                  <span class="meta-label">格式</span>
-                  <span class="meta-value">{{ photoFormat }}</span>
-                </div>
                 <div class="meta-item">
                   <span class="meta-label">地点</span>
                   <span class="meta-value">{{ photoLocation }}</span>
-                </div>
-                <div v-if="photoBuilding" class="meta-item">
-                  <span class="meta-label">楼宇</span>
-                  <span class="meta-value">{{ photoBuilding }}</span>
                 </div>
                 <div class="meta-item">
                   <span class="meta-label">版权声明</span>
@@ -195,35 +172,6 @@
                     </div>
                   </n-popover>
                 </div>
-              </div>
-            </div>
-
-            <!-- 分类标签 -->
-            <div v-if="photo.classifications && Object.keys(photo.classifications).length" class="meta-section">
-              <h3 class="meta-title">分类</h3>
-              <div class="class-tags">
-                <span
-                  v-for="cls in classificationList"
-                  :key="cls.node_id"
-                  class="class-tag"
-                >
-                  {{ cls.facet_name }}: {{ cls.node_name }}
-                </span>
-              </div>
-            </div>
-
-            <!-- 关键词 -->
-            <div v-if="allTags.length" class="meta-section">
-              <h3 class="meta-title">关键词</h3>
-              <div class="compact-keywords-list">
-                <span
-                  v-for="tag in allTags"
-                  :key="tag"
-                  class="keyword-tag"
-                  @click="handleKeywordClick(tag)"
-                >
-                  {{ tag }}
-                </span>
               </div>
             </div>
 
@@ -270,7 +218,7 @@ import {
 import { getPublicPhotos } from '../api/photo'
 import { incrementView } from '../api/stats'
 import { usePhotoStore } from '../stores/photo'
-import type { Photo, TaxonomyValue } from '../types/photo'
+import type { Photo } from '../types/photo'
 import { taxonomyValueName } from '../types/photo'
 import { getPhotoUrl, getPhotoDownloadUrl } from '../utils/format'
 
@@ -339,19 +287,6 @@ const currentIndex = computed(() => {
 const hasPrev = computed(() => currentIndex.value > 0)
 const hasNext = computed(() => currentIndex.value >= 0 && currentIndex.value < contextPhotos.value.length - 1)
 
-const allTags = computed(() => {
-  if (!photo.value) return []
-  const tags = new Set<string>()
-  photo.value.tags?.forEach((t) => tags.add(t))
-  photo.value.free_tags?.forEach((t) => tags.add(t))
-  return Array.from(tags)
-})
-
-const classificationList = computed<TaxonomyValue[]>(() => {
-  if (!photo.value?.classifications) return []
-  return Object.values(photo.value.classifications).flatMap((value) => Array.isArray(value) ? value : [value])
-})
-
 const descriptionParts = computed(() => {
   return (photo.value?.description || '')
     .split('|')
@@ -361,6 +296,7 @@ const descriptionParts = computed(() => {
 
 const photoTitle = computed(() => {
   if (!photo.value) return '未知'
+  if (photo.value.title?.trim()) return photo.value.title.trim()
   const titlePart = descriptionParts.value.find((part) => !part.includes('作者') && !part.includes('序号'))
   if (titlePart) return titlePart
   return photo.value.filename.replace(/\.[^.]+$/, '')
@@ -374,6 +310,7 @@ const parsedAuthor = computed(() => {
 
 const photoAuthor = computed(() => {
   if (!photo.value) return '未知'
+  if (photo.value.author?.trim()) return photo.value.author.trim()
   const studentId = photo.value.uploader_student_id
   const name = photo.value.uploader_name || parsedAuthor.value
   if (studentId && name) return `学/工号：${studentId} | ${name}`
@@ -383,47 +320,16 @@ const photoAuthor = computed(() => {
 
 const photoSource = computed(() => {
   const classifications = photo.value?.classifications || {}
-  const sourceType = taxonomyValueName(classifications.source_type)
-  if (sourceType) return sourceType
   const series = taxonomyValueName(classifications.gallery_series)
-  const year = taxonomyValueName(classifications.gallery_year)
-  if (series === '昌平校区摄影大赛' && year) {
-    return `${normalizeGalleryYear(year)}昌平校区摄影大赛获奖作品（${extractGalleryYear(year)}）`
-  }
-  if (series === '投稿作品') return '学生投稿'
-  return series || year || '未知'
-})
-
-const photoDimensions = computed(() => {
-  if (!photo.value?.width || !photo.value?.height) return '未知'
-  return `${photo.value.width} x ${photo.value.height} px`
-})
-
-const photoFormat = computed(() => {
-  const subtype = photo.value?.mime_type?.split('/')[1]?.toUpperCase()
-  if (!subtype) return 'JPG'
-  return subtype === 'JPEG' ? 'JPG' : subtype
+  if (series === '昌平校区摄影大赛') return '获奖作品'
+  if (series === '投稿作品') return '投稿作品'
+  return series || '未知'
 })
 
 const photoLocation = computed(() => {
   const classifications = photo.value?.classifications || {}
   return taxonomyValueName(classifications.campus) || photo.value?.campus || '未知'
 })
-
-const photoBuilding = computed(() => {
-  const classifications = photo.value?.classifications || {}
-  return taxonomyValueName(classifications.building) || taxonomyValueName(classifications.landmark) || ''
-})
-
-function normalizeGalleryYear(value: string): string {
-  const match = value.match(/(第[一二三四五六七八九十]+届)/)
-  return match?.[1] || value.replace(/（?\d{4}年?）?/g, '').replace('获奖作品', '').trim()
-}
-
-function extractGalleryYear(value: string): string {
-  const match = value.match(/(20\d{2})/)
-  return match ? `${match[1]}年` : ''
-}
 
 function loadOriginal() {
   showOriginal.value = !showOriginal.value
@@ -440,18 +346,6 @@ function handleHdError(event: Event) {
   // 高清图加载失败，缩略图仍在底层显示，无需额外处理
   console.warn('HD image error')
   hdReady.value = false
-}
-
-function formatFileSize(bytes: number | null): string {
-  if (!bytes) return '未知'
-  const units = ['B', 'KB', 'MB', 'GB']
-  let size = bytes
-  let unitIndex = 0
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024
-    unitIndex++
-  }
-  return `${size.toFixed(2)} ${units[unitIndex]}`
 }
 
 function handleClose() {
@@ -619,10 +513,6 @@ function goNext() {
 
 function goToPhoto(id: string) {
   router.push(`/photo/${id}`)
-}
-
-function handleKeywordClick(tag: string) {
-  router.push({ path: '/gallery', query: { search: tag } })
 }
 
 function downloadImage() {
@@ -809,7 +699,7 @@ watch(
 /* 图片舞台 */
 .image-stage {
   position: absolute;
-  inset: 48px 0 48px 0;
+  inset: 48px 0 0 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -912,20 +802,6 @@ watch(
   right: 16px;
 }
 
-/* 底部操作栏 */
-.stage-bottom-bar {
-  position: absolute;
-  bottom: 12px;
-  right: 16px;
-  z-index: 15;
-  opacity: 0.6;
-  transition: opacity 0.2s;
-}
-
-.detail-image-section:hover .stage-bottom-bar {
-  opacity: 1;
-}
-
 /* ===== 右侧信息面板 ===== */
 .detail-info-section {
   width: 360px;
@@ -938,6 +814,18 @@ watch(
 
 .info-panel {
   padding: 20px;
+}
+
+.detail-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.detail-actions :deep(.n-button) {
+  height: 42px;
+  justify-content: center;
 }
 
 /* 元信息区 */
@@ -981,21 +869,6 @@ watch(
   color: #333;
   text-align: right;
   overflow-wrap: anywhere;
-}
-
-/* 分类标签 */
-.class-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.class-tag {
-  font-size: 12px;
-  color: #666;
-  background: #f5f5f5;
-  padding: 4px 10px;
-  border-radius: 4px;
 }
 
 .photo-description {
@@ -1044,29 +917,6 @@ watch(
 
 :global(.copyright-popover.n-popover .n-popover-arrow) {
   background: rgba(24, 24, 28, 0.94);
-}
-
-/* ===== 关键词区域 ===== */
-.compact-keywords-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.keyword-tag {
-  font-size: 13px;
-  color: #666;
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  padding: 6px 14px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.keyword-tag:hover {
-  color: #e60012;
-  border-color: #e60012;
 }
 
 /* ===== 推荐图片 ===== */
@@ -1180,10 +1030,6 @@ watch(
   .stage-thumb,
   .stage-hd {
     max-height: 55vh;
-  }
-
-  .stage-bottom-bar {
-    position: relative;
   }
 
   .info-panel {

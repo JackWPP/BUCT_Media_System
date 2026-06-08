@@ -36,12 +36,16 @@ class TaggingTaskBatchCreate(BaseModel):
 
 
 class TaggingTaskItemSubmit(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=200)
+    author: Optional[str] = Field(default=None, max_length=100)
     tags: list[str] = Field(default_factory=list)
     classifications: dict[str, int | list[int]] = Field(default_factory=dict)
     note: Optional[str] = None
 
 
 class TaggingTaskItemDraft(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=200)
+    author: Optional[str] = Field(default=None, max_length=100)
     tags: list[str] = Field(default_factory=list)
     classifications: dict[str, int | list[int]] = Field(default_factory=dict)
     note: Optional[str] = None
@@ -70,10 +74,16 @@ class TaggingTaskItemResponse(BaseModel):
     task_id: str
     photo_id: str
     status: str
+    original_title: Optional[str] = None
+    original_author: Optional[str] = None
     original_tags: list[str] | None = None
+    submitted_title: Optional[str] = None
+    submitted_author: Optional[str] = None
     submitted_tags: list[str] | None = None
     original_classifications: dict[str, Any] | None = None
     submitted_classifications: dict[str, Any] | None = None
+    draft_title: Optional[str] = None
+    draft_author: Optional[str] = None
     draft_tags: list[str] | None = None
     draft_classifications: dict[str, Any] | None = None
     draft_note: Optional[str] = None

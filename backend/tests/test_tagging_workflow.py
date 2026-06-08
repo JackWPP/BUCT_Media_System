@@ -66,6 +66,8 @@ async def setup_db(session_factory: async_sessionmaker) -> dict[str, str]:
             id="photo-1",
             uploader_id=admin.id,
             filename="photo.jpg",
+            title="旧标题",
+            author="旧作者",
             original_path="photos/photo.jpg",
             thumb_path="photos/photo-thumb.jpg",
             width=800,
@@ -123,6 +125,7 @@ def test_taxonomy_seed_and_public_guide(tagging_client):
     assert facet_names["award_level"] == "奖项"
     assert facet_names["documentary_topic"] == "纪实主题"
     assert facet_names["building"] == "楼宇"
+    assert facet_names["photo_type"] == "类别"
     assert "landmark" not in facet_names
     building_nodes = {
         node["name"]
@@ -144,6 +147,17 @@ def test_taxonomy_seed_and_public_guide(tagging_client):
     assert photo_type_nodes == {"建筑楼宇", "校区设施", "自然生态"}
     assert guide.json()["dependencies"]["photo_type"]["建筑楼宇"] == ["building", "landscape", "season", "technique"]
     assert guide.json()["dependencies"]["photo_type"]["校区设施"] == ["facility", "landscape", "season", "technique"]
+    assert guide.json()["dependencies"]["gallery_series"]["投稿作品"] == []
+    campus_guide = guide.json()["campus_structure"]
+    assert campus_guide["昌平校区"]["building"]["二期项目"][0] == "实验楼"
+    assert "教学楼（朝阳校区）" in campus_guide["朝阳校区"]["building"]
+    assert "雌性绿头鸭" in campus_guide["昌平校区"]["natural_ecology"]["动物"]
+    category_tree = guide.json()["campus_category_tree"]
+    assert category_tree["昌平校区"]["建筑楼宇"][1]["title"] == "二期项目"
+    assert "实验楼" in category_tree["昌平校区"]["建筑楼宇"][1]["nodes"]
+
+    animal_node = find_taxonomy_node(taxonomy.json(), "animal", "雌性绿头鸭")
+    assert any(alias["alias"] == "麻鸭" for alias in animal_node["aliases"])
 
 
 def test_taxonomy_seed_converges_legacy_nodes_to_new_scheme(tagging_client):
@@ -225,6 +239,26 @@ def test_taxonomy_seed_converges_legacy_nodes_to_new_scheme(tagging_client):
                 )
             )
 
+            animal_facet = (
+                await session.execute(select(TaxonomyFacet).where(TaxonomyFacet.key == "animal"))
+            ).scalar_one()
+            legacy_duck = TaxonomyNode(
+                facet_id=animal_facet.id,
+                key="legacy-duck",
+                name="麻鸭",
+                is_active=True,
+                sort_order=99,
+            )
+            session.add(legacy_duck)
+            await session.flush()
+            session.add(
+                PhotoClassification(
+                    photo_id=photo.id,
+                    facet_id=animal_facet.id,
+                    node_id=legacy_duck.id,
+                )
+            )
+
             await session.commit()
 
     async def assert_converged():
@@ -245,6 +279,14 @@ def test_taxonomy_seed_converges_legacy_nodes_to_new_scheme(tagging_client):
             assert node_states[("photo_type", "建筑楼宇")] is True
             if ("photo_type", "校园风光") in node_states:
                 assert node_states[("photo_type", "校园风光")] is False
+            animal_rows = await session.execute(
+                select(TaxonomyFacet.key, TaxonomyNode.name, TaxonomyNode.is_active)
+                .join(TaxonomyNode, TaxonomyNode.facet_id == TaxonomyFacet.id)
+                .where(TaxonomyNode.name.in_(["麻鸭", "雌性绿头鸭"]))
+            )
+            animal_states = {(facet, name): is_active for facet, name, is_active in animal_rows.all()}
+            assert animal_states[("animal", "麻鸭")] is False
+            assert animal_states[("animal", "雌性绿头鸭")] is True
             landmark_facet = (
                 await session.execute(select(TaxonomyFacet).where(TaxonomyFacet.key == "landmark"))
             ).scalar_one()
@@ -255,10 +297,10 @@ def test_taxonomy_seed_converges_legacy_nodes_to_new_scheme(tagging_client):
                     select(TaxonomyNode.name, TaxonomyNode.is_active)
                     .join(PhotoClassification, PhotoClassification.node_id == TaxonomyNode.id)
                     .join(TaxonomyFacet, TaxonomyFacet.id == PhotoClassification.facet_id)
-                    .where(PhotoClassification.photo_id == "photo-1", TaxonomyFacet.key == "photo_type")
+                    .where(PhotoClassification.photo_id == "photo-1", TaxonomyFacet.key == "animal")
                 )
             ).all()
-            assert classifications == [("风光", False)]
+            assert classifications == [("雌性绿头鸭", True)]
 
     asyncio.run(add_legacy_nodes())
     asyncio.run(assert_converged())
@@ -407,6 +449,8 @@ def test_tagger_can_submit_and_admin_approval_writes_photo_data(tagging_client):
         f"/api/v1/tagging-tasks/items/{item_id}/draft",
         headers=headers(tokens["tagger"]),
         json={
+            "title": "草稿标题",
+            "author": "草稿作者",
             "tags": ["草稿标签"],
             "classifications": {
                 "photo_type": type_node["id"],
@@ -416,28 +460,36 @@ def test_tagger_can_submit_and_admin_approval_writes_photo_data(tagging_client):
     )
     assert draft_response.status_code == 200
     assert draft_response.json()["draft_saved_at"]
+    assert draft_response.json()["original_title"] == "旧标题"
+    assert draft_response.json()["draft_title"] == "草稿标题"
+    assert draft_response.json()["draft_author"] == "草稿作者"
 
-    invalid_response = client.post(
+    contest_missing_year_response = client.post(
         f"/api/v1/tagging-tasks/items/{item_id}/submit",
         headers=headers(tokens["tagger"]),
         json={
+            "title": "赛题标题",
+            "author": "赛题作者",
             "tags": ["图书馆"],
             "classifications": {
+                "gallery_series": find_taxonomy_node(taxonomy, "gallery_series", "昌平校区摄影大赛")["id"],
+                "campus": campus_node["id"],
                 "photo_type": type_node["id"],
             },
         },
     )
-    assert invalid_response.status_code == 400
-    assert "专区" in invalid_response.json()["detail"]
+    assert contest_missing_year_response.status_code == 400
+    assert "届次/年份" in contest_missing_year_response.json()["detail"]
 
     invalid_group_response = client.post(
         f"/api/v1/tagging-tasks/items/{item_id}/submit",
         headers=headers(tokens["tagger"]),
         json={
+            "title": "投稿标题",
+            "author": "投稿作者",
             "tags": [],
             "classifications": {
                 "gallery_series": series_node["id"],
-                "source_type": source_node["id"],
                 "campus": campus_node["id"],
                 "photo_type": type_node["id"],
                 "building": [building_group_node["id"]],
@@ -451,10 +503,11 @@ def test_tagger_can_submit_and_admin_approval_writes_photo_data(tagging_client):
         f"/api/v1/tagging-tasks/items/{item_id}/submit",
         headers=headers(tokens["tagger"]),
         json={
+            "title": "投稿标题",
+            "author": "投稿作者",
             "tags": [" 图书馆 ", "Library"],
             "classifications": {
                 "gallery_series": series_node["id"],
-                "source_type": source_node["id"],
                 "campus": campus_node["id"],
                 "photo_type": type_node["id"],
                 "building": [building_node["id"]],
@@ -465,6 +518,8 @@ def test_tagger_can_submit_and_admin_approval_writes_photo_data(tagging_client):
     )
     assert submit_response.status_code == 200
     assert submit_response.json()["status"] == "submitted"
+    assert submit_response.json()["submitted_title"] == "投稿标题"
+    assert submit_response.json()["submitted_author"] == "投稿作者"
 
     approve_response = client.post(
         f"/api/v1/tagging-tasks/items/{item_id}/approve",
@@ -480,7 +535,10 @@ def test_tagger_can_submit_and_admin_approval_writes_photo_data(tagging_client):
             classifications = (await session.execute(select(PhotoClassification))).scalars().all()
             assert "图书馆" in tags
             assert "library" in tags
-            assert len(classifications) == 7
+            assert len(classifications) == 6
+            photo = (await session.execute(select(Photo).where(Photo.id == "photo-1"))).scalar_one()
+            assert photo.title == "投稿标题"
+            assert photo.author == "投稿作者"
 
     asyncio.run(assert_written())
 

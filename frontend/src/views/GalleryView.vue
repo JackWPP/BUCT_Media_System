@@ -46,7 +46,7 @@
           <span v-if="photoStore.filters.search && !isVectorSearch" class="search-term">
             "{{ photoStore.filters.search }}"
           </span>
-          <span v-else>按专区、校区和题材筛选图片</span>
+          <span v-else>按专区、校区和类别筛选图片</span>
         </div>
 
         <div class="toolbar-actions">
@@ -137,6 +137,41 @@
                 >
                   {{ expandedGroups[facetKey] ? '收起' : '更多' }}
                 </n-button>
+              </div>
+            </div>
+
+            <div v-if="campusCategoryGroups.length" class="filter-group filter-group-child standard-tag-group">
+              <span class="filter-label">具体标签</span>
+              <div class="standard-tag-panel">
+                <n-input
+                  v-model:value="standardTagSearch"
+                  size="small"
+                  clearable
+                  placeholder="在当前校区和类别下搜索标准标签"
+                  class="standard-tag-search"
+                >
+                  <template #prefix>
+                    <n-icon :component="SearchOutline" />
+                  </template>
+                </n-input>
+                <div
+                  v-for="group in campusCategoryGroups"
+                  :key="group.key"
+                  class="standard-tag-subgroup"
+                >
+                  <span class="standard-tag-title">{{ group.title }}</span>
+                  <div class="pills-row">
+                    <span
+                      v-for="opt in group.options"
+                      :key="`${group.facetKey}-${opt.value}`"
+                      class="tag-pill"
+                      :class="{ active: photoStore.filters[group.facetKey] === opt.value, disabled: opt.disabled }"
+                      @click="!opt.disabled && toggleFilter(group.facetKey as keyof PhotoFilters, opt.value as string)"
+                    >
+                      {{ opt.label }}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -354,8 +389,7 @@ import { useDebounceFn } from '@vueuse/core'
 import type { SelectOption } from 'naive-ui'
 import MasonryLayout from '../components/common/MasonryLayout.vue'
 import { usePhotoStore } from '../stores/photo'
-import { getPublicTaxonomy, getPublicTaxonomyGuide, type TaxonomyFacet, type TaxonomyGuide } from '../api/taxonomy'
-import { getPublicTags } from '../api/tag'
+import { getPublicTaxonomy, getPublicTaxonomyGuide, type TaxonomyFacet, type TaxonomyGuide, type TaxonomyGuideGroup } from '../api/taxonomy'
 import type { Photo, PhotoFilters, SearchInterpretation as SearchInterpretationType } from '../types/photo'
 import { taxonomyValueName } from '../types/photo'
 import { interpretSearch } from '../api/photo'
@@ -377,7 +411,6 @@ const authStore = useAuthStore()
 
 const taxonomyFacets = ref<TaxonomyFacet[]>([])
 const taxonomyGuide = ref<TaxonomyGuide | null>(null)
-const publicTagOptions = ref<SelectOption[]>([])
 const taxonomyLoading = ref(false)
 const taxonomyError = ref(false)
 const syncingRoute = ref(false)
@@ -386,6 +419,7 @@ const smartSearchEnabled = ref(true)
 const isInterpreting = ref(false)
 const currentInterpretation = ref<SearchInterpretationType | null>(null)
 const searchKeyword = ref('')
+const standardTagSearch = ref('')
 const filterMode = ref<'pills' | 'compact'>('pills')
 const expandedGroups = reactive<Record<string, boolean>>({})
 const showEditModal = ref(false)
@@ -433,6 +467,12 @@ const dynamicFacetKeys = GALLERY_FILTER_KEYS
 
 const primaryFacetKeys = computed(() => taxonomyGuide.value?.primary || ['gallery_series', 'campus', 'photo_type'])
 
+const campusCategoryFacetKeys = computed(() => {
+  const keys = new Set<string>()
+  campusCategoryGroups.value.forEach((group) => keys.add(group.facetKey))
+  return keys
+})
+
 const dependentFacetKeys = computed(() => {
   const keys: string[] = []
   const dependencies = taxonomyGuide.value?.dependencies || {}
@@ -448,6 +488,7 @@ const dependentFacetKeys = computed(() => {
 const visibleFacetKeys = computed(() => {
   const visible: string[] = []
   dynamicFacetKeys.forEach((key) => {
+    if (campusCategoryFacetKeys.value.has(key)) return
     if (facetOptions(key).length > 0) {
       visible.push(key)
     }
@@ -462,11 +503,9 @@ const guideVisibleFacetKeys = computed(() => {
     'gallery_series',
     'gallery_year',
     'award_level',
-    'source_type',
     'campus',
     'photo_type',
     ...dependentFacetKeys.value,
-    'tag',
   ]
   const keys = [...preferred, ...primaryFacetKeys.value]
   return [...new Set(keys)].filter((key) => visibleFacetKeys.value.includes(key))
@@ -512,10 +551,6 @@ const masonryPageSizes = computed(() => {
 function facetOptions(key: string): SelectOption[] {
   let options: SelectOption[] = []
 
-  if (key === 'tag') {
-    return publicTagOptions.value
-  }
-
   // 优先从 taxonomy API 动态获取
   const taxonomyKey = key
   const facet = facetMap.value[taxonomyKey]
@@ -557,11 +592,49 @@ function filterValueLabel(key: string, value: string) {
     const normalized = Object.prototype.hasOwnProperty.call(legacyPhotoTypeDisplayMap, value)
       ? legacyPhotoTypeDisplayMap[value]
       : value
-    if (!normalized) return '待补充题材'
+    if (!normalized) return '待补充类别'
     return facetOptions(key).find((option) => option.value === normalized)?.label || normalized
   }
   return facetOptions(key).find((option) => option.value === value)?.label || value
 }
+
+interface StandardTagGroup {
+  key: string
+  title: string
+  facetKey: string
+  options: SelectOption[]
+}
+
+function collectGuideGroups(groups: TaxonomyGuideGroup[] | undefined, parentTitle = ''): StandardTagGroup[] {
+  if (!groups?.length) return []
+  return groups.flatMap((group) => {
+    const title = parentTitle ? `${parentTitle} / ${group.title}` : group.title
+    const children = collectGuideGroups(group.groups, title)
+    const nodeNames = group.nodes || []
+    const query = standardTagSearch.value.trim().toLowerCase()
+    const options = facetOptions(group.facet_key)
+      .filter((option) => {
+        const nodeName = (option as SelectOption & { node?: { name?: string } }).node?.name
+        if (nodeNames.length && !nodeNames.includes(option.label) && !nodeNames.includes(option.value as string) && (!nodeName || !nodeNames.includes(nodeName))) {
+          return false
+        }
+        return !query || option.searchText.includes(query) || String(option.label).toLowerCase().includes(query)
+      })
+    const current = options.length
+      ? [{ key: `${group.facet_key}-${title}`, title, facetKey: group.facet_key, options }]
+      : []
+    return [...current, ...children]
+  })
+}
+
+const campusCategoryGroups = computed(() => {
+  const campus = photoStore.filters.campus
+  const category = photoStore.filters.photo_type
+  if (!campus || !category) return []
+  const groups = taxonomyGuide.value?.campus_category_tree?.[campus]?.[category]
+  if (!groups?.length) return []
+  return collectGuideGroups(groups)
+})
 
 function normalizeFacetFilterValue(key: string, value: string): string | null {
   if (key !== 'photo_type') return value
@@ -949,18 +1022,12 @@ async function loadTaxonomy() {
   taxonomyLoading.value = true
   taxonomyError.value = false
   try {
-    const [facets, guide, tags] = await Promise.all([
+    const [facets, guide] = await Promise.all([
       getPublicTaxonomy(),
       getPublicTaxonomyGuide(),
-      getPublicTags({ limit: 60 }),
     ])
     taxonomyFacets.value = facets
     taxonomyGuide.value = guide
-    publicTagOptions.value = tags.items.map((tag) => ({
-      label: tag.name,
-      value: tag.name,
-      disabled: false,
-    }))
   } catch (error) {
     console.error('加载分类失败:', error)
     taxonomyError.value = true

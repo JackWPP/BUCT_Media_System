@@ -1,6 +1,6 @@
 <template>
   <div class="tagging-workspace">
-    <n-page-header title="标注工作台" subtitle="完成来源、校区、题材和明显可见内容标签">
+    <n-page-header title="标注工作台" subtitle="补全作品信息，选择专区、校区、类别和明显可见的标准标签">
       <template #extra>
         <n-space align="center">
           <n-tag v-if="draftState" size="small" :type="draftState === '已保存' ? 'success' : 'warning'">
@@ -93,10 +93,6 @@
             <p>{{ selectedItem.photo.description || '暂无描述' }}</p>
           </div>
           <div>
-            <span>已有自由标签</span>
-            <p>{{ existingTags.join('、') || '暂无' }}</p>
-          </div>
-          <div>
             <span>已有分类</span>
             <p>{{ existingClassificationSummary || '暂无' }}</p>
           </div>
@@ -108,7 +104,22 @@
           <n-space vertical size="large">
             <section class="question-section">
               <div class="section-head">
-                <strong>1. 核心分类</strong>
+                <strong>1. 作品信息</strong>
+                <n-tag size="small">建议填写</n-tag>
+              </div>
+              <n-form label-placement="top">
+                <n-form-item label="作品名称">
+                  <n-input v-model:value="titleDraft" clearable placeholder="可从作品名、描述或文件名中整理" />
+                </n-form-item>
+                <n-form-item label="作者">
+                  <n-input v-model:value="authorDraft" clearable placeholder="填写作者姓名；不确定可暂留空" />
+                </n-form-item>
+              </n-form>
+            </section>
+
+            <section class="question-section">
+              <div class="section-head">
+                <strong>2. 核心分类</strong>
                 <n-tag size="small" type="error">必填</n-tag>
               </div>
               <n-form label-placement="top">
@@ -135,20 +146,6 @@
                     placeholder="选择摄影大赛届次"
                   />
                 </n-form-item>
-                <n-form-item v-if="selectedSeriesName === '投稿作品'" label="投稿来源">
-                  <n-radio-group v-model:value="classificationDraft.source_type">
-                    <n-space>
-                      <n-radio
-                        v-for="option in optionsFor('source_type')"
-                        :key="option.value"
-                        :value="option.value"
-                        :disabled="option.disabled"
-                      >
-                        {{ option.label }}
-                      </n-radio>
-                    </n-space>
-                  </n-radio-group>
-                </n-form-item>
                 <n-form-item label="校区">
                   <n-radio-group v-model:value="classificationDraft.campus">
                     <n-space>
@@ -163,7 +160,7 @@
                     </n-space>
                   </n-radio-group>
                 </n-form-item>
-                <n-form-item label="题材">
+                <n-form-item label="类别">
                   <n-radio-group v-model:value="classificationDraft.photo_type">
                     <n-space vertical size="small">
                       <n-radio
@@ -185,7 +182,7 @@
 
             <section class="question-section">
               <div class="section-head">
-                <strong>2. 季节</strong>
+                <strong>3. 季节</strong>
                 <n-tag size="small">明显时填写</n-tag>
               </div>
               <n-radio-group v-model:value="classificationDraft.season">
@@ -204,11 +201,18 @@
 
             <section class="question-section">
               <div class="section-head">
-                <strong>3. 细分标签</strong>
+                <strong>4. 标准细分标签</strong>
                 <n-tag size="small">只选明显可见项</n-tag>
               </div>
-              <n-input v-model:value="fineSearch" clearable placeholder="搜索楼宇、设施、景观、动植物等" />
-              <n-collapse :default-expanded-names="['building', 'facility', 'landscape']">
+              <n-input v-model:value="fineSearch" clearable placeholder="在当前校区和类别下搜索标准标签" />
+              <n-empty
+                v-if="classificationDraft.campus && classificationDraft.photo_type && !visibleFineFacets.length"
+                description="当前校区和类别暂无可选细分标签"
+              />
+              <n-alert v-else-if="!classificationDraft.campus || !classificationDraft.photo_type" type="info" :show-icon="false">
+                先选择校区和类别，再补充对应的具体标签。
+              </n-alert>
+              <n-collapse v-else :default-expanded-names="visibleFineFacets.map((facet) => facet.key)">
                 <n-collapse-item
                   v-for="facet in visibleFineFacets"
                   :key="facet.key"
@@ -243,7 +247,7 @@
 
             <section class="question-section">
               <div class="section-head">
-                <strong>4. 纪实补充</strong>
+                <strong>5. 纪实补充</strong>
                 <n-tag size="small">需要时补充</n-tag>
               </div>
               <n-select
@@ -264,30 +268,6 @@
                 <span>奖项</span><b>{{ referenceValue('award_level') }}</b>
                 <span>原楼宇</span><b>{{ referenceValue('landmark') }}</b>
               </div>
-            </section>
-
-            <section class="question-section">
-              <div class="section-head">
-                <strong>自由标签</strong>
-                <n-tag size="small">补充说明</n-tag>
-              </div>
-              <n-dynamic-tags v-model:value="tagDraft" />
-              <n-input
-                v-model:value="tagSearch"
-                placeholder="搜索已有标签候选"
-                clearable
-                @update:value="loadTagSuggestions"
-              />
-              <n-space v-if="tagSuggestions.length" wrap>
-                <n-tag
-                  v-for="tag in tagSuggestions"
-                  :key="tag.id"
-                  class="candidate-tag"
-                  @click="addCandidateTag(tag.name)"
-                >
-                  {{ tag.name }}
-                </n-tag>
-              </n-space>
             </section>
 
             <n-input v-model:value="note" type="textarea" :rows="3" placeholder="备注（可选）" />
@@ -314,8 +294,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useMessage } from 'naive-ui'
-import { getTagSuggestions, type TagSuggestion } from '../api/tag'
-import { getPublicTaxonomy, type TaxonomyFacet, type TaxonomyNode } from '../api/taxonomy'
+import { getPublicTaxonomy, getPublicTaxonomyGuide, type TaxonomyFacet, type TaxonomyGuide, type TaxonomyGuideGroup, type TaxonomyNode } from '../api/taxonomy'
 import {
   getTaggingTasks,
   saveTaggingItemDraft,
@@ -344,9 +323,9 @@ const tasks = ref<TaggingTask[]>([])
 const selectedTask = ref<TaggingTask | null>(null)
 const selectedItemId = ref<string | null>(null)
 const taxonomyFacets = ref<TaxonomyFacet[]>([])
-const tagDraft = ref<string[]>([])
-const tagSearch = ref('')
-const tagSuggestions = ref<TagSuggestion[]>([])
+const taxonomyGuide = ref<TaxonomyGuide | null>(null)
+const titleDraft = ref('')
+const authorDraft = ref('')
 const classificationDraft = reactive<Record<string, number | null>>({})
 const multiClassificationDraft = reactive<Record<string, number[]>>({})
 const note = ref('')
@@ -387,19 +366,30 @@ const canSubmit = computed(() =>
 const validationMessage = computed(() => {
   if (!classificationDraft.gallery_series) return '请选择专区'
   if (selectedSeriesName.value === '昌平校区摄影大赛' && !classificationDraft.gallery_year) return '请选择摄影大赛届次'
-  if (selectedSeriesName.value === '投稿作品' && !classificationDraft.source_type) return '请选择投稿来源'
   if (!classificationDraft.campus) return '请选择校区'
-  if (!classificationDraft.photo_type) return '请选择题材'
+  if (!classificationDraft.photo_type) return '请选择类别'
   return ''
 })
 
 const selectedSeriesName = computed(() => optionLabel('gallery_series', classificationDraft.gallery_series))
 
-const visibleFineFacets = computed(() =>
-  taxonomyFacets.value.filter((facet) => FINE_FACETS.includes(facet.key)),
+const guideFineGroups = computed(() => {
+  const campusName = optionLabel('campus', classificationDraft.campus)
+  const categoryName = optionLabel('photo_type', classificationDraft.photo_type)
+  if (!campusName || !categoryName) return []
+  return collectGuideGroups(taxonomyGuide.value?.campus_category_tree?.[campusName]?.[categoryName])
+})
+
+const guideFineFacetKeys = computed(() =>
+  new Set(guideFineGroups.value.map((group) => group.facetKey).filter((key) => FINE_FACETS.includes(key))),
 )
 
-const existingTags = computed(() => selectedItem.value?.photo?.free_tags || selectedItem.value?.photo?.tags || [])
+const visibleFineFacets = computed(() => {
+  const keys = guideFineFacetKeys.value
+  if (keys.size) return taxonomyFacets.value.filter((facet) => keys.has(facet.key))
+  if (!classificationDraft.campus || !classificationDraft.photo_type) return []
+  return taxonomyFacets.value.filter((facet) => FINE_FACETS.includes(facet.key))
+})
 
 const existingClassificationSummary = computed(() => {
   const values = selectedItem.value?.photo?.classifications || {}
@@ -435,7 +425,7 @@ onBeforeUnmount(() => {
 })
 
 watch(
-  [tagDraft, () => ({ ...classificationDraft }), () => ({ ...multiClassificationDraft }), note],
+  [titleDraft, authorDraft, () => ({ ...classificationDraft }), () => ({ ...multiClassificationDraft }), note],
   () => {
     if (!hydrating) scheduleDraftSave()
   },
@@ -443,7 +433,9 @@ watch(
 )
 
 async function loadTaxonomy() {
-  taxonomyFacets.value = await getPublicTaxonomy()
+  const [facets, guide] = await Promise.all([getPublicTaxonomy(), getPublicTaxonomyGuide()])
+  taxonomyFacets.value = facets
+  taxonomyGuide.value = guide
 }
 
 async function loadTasks() {
@@ -482,7 +474,8 @@ async function goRelative(offset: number) {
 function hydrateDraft() {
   hydrating = true
   const item = selectedItem.value
-  tagDraft.value = item?.submitted_tags || item?.draft_tags || item?.photo?.free_tags || item?.photo?.tags || []
+  titleDraft.value = item?.submitted_title || item?.draft_title || item?.photo?.title || parsedTitleFromPhoto() || ''
+  authorDraft.value = item?.submitted_author || item?.draft_author || item?.photo?.author || parsedAuthorFromPhoto() || ''
   Object.keys(classificationDraft).forEach((key) => delete classificationDraft[key])
   Object.keys(multiClassificationDraft).forEach((key) => delete multiClassificationDraft[key])
 
@@ -516,6 +509,24 @@ function hydrateDraft() {
   })
 }
 
+interface FineGuideGroup {
+  title: string
+  facetKey: string
+  nodeNames: string[]
+}
+
+function collectGuideGroups(groups: TaxonomyGuideGroup[] | undefined): FineGuideGroup[] {
+  if (!groups?.length) return []
+  return groups.flatMap((group) => [
+    {
+      title: group.title,
+      facetKey: group.facet_key,
+      nodeNames: group.nodes || [],
+    },
+    ...collectGuideGroups(group.groups),
+  ])
+}
+
 function optionsFor(facetKey: string): SelectOption[] {
   const facet = taxonomyFacets.value.find((item) => item.key === facetKey)
   return facet ? flattenOptions(facet.nodes) : []
@@ -523,7 +534,13 @@ function optionsFor(facetKey: string): SelectOption[] {
 
 function filteredOptionsFor(facetKey: string): SelectOption[] {
   const query = fineSearch.value.trim().toLowerCase()
-  const options = optionsFor(facetKey)
+  const allowed = guideFineGroups.value
+    .filter((group) => group.facetKey === facetKey)
+    .flatMap((group) => group.nodeNames)
+  const options = optionsFor(facetKey).filter((option) => {
+    if (!allowed.length) return true
+    return allowed.includes(option.label) || allowed.includes(option.node.name)
+  })
   if (!query) return options
   return options.filter((option) => option.searchText.includes(query))
 }
@@ -582,8 +599,10 @@ async function saveDraftNow() {
   if (!selectedItem.value || selectedItem.value.status === 'approved') return
   try {
     const updated = await saveTaggingItemDraft(selectedItem.value.id, {
-      tags: tagDraft.value,
+      tags: [],
       classifications: buildClassifications(),
+      title: titleDraft.value.trim() || undefined,
+      author: authorDraft.value.trim() || undefined,
       note: note.value || undefined,
     })
     replaceItem(updated)
@@ -591,19 +610,6 @@ async function saveDraftNow() {
   } catch (error: any) {
     draftState.value = '保存失败'
   }
-}
-
-async function loadTagSuggestions(value: string) {
-  if (!value.trim()) {
-    tagSuggestions.value = []
-    return
-  }
-  tagSuggestions.value = await getTagSuggestions(value.trim())
-}
-
-function addCandidateTag(name: string) {
-  const clean = name.trim()
-  if (clean && !tagDraft.value.includes(clean)) tagDraft.value.push(clean)
 }
 
 function removeFineLabel(facetKey: string, value: number) {
@@ -618,8 +624,10 @@ async function submitCurrent() {
   submitting.value = true
   try {
     const updated = await submitTaggingItem(selectedItem.value.id, {
-      tags: tagDraft.value,
+      tags: [],
       classifications: buildClassifications(),
+      title: titleDraft.value.trim() || undefined,
+      author: authorDraft.value.trim() || undefined,
       note: note.value || undefined,
     })
     replaceItem(updated)
@@ -630,6 +638,23 @@ async function submitCurrent() {
   } finally {
     submitting.value = false
   }
+}
+
+function parsedDescriptionParts() {
+  return (selectedItem.value?.photo?.description || '')
+    .split('|')
+    .map((part) => part.trim())
+    .filter(Boolean)
+}
+
+function parsedTitleFromPhoto() {
+  return parsedDescriptionParts().find((part) => !part.includes('作者') && !part.includes('序号')) || ''
+}
+
+function parsedAuthorFromPhoto() {
+  const authorPart = parsedDescriptionParts().find((part) => part.includes('作者'))
+  const match = authorPart?.match(/作者[：:]\s*(.+)$/)
+  return match?.[1]?.trim() || ''
 }
 
 function replaceItem(updated: TaggingTaskItem) {

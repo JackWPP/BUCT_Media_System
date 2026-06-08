@@ -59,6 +59,14 @@ export interface TaxonomyGuide {
   primary: string[]
   dependencies: Record<string, Record<string, string[]>>
   legacy_query_aliases: Record<string, string>
+  campus_category_tree?: Record<string, Record<string, TaxonomyGuideGroup[]>>
+}
+
+export interface TaxonomyGuideGroup {
+  title: string
+  facet_key: string
+  nodes?: string[]
+  groups?: TaxonomyGuideGroup[]
 }
 
 export interface TaxonomyFacetCreate {

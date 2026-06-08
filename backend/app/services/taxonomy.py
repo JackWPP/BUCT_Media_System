@@ -74,6 +74,54 @@ CHAOYANG_BUILDINGS = [
 
 HAIDIAN_BUILDINGS = ["教学楼（海淀校区）", "军乐厅", "荣茂图书馆"]
 
+CHANGPING_BUILDING_PHASE_1 = [
+    "第一教学楼",
+    "第二教学楼",
+    "图书馆",
+    "体育馆",
+    "大学生活动中心",
+    "校史博物馆",
+    "文理楼",
+    "工程训练中心",
+    "机电信息楼A座",
+    "后勤服务楼",
+    "保卫处监控指挥中心",
+]
+
+CHANGPING_BUILDING_PHASE_2 = [
+    "实验楼",
+    "学生公寓",
+    "紫竹餐厅",
+    "玉兰餐厅",
+    "新校区建设指挥部",
+    "樱花苑",
+    "紫竹苑",
+    "玉兰苑",
+    "留学生公寓",
+    "杏坛苑/青教公寓",
+    "杏坛苑/短租公寓",
+]
+
+CHANGPING_FACILITY_GROUPS = {
+    "室外设施": ["运动场/风雨操场", "第二运动场", "足球场", "篮球场", "网球场", "排球场", "素质拓展基地"],
+    "教学设施": ["教室（第一教学楼）", "教室（第二教学楼）", "求真讲堂（第二教学楼）", "励学讲堂（第二教学楼）", "教研室（大学生活动中心）"],
+    "体育设施": ["比赛主场馆（体育馆）", "健身房（体育馆）", "篮球训练馆（体育馆）", "网球馆（体育馆）", "羽毛球馆（体育馆）", "乒乓球馆（体育馆）", "游泳馆（体育馆）", "健美操室（体育馆）", "舞蹈室（体育馆）", "跆拳道室（体育馆）", "形体室（体育馆）", "体测室（体育馆）"],
+    "美育设施": ["蓝晒美育工坊（实验楼）", "人因工学美育工坊（实验楼）", "掐丝珐琅美育工坊（实验楼）", "滴胶艺术坊（实验楼）", "陶艺拉坯美育工坊（实验楼）", "陶艺彩绘美育工坊（实验楼）", "情绪串珠美育工坊（实验楼）", "永生绒花美育工坊（实验楼）", "木艺工坊（实验楼）"],
+    "实验设施": ["数字化智能教学未来中心（实验楼）", "思政学习创新中心（实验楼）", "实践教学与创新培养未来中心（实验楼）"],
+    "办公设施": ["一站式服务大厅（图书馆）", "马克思主义学院（文理楼）", "数理学院（文理楼）", "文法学院（文理楼）", "经济管理学院（文理楼）"],
+    "会议设施": ["网络视频会议室（图书馆）", "共享研讨空间（图书馆）", "第一会议室（图书馆）", "第二会议室（图书馆）", "学术报告厅（图书馆）", "共享办公空间（图书馆）", "多功能厅（体育馆）", "会议室（第二教学楼）", "会议室（后勤服务楼）", "贵宾室（体育馆）", "贵宾室（第二教学楼）", "会议室（校史博物馆）"],
+    "其他设施": ["小剧场（大学生活动中心）", "主题摄影展（图书馆）", "212大型视听室（图书馆）", "校史馆临时展厅（图书馆）", "智慧教学运行中心（第二教学楼）", "艺术展厅（大学生活动中心）", "琴房（大学生活动中心）", "活动室（大学生活动中心）", "排练厅（大学生活动中心）", "创享商圈（大学生活动中心）", "主题展厅（校史博物馆）", "藏品修复室（校史博物馆）", "数控仿真室（工程训练中心）", "创客空间（工程训练中心）", "游戏设计工坊（工程训练中心）", "寓建生活工坊（学生公寓）"],
+}
+
+CHANGPING_NATURAL_ECOLOGY = {
+    "季节": ["春季", "夏季", "秋季", "冬季"],
+    "自然现象": ["日出", "日落", "蓝天", "日食", "月食", "雨", "白云", "雾", "雷电", "彩虹", "晚霞", "星", "乌云", "雪", "星轨", "银河"],
+    "动物": ["猫", "黑天鹅", "白鹅", "绿头鸭", "雌性绿头鸭", "苍鹭", "番鸭", "黑水鸡", "小天鹅"],
+    "植物": ["迎春", "杏", "连翘", "芍药", "郁金香", "二月兰", "桃", "牡丹", "紫花地丁", "海棠", "樱花", "玉兰"],
+}
+
+CHANGPING_LANDSCAPE_MAINTENANCE = ["校名石", "荷塘", "柳湖", "玉屏山", "北化知行园", "静心亭（柳湖）", "师贤亭（荷塘）", "燕贺亭（玉屏山）", "钟塔（第二教学楼）", "文化墙（第二教学楼）", "质量文化（图书馆）", "中心广场（大学生活动中心）", "枫叶广场（玉屏山）", "校名标识字（玉屏山）", "化彩三台（北化八景）", "馆声凫影（北化八景）", "镜湖书柳（北化八景）", "小荷听书（北化八景）", "花海晴光（北化八景）", "平湖跃金（北化八景）", "花海聆淙（北化八景）", "烟雨玉屏（北化八景）"]
+
 DEFAULT_TAXONOMY = [
     {
         "key": "season",
@@ -177,7 +225,7 @@ DEFAULT_TAXONOMY = [
     },
     {
         "key": "photo_type",
-        "name": "题材",
+        "name": "类别",
         "is_system": True,
         "sort_order": 60,
         "nodes": ["建筑楼宇", "校区设施", "自然生态"],
@@ -238,8 +286,10 @@ DEFAULT_TAXONOMY = [
         "selection_mode": "multiple",
         "is_system": True,
         "sort_order": 120,
-        "nodes": ["猫", "黑天鹅", "白鹅", "绿头鸭", "麻鸭", "苍鹭", "番鸭", "黑水鸡", "小天鹅"],
-        "aliases": {},
+        "nodes": ["猫", "黑天鹅", "白鹅", "绿头鸭", "雌性绿头鸭", "苍鹭", "番鸭", "黑水鸡", "小天鹅"],
+        "aliases": {
+            "雌性绿头鸭": ["麻鸭"],
+        },
     },
     {
         "key": "plant",
@@ -314,6 +364,9 @@ LEGACY_NODE_MERGES = {
         "人文纪实": None,
         "人像": None,
     },
+    "animal": {
+        "麻鸭": "雌性绿头鸭",
+    },
 }
 
 TAXONOMY_GUIDE = {
@@ -326,12 +379,72 @@ TAXONOMY_GUIDE = {
         },
         "gallery_series": {
             "昌平校区摄影大赛": ["gallery_year", "award_level"],
-            "投稿作品": ["source_type"],
+            "投稿作品": [],
         },
         "photo_type": {
             "建筑楼宇": ["building", "landscape", "season", "technique"],
             "校区设施": ["facility", "landscape", "season", "technique"],
             "自然生态": ["season", "natural_phenomenon", "landscape", "animal", "plant", "technique"],
+        },
+    },
+    "campus_structure": {
+        "昌平校区": {
+            "building": {
+                "一期项目": CHANGPING_BUILDING_PHASE_1,
+                "二期项目": CHANGPING_BUILDING_PHASE_2,
+            },
+            "facility": CHANGPING_FACILITY_GROUPS,
+            "natural_ecology": CHANGPING_NATURAL_ECOLOGY,
+            "landscape": {
+                "景观维持": CHANGPING_LANDSCAPE_MAINTENANCE,
+            },
+        },
+        "朝阳校区": {
+            "building": CHAOYANG_BUILDINGS,
+        },
+        "海淀校区": {
+            "building": HAIDIAN_BUILDINGS,
+        },
+    },
+    "campus_category_tree": {
+        "昌平校区": {
+            "建筑楼宇": [
+                {"title": "一期项目", "facet_key": "building", "nodes": CHANGPING_BUILDING_PHASE_1},
+                {"title": "二期项目", "facet_key": "building", "nodes": CHANGPING_BUILDING_PHASE_2},
+            ],
+            "校区设施": [
+                {"title": title, "facet_key": "facility", "nodes": nodes}
+                for title, nodes in CHANGPING_FACILITY_GROUPS.items()
+            ] + [
+                {"title": "景观", "facet_key": "landscape", "nodes": CHANGPING_LANDSCAPE_MAINTENANCE},
+            ],
+            "自然生态": [
+                {"title": "季节", "facet_key": "season", "nodes": CHANGPING_NATURAL_ECOLOGY["季节"]},
+                {"title": "自然现象", "facet_key": "natural_phenomenon", "nodes": CHANGPING_NATURAL_ECOLOGY["自然现象"]},
+                {"title": "动物", "facet_key": "animal", "nodes": CHANGPING_NATURAL_ECOLOGY["动物"]},
+                {"title": "植物", "facet_key": "plant", "nodes": CHANGPING_NATURAL_ECOLOGY["植物"]},
+                {"title": "景观", "facet_key": "landscape", "nodes": CHANGPING_LANDSCAPE_MAINTENANCE},
+            ],
+        },
+        "朝阳校区": {
+            "建筑楼宇": [{"title": "朝阳校区楼宇", "facet_key": "building", "nodes": CHAOYANG_BUILDINGS}],
+            "校区设施": [],
+            "自然生态": [
+                {"title": "季节", "facet_key": "season"},
+                {"title": "自然现象", "facet_key": "natural_phenomenon"},
+                {"title": "动物", "facet_key": "animal"},
+                {"title": "植物", "facet_key": "plant"},
+            ],
+        },
+        "海淀校区": {
+            "建筑楼宇": [{"title": "海淀校区楼宇", "facet_key": "building", "nodes": HAIDIAN_BUILDINGS}],
+            "校区设施": [],
+            "自然生态": [
+                {"title": "季节", "facet_key": "season"},
+                {"title": "自然现象", "facet_key": "natural_phenomenon"},
+                {"title": "动物", "facet_key": "animal"},
+                {"title": "植物", "facet_key": "plant"},
+            ],
         },
     },
     "legacy_query_aliases": {"landmark": "building"},

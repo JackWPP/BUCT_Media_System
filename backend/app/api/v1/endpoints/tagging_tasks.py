@@ -42,10 +42,16 @@ async def _serialize_item(db: AsyncSession, item: TaggingTaskItem) -> TaggingTas
         task_id=item.task_id,
         photo_id=item.photo_id,
         status=item.status,
+        original_title=item.original_title,
+        original_author=item.original_author,
         original_tags=item.original_tags,
+        submitted_title=item.submitted_title,
+        submitted_author=item.submitted_author,
         submitted_tags=item.submitted_tags,
         original_classifications=item.original_classifications,
         submitted_classifications=item.submitted_classifications,
+        draft_title=item.draft_title,
+        draft_author=item.draft_author,
         draft_tags=item.draft_tags,
         draft_classifications=item.draft_classifications,
         draft_note=item.draft_note,
@@ -246,7 +252,15 @@ async def save_tagging_item_draft(
     if item.status == "approved":
         raise HTTPException(status_code=400, detail="Approved items cannot be edited")
     try:
-        item = await tagging_service.save_draft(db, item, payload.tags, payload.classifications, payload.note)
+        item = await tagging_service.save_draft(
+            db,
+            item,
+            payload.title,
+            payload.author,
+            payload.tags,
+            payload.classifications,
+            payload.note,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return await _serialize_item(db, item)
@@ -267,7 +281,15 @@ async def submit_tagging_item(
     if item.status == "approved":
         raise HTTPException(status_code=400, detail="Approved items cannot be resubmitted")
     try:
-        item = await tagging_service.submit_item(db, item, payload.tags, payload.classifications, payload.note)
+        item = await tagging_service.submit_item(
+            db,
+            item,
+            payload.title,
+            payload.author,
+            payload.tags,
+            payload.classifications,
+            payload.note,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return await _serialize_item(db, item)

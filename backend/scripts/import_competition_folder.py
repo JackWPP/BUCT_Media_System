@@ -109,6 +109,8 @@ async def import_record(record, *, uploader_id: str, approved: bool) -> str:
                 id=photo_uuid,
                 uploader_id=uploader_id,
                 filename=record.filename,
+                title=record.title,
+                author=record.author,
                 original_path=stored_media.original_path,
                 thumb_path=stored_media.thumb_path,
                 compressed_path=stored_media.compressed_path,

@@ -110,7 +110,7 @@ const displayTags = computed<DisplayTag[]>(() => {
       landmark: '楼宇',
       gallery_series: '专区',
       gallery_year: '届次/年份',
-      photo_type: '题材',
+      photo_type: '类别',
       building: '楼宇',
       source_type: '来源',
       facility: '设施',

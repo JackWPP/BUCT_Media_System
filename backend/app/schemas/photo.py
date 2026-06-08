@@ -11,6 +11,8 @@ from app.schemas.taxonomy import TaxonomyValueResponse
 class PhotoBase(BaseModel):
     """Base photo schema"""
     filename: str = Field(..., description="Original filename")
+    title: Optional[str] = Field(None, max_length=200, description="Photo title")
+    author: Optional[str] = Field(None, max_length=100, description="Photo author")
     description: Optional[str] = Field(None, max_length=500, description="Photo description")
     season: Optional[str] = Field(None, description="Season: Spring/Summer/Autumn/Winter")
     category: Optional[str] = Field(None, description="Category: Landscape/Portrait/Activity/Documentary")
@@ -24,6 +26,8 @@ class PhotoCreate(PhotoBase):
 
 class PhotoUpdate(BaseModel):
     """Schema for updating a photo"""
+    title: Optional[str] = Field(None, max_length=200)
+    author: Optional[str] = Field(None, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
     season: Optional[str] = None
     category: Optional[str] = None
@@ -94,6 +98,8 @@ class PhotoUploadResponse(BaseModel):
     """Response after uploading a photo"""
     id: str
     filename: str
+    title: Optional[str] = None
+    author: Optional[str] = None
     original_path: str
     thumb_path: Optional[str] = None
     compressed_path: Optional[str] = None

@@ -13,7 +13,7 @@ export const FACET_LABELS: Record<string, string> = {
   gallery_series: '专区',
   source_type: '来源',
   campus: '校区',
-  photo_type: '题材',
+  photo_type: '类别',
   building: '楼宇',
   facility: '设施',
   landscape: '景观',
@@ -25,7 +25,7 @@ export const FACET_LABELS: Record<string, string> = {
   animal: '动物',
   plant: '植物',
   documentary_topic: '纪实主题',
-  tag: '自由标签',
+  tag: '补充标签',
   landmark: '楼宇',
 }
 
@@ -47,7 +47,22 @@ export const TAXONOMY_FILTER_KEYS = [
   'documentary_topic',
 ] as const
 
-export const GALLERY_FILTER_KEYS = [...TAXONOMY_FILTER_KEYS, 'tag'] as const
+export const GALLERY_FILTER_KEYS = [
+  'gallery_series',
+  'campus',
+  'photo_type',
+  'building',
+  'facility',
+  'landscape',
+  'gallery_year',
+  'award_level',
+  'season',
+  'natural_phenomenon',
+  'technique',
+  'animal',
+  'plant',
+  'documentary_topic',
+] as const
 
 export function isNodeSelectable(node: TaxonomyNode) {
   return node.is_selectable ?? !(node.children || []).length

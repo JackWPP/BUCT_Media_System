@@ -15,6 +15,8 @@ export interface Photo {
   id: string
   uploader_id: string
   filename: string
+  title: string | null
+  author: string | null
   original_path: string
   processed_path: string | null
   thumb_path: string | null
@@ -52,6 +54,8 @@ export interface PhotoUploadResponse {
 }
 
 export interface PhotoUpdate {
+  title?: string | null
+  author?: string | null
   description?: string
   season?: string
   category?: string

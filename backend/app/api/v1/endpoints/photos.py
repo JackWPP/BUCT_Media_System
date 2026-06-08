@@ -320,6 +320,8 @@ async def download_photo(
 async def upload_photo(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(..., description="Photo file to upload"),
+    title: Optional[str] = Form(None, max_length=200),
+    author: Optional[str] = Form(None, max_length=100),
     description: Optional[str] = Form(None, max_length=500),
     season: Optional[str] = Form(None),
     category: Optional[str] = Form(None),
@@ -370,6 +372,8 @@ async def upload_photo(
             {
                 "id": photo_uuid,
                 "filename": original_filename,
+                "title": title,
+                "author": author,
                 "original_path": stored_media.original_path,
                 "thumb_path": stored_media.thumb_path,
                 "compressed_path": stored_media.compressed_path,
@@ -416,6 +420,8 @@ async def upload_photo(
         return PhotoUploadResponse(
             id=photo.id,
             filename=photo.filename,
+            title=photo.title,
+            author=photo.author,
             original_path=photo.original_path,
             thumb_path=photo.thumb_path,
             width=photo.width,

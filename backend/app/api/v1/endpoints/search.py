@@ -57,7 +57,7 @@ async def search_photos(
     gallery_series: Optional[str] = Query(None, description="专区 filter"),
     gallery_year: Optional[str] = Query(None, description="届次/年份 filter"),
     award_level: Optional[str] = Query(None, description="奖项 filter"),
-    photo_type: Optional[str] = Query(None, description="题材 filter"),
+    photo_type: Optional[str] = Query(None, description="类别 filter"),
     source_type: Optional[str] = Query(None, description="来源 filter"),
     facility: Optional[str] = Query(None, description="设施 filter"),
     landscape: Optional[str] = Query(None, description="景观 filter"),

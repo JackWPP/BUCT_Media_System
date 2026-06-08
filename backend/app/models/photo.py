@@ -15,6 +15,8 @@ class Photo(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     uploader_id = Column(String(36), ForeignKey("users.id"), nullable=False)
     filename = Column(String(255), nullable=False)
+    title = Column(String(200))
+    author = Column(String(100))
     original_path = Column(Text)
     processed_path = Column(Text)
     thumb_path = Column(Text)

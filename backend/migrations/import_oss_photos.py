@@ -215,6 +215,8 @@ def import_photos(
                 "id": photo_id,
                 "uploader_id": uploader_id,
                 "filename": filename,
+                "title": row["title"],
+                "author": row["author"],
                 "original_path": oss_key,
                 "thumb_path": None,
                 "processed_path": None,
@@ -239,13 +241,14 @@ def import_photos(
             if apply:
                 main_cursor.execute(
                     """INSERT INTO photos (
-                        id, uploader_id, filename, original_path, thumb_path, processed_path,
+                        id, uploader_id, filename, title, author, original_path, thumb_path, processed_path,
                         width, height, file_size, mime_type, season, category, campus,
                         description, exif_data, status, processing_status,
                         created_at, updated_at, captured_at, published_at, views
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         record["id"], record["uploader_id"], record["filename"],
+                        record["title"], record["author"],
                         record["original_path"], record["thumb_path"], record["processed_path"],
                         record["width"], record["height"], record["file_size"],
                         record["mime_type"], record["season"], record["category"],

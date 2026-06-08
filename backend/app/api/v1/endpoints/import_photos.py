@@ -149,6 +149,8 @@ async def import_photos(
             new_photo_data = {
                 'id': photo_uuid,
                 'filename': filename,
+                'title': photo_data.get('title'),
+                'author': photo_data.get('author'),
                 'original_path': original_relative,
                 'thumb_path': processing_result.get('thumb_path'),
                 'width': photo_data.get('width') or processing_result.get('width'),

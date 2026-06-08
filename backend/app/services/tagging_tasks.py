@@ -32,6 +32,27 @@ def _is_reviewer(user: User) -> bool:
     return user.role in ("admin", "auditor")
 
 
+def _clean_optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    clean = value.strip()
+    return clean or None
+
+
+def _resolve_text_value(current_value: str | None, update_value: str | None) -> str | None:
+    cleaned = _clean_optional_text(update_value)
+    return cleaned if cleaned is not None else current_value
+
+
+def _snapshot_photo_metadata(photo: Photo, title: str | None, author: str | None) -> dict[str, str | None]:
+    return {
+        "original_title": photo.title,
+        "original_author": photo.author,
+        "draft_title": _resolve_text_value(photo.title, title),
+        "draft_author": _resolve_text_value(photo.author, author),
+    }
+
+
 def task_stats(task: TaggingTask) -> dict[str, int | float]:
     statuses = [item.status for item in task.items]
     total = len(statuses)
@@ -104,11 +125,7 @@ def _dependency_missing_filter():
         _facet_value_exists("gallery_series", "昌平校区摄影大赛"),
         ~_facet_exists("gallery_year"),
     )
-    submission_missing_source = and_(
-        _facet_value_exists("gallery_series", "投稿作品"),
-        ~_facet_exists("source_type"),
-    )
-    return or_(contest_missing_year, submission_missing_source)
+    return contest_missing_year
 
 
 async def get_task(db: AsyncSession, task_id: str) -> TaggingTask | None:
@@ -392,10 +409,19 @@ async def _serialize_submission_classifications(
 async def save_draft(
     db: AsyncSession,
     item: TaggingTaskItem,
+    title: str | None,
+    author: str | None,
     tag_names: list[str],
     classifications: dict[str, int | list[int]],
     note: str | None,
 ) -> TaggingTaskItem:
+    photo = item.photo
+    if photo is not None:
+        metadata = _snapshot_photo_metadata(photo, title, author)
+        item.original_title = metadata["original_title"]
+        item.original_author = metadata["original_author"]
+        item.draft_title = metadata["draft_title"]
+        item.draft_author = metadata["draft_author"]
     item.draft_tags = [tag.strip() for tag in tag_names if tag.strip()]
     item.draft_classifications = await _serialize_submission_classifications(db, classifications)
     item.draft_note = note
@@ -411,6 +437,8 @@ async def save_draft(
 async def submit_item(
     db: AsyncSession,
     item: TaggingTaskItem,
+    title: str | None,
+    author: str | None,
     tag_names: list[str],
     classifications: dict[str, int | list[int]],
     note: str | None,
@@ -419,6 +447,11 @@ async def submit_item(
     if photo is None:
         raise ValueError("Photo not found")
 
+    metadata = _snapshot_photo_metadata(photo, title, author)
+    item.original_title = metadata["original_title"]
+    item.original_author = metadata["original_author"]
+    item.submitted_title = metadata["draft_title"]
+    item.submitted_author = metadata["draft_author"]
     submitted_classifications = await _serialize_submission_classifications(db, classifications)
     if not _has_classification(submitted_classifications, "gallery_series"):
         raise ValueError("专区为必填项")
@@ -426,15 +459,12 @@ async def submit_item(
     if gallery_series == "昌平校区摄影大赛":
         if not _has_classification(submitted_classifications, "gallery_year"):
             raise ValueError("摄影大赛作品必须选择届次/年份")
-    elif gallery_series == "投稿作品":
-        if not _has_classification(submitted_classifications, "source_type"):
-            raise ValueError("投稿作品必须选择教职工投稿或学生投稿")
-    else:
+    elif gallery_series != "投稿作品":
         raise ValueError("专区必须为昌平校区摄影大赛或投稿作品")
     if not _has_classification(submitted_classifications, "campus"):
         raise ValueError("校区为必填项")
     if not _has_classification(submitted_classifications, "photo_type"):
-        raise ValueError("题材为必填项")
+        raise ValueError("类别为必填项")
 
     item.original_tags = [tag.name for tag in await photo_crud.get_photo_tags(db, photo.id)]
     item.original_classifications = serialize_classifications(photo)
@@ -444,6 +474,8 @@ async def submit_item(
     item.draft_tags = item.submitted_tags
     item.draft_classifications = submitted_classifications
     item.draft_note = note
+    item.draft_title = item.submitted_title
+    item.draft_author = item.submitted_author
     item.draft_saved_at = datetime.utcnow()
     item.status = "submitted"
     item.submitted_at = datetime.utcnow()
@@ -468,6 +500,11 @@ async def approve_item(
         tag = await tag_crud.get_or_create_tag(db, tag_name)
         tag_ids.append(tag.id)
     await photo_crud.add_tags_to_photo(db, photo.id, tag_ids)
+
+    if item.submitted_title is not None:
+        photo.title = item.submitted_title
+    if item.submitted_author is not None:
+        photo.author = item.submitted_author
 
     classification_ids = {}
     for facet_key, value in (item.submitted_classifications or {}).items():

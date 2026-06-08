@@ -13,9 +13,13 @@ export interface TaggingTaskItem {
   submitted_classifications: Record<string, any> | null
   draft_tags: string[] | null
   draft_classifications: Record<string, any> | null
+  draft_title: string | null
+  draft_author: string | null
   draft_note: string | null
   draft_saved_at: string | null
   submitter_note: string | null
+  submitted_title: string | null
+  submitted_author: string | null
   reviewer_id: string | null
   reviewer_note: string | null
   submitted_at: string | null
@@ -102,6 +106,8 @@ export function getTaggingPhotoCandidates(params?: {
 export function submitTaggingItem(itemId: string, data: {
   tags: string[]
   classifications: Record<string, number | number[]>
+  title?: string
+  author?: string
   note?: string
 }) {
   return request.post<TaggingTaskItem>(`/api/v1/tagging-tasks/items/${itemId}/submit`, data)
@@ -110,6 +116,8 @@ export function submitTaggingItem(itemId: string, data: {
 export function saveTaggingItemDraft(itemId: string, data: {
   tags: string[]
   classifications: Record<string, number | number[]>
+  title?: string
+  author?: string
   note?: string
 }) {
   return request.post<TaggingTaskItem>(`/api/v1/tagging-tasks/items/${itemId}/draft`, data)
