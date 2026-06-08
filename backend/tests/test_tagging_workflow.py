@@ -12,7 +12,8 @@ from app.core.security import create_access_token, get_password_hash
 from app.main import app
 from app.models import Photo, PhotoClassification, Tag, User
 from app.models.taxonomy import TaxonomyFacet, TaxonomyNode
-from app.services.taxonomy import ensure_default_taxonomy
+from app.services.taxonomy import ensure_default_taxonomy, resolve_legacy_photo_classifications
+from scripts import migrate_photo_type_fix68
 
 
 def headers(token: str) -> dict[str, str]:
@@ -135,7 +136,14 @@ def test_taxonomy_seed_and_public_guide(tagging_client):
     assert find_taxonomy_node(taxonomy.json(), "building", "昌平校区楼宇")["is_selectable"] is False
     assert find_taxonomy_node(taxonomy.json(), "building", "图书馆")["is_selectable"] is True
     assert guide.status_code == 200
-    assert guide.json()["dependencies"]["photo_type"]["人文纪实"] == ["documentary_topic"]
+    photo_type_nodes = {
+        node["name"]
+        for facet in taxonomy.json() if facet["key"] == "photo_type"
+        for node in flatten_nodes(facet["nodes"])
+    }
+    assert photo_type_nodes == {"建筑楼宇", "校区设施", "自然生态"}
+    assert guide.json()["dependencies"]["photo_type"]["建筑楼宇"] == ["building", "landscape", "season", "technique"]
+    assert guide.json()["dependencies"]["photo_type"]["校区设施"] == ["facility", "landscape", "season", "technique"]
 
 
 def test_taxonomy_seed_converges_legacy_nodes_to_new_scheme(tagging_client):
@@ -227,28 +235,30 @@ def test_taxonomy_seed_converges_legacy_nodes_to_new_scheme(tagging_client):
             rows = await session.execute(
                 select(TaxonomyFacet.key, TaxonomyNode.name, TaxonomyNode.is_active)
                 .join(TaxonomyNode, TaxonomyNode.facet_id == TaxonomyFacet.id)
-                .where(TaxonomyNode.name.in_(["风光", "人像", "摄影大赛", "2018", "校园风光"]))
+                .where(TaxonomyNode.name.in_(["风光", "人像", "摄影大赛", "2018", "建筑楼宇", "校园风光"]))
             )
             node_states = {(facet, name): is_active for facet, name, is_active in rows.all()}
             assert node_states[("photo_type", "风光")] is False
             assert node_states[("photo_type", "人像")] is False
             assert node_states[("gallery_series", "摄影大赛")] is False
             assert node_states[("gallery_year", "2018")] is False
-            assert node_states[("photo_type", "校园风光")] is True
+            assert node_states[("photo_type", "建筑楼宇")] is True
+            if ("photo_type", "校园风光") in node_states:
+                assert node_states[("photo_type", "校园风光")] is False
             landmark_facet = (
                 await session.execute(select(TaxonomyFacet).where(TaxonomyFacet.key == "landmark"))
             ).scalar_one()
             assert landmark_facet.is_active is False
 
-            classification = (
+            classifications = (
                 await session.execute(
-                    select(TaxonomyNode.name)
+                    select(TaxonomyNode.name, TaxonomyNode.is_active)
                     .join(PhotoClassification, PhotoClassification.node_id == TaxonomyNode.id)
                     .join(TaxonomyFacet, TaxonomyFacet.id == PhotoClassification.facet_id)
                     .where(PhotoClassification.photo_id == "photo-1", TaxonomyFacet.key == "photo_type")
                 )
-            ).scalar_one()
-            assert classification == "校园风光"
+            ).all()
+            assert classifications == [("风光", False)]
 
     asyncio.run(add_legacy_nodes())
     asyncio.run(assert_converged())
@@ -263,7 +273,101 @@ def test_taxonomy_seed_converges_legacy_nodes_to_new_scheme(tagging_client):
     assert ("photo_type", "人像") not in public_nodes
     assert ("gallery_series", "摄影大赛") not in public_nodes
     assert ("gallery_year", "2018") not in public_nodes
-    assert ("photo_type", "校园风光") in public_nodes
+    assert ("photo_type", "建筑楼宇") in public_nodes
+    assert ("photo_type", "校园风光") not in public_nodes
+
+
+def test_legacy_photo_type_resolution_uses_fix68_values(tagging_client):
+    _client, _tokens, session_factory = tagging_client
+
+    async def resolve_values():
+        async with session_factory() as session:
+            landscape = await resolve_legacy_photo_classifications(session, category="Landscape")
+            documentary = await resolve_legacy_photo_classifications(session, category="Documentary")
+            facility = await resolve_legacy_photo_classifications(session, category="校区设施")
+
+            rows = await session.execute(
+                select(TaxonomyNode.id, TaxonomyNode.name)
+                .join(TaxonomyFacet, TaxonomyFacet.id == TaxonomyNode.facet_id)
+                .where(TaxonomyFacet.key == "photo_type")
+            )
+            node_names = dict(rows.all())
+            return (
+                node_names.get(landscape.get("photo_type")),
+                documentary.get("photo_type"),
+                node_names.get(facility.get("photo_type")),
+            )
+
+    landscape_name, documentary_node, facility_name = asyncio.run(resolve_values())
+    assert landscape_name == "建筑楼宇"
+    assert documentary_node is None
+    assert facility_name == "校区设施"
+
+
+def test_new_photo_type_candidate_filters_do_not_use_legacy_category_fallback(tagging_client):
+    client, tokens, session_factory = tagging_client
+
+    async def add_facility_photo():
+        async with session_factory() as session:
+            photo = Photo(
+                id="photo-facility",
+                uploader_id="admin-user",
+                filename="facility.jpg",
+                original_path="photos/facility.jpg",
+                width=800,
+                height=600,
+                file_size=100,
+                mime_type="image/jpeg",
+                status="approved",
+                processing_status="completed",
+                views=0,
+                category="Landscape",
+            )
+            session.add(photo)
+            await session.flush()
+            photo_type_facet = (
+                await session.execute(select(TaxonomyFacet).where(TaxonomyFacet.key == "photo_type"))
+            ).scalar_one()
+            facility_node = (
+                await session.execute(
+                    select(TaxonomyNode).where(
+                        TaxonomyNode.facet_id == photo_type_facet.id,
+                        TaxonomyNode.name == "校区设施",
+                    )
+                )
+            ).scalar_one()
+            session.add(
+                PhotoClassification(
+                    photo_id=photo.id,
+                    facet_id=photo_type_facet.id,
+                    node_id=facility_node.id,
+                )
+            )
+            await session.commit()
+
+    asyncio.run(add_facility_photo())
+
+    building_candidates = client.get(
+        "/api/v1/tagging-tasks/photo-candidates",
+        headers=headers(tokens["admin"]),
+        params={
+            "selection_mode": "all",
+            "photo_type": "建筑楼宇",
+        },
+    )
+    assert building_candidates.status_code == 200
+    assert "photo-facility" not in {item["id"] for item in building_candidates.json()["items"]}
+
+    facility_candidates = client.get(
+        "/api/v1/tagging-tasks/photo-candidates",
+        headers=headers(tokens["admin"]),
+        params={
+            "selection_mode": "all",
+            "photo_type": "校区设施",
+        },
+    )
+    assert facility_candidates.status_code == 200
+    assert "photo-facility" in {item["id"] for item in facility_candidates.json()["items"]}
 
 
 def test_tagger_can_submit_and_admin_approval_writes_photo_data(tagging_client):
@@ -283,7 +387,7 @@ def test_tagger_can_submit_and_admin_approval_writes_photo_data(tagging_client):
     item_id = create_response.json()["items"][0]["id"]
 
     taxonomy = client.get("/api/v1/taxonomy/public").json()
-    type_node = find_taxonomy_node(taxonomy, "photo_type", "校园风光")
+    type_node = find_taxonomy_node(taxonomy, "photo_type", "建筑楼宇")
     series_node = find_taxonomy_node(taxonomy, "gallery_series", "投稿作品")
     source_node = find_taxonomy_node(taxonomy, "source_type", "学生投稿")
     campus_node = find_taxonomy_node(taxonomy, "campus", "昌平校区")
@@ -401,7 +505,7 @@ def test_batch_review_only_processes_submitted_items_and_updates_stats(tagging_c
     item_id = create_response.json()["items"][0]["id"]
 
     taxonomy = client.get("/api/v1/taxonomy/public").json()
-    type_node = find_taxonomy_node(taxonomy, "photo_type", "人文纪实")
+    type_node = find_taxonomy_node(taxonomy, "photo_type", "自然生态")
     series_node = find_taxonomy_node(taxonomy, "gallery_series", "投稿作品")
     source_node = find_taxonomy_node(taxonomy, "source_type", "学生投稿")
     campus_node = find_taxonomy_node(taxonomy, "campus", "昌平校区")
@@ -450,3 +554,97 @@ def test_batch_review_only_processes_submitted_items_and_updates_stats(tagging_c
     ).json()
     assert task["stats"]["approved"] == 1
     assert task["stats"]["completion_rate"] == 100
+
+
+def test_fix68_photo_type_migration_only_maps_deterministic_content(tagging_client):
+    _client, _tokens, session_factory = tagging_client
+
+    async def arrange_and_migrate():
+        async with session_factory() as session:
+            building_photo = (await session.execute(select(Photo).where(Photo.id == "photo-1"))).scalar_one()
+            documentary_photo = Photo(
+                id="photo-2",
+                uploader_id="admin-user",
+                filename="activity.jpg",
+                original_path="photos/activity.jpg",
+                width=800,
+                height=600,
+                file_size=100,
+                mime_type="image/jpeg",
+                status="approved",
+                processing_status="completed",
+                views=0,
+            )
+            session.add(documentary_photo)
+            await session.flush()
+
+            photo_type_facet = (
+                await session.execute(select(TaxonomyFacet).where(TaxonomyFacet.key == "photo_type"))
+            ).scalar_one()
+            old_landscape = TaxonomyNode(
+                facet_id=photo_type_facet.id,
+                key="old-campus-view",
+                name="校园风光",
+                is_active=True,
+                is_selectable=True,
+                sort_order=90,
+            )
+            old_documentary = TaxonomyNode(
+                facet_id=photo_type_facet.id,
+                key="old-documentary",
+                name="人文纪实",
+                is_active=True,
+                is_selectable=True,
+                sort_order=91,
+            )
+            session.add_all([old_landscape, old_documentary])
+            await session.flush()
+
+            building_facet = (
+                await session.execute(select(TaxonomyFacet).where(TaxonomyFacet.key == "building"))
+            ).scalar_one()
+            library_node = (
+                await session.execute(
+                    select(TaxonomyNode).where(
+                        TaxonomyNode.facet_id == building_facet.id,
+                        TaxonomyNode.name == "图书馆",
+                    )
+                )
+            ).scalar_one()
+            session.add_all(
+                [
+                    PhotoClassification(
+                        photo_id=building_photo.id,
+                        facet_id=photo_type_facet.id,
+                        node_id=old_landscape.id,
+                    ),
+                    PhotoClassification(
+                        photo_id=building_photo.id,
+                        facet_id=building_facet.id,
+                        node_id=library_node.id,
+                    ),
+                    PhotoClassification(
+                        photo_id=documentary_photo.id,
+                        facet_id=photo_type_facet.id,
+                        node_id=old_documentary.id,
+                    ),
+                ]
+            )
+            await session.commit()
+
+        async with session_factory() as session:
+            await migrate_photo_type_fix68.migrate(session, apply=True)
+            await session.commit()
+            rows = await session.execute(
+                select(PhotoClassification.photo_id, TaxonomyNode.name)
+                .join(TaxonomyNode, TaxonomyNode.id == PhotoClassification.node_id)
+                .join(TaxonomyFacet, TaxonomyFacet.id == PhotoClassification.facet_id)
+                .where(TaxonomyFacet.key == "photo_type")
+                .order_by(PhotoClassification.photo_id)
+            )
+            return rows.all()
+
+    rows = asyncio.run(arrange_and_migrate())
+    assert ("photo-1", "建筑楼宇") in rows
+    assert not any(photo_id == "photo-2" for photo_id, _node_name in rows)
+    assert ("photo-2", "建筑楼宇") not in rows

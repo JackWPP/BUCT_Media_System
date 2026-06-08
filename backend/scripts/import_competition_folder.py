@@ -26,7 +26,7 @@ from app.services.taxonomy import ensure_default_taxonomy, resolve_taxonomy_node
 
 DEFAULT_SOURCE_DIR = Path(r"D:\BUCTuploader\第八届昌平校区摄影大赛获奖作品\1.风光类作品")
 DEFAULT_GALLERY_YEAR = "2025年第八届获奖作品"
-DEFAULT_PHOTO_TYPE = "风光类"
+DEFAULT_PHOTO_TYPE = "建筑楼宇"
 
 MIME_MAP = {
     ".jpg": "image/jpeg",
@@ -117,7 +117,7 @@ async def import_record(record, *, uploader_id: str, approved: bool) -> str:
                 file_size=stored_media.file_size,
                 mime_type=get_mime_type(record.source_path),
                 season=None,
-                category="Landscape" if record.photo_type == "风光类" else "Documentary",
+                category="Landscape" if record.photo_type in {"风光类", "建筑楼宇", "校区设施", "自然生态"} else "Documentary",
                 campus=record.campus,
                 description=build_description(record),
                 exif_data=processing_result.get("exif_data", {}),

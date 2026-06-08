@@ -78,6 +78,26 @@ interface DisplayTag {
   removable: boolean
 }
 
+const legacyPhotoTypeDisplayMap: Record<string, string | null> = {
+  Landscape: '建筑楼宇',
+  风光: '建筑楼宇',
+  风光类: '建筑楼宇',
+  校园风光: '建筑楼宇',
+  Documentary: null,
+  Activity: null,
+  纪实: null,
+  纪实类: null,
+  活动: null,
+  人文纪实: null,
+}
+
+function displayFacetValue(facetKey: string, value: string): string | null {
+  if (facetKey !== 'photo_type') return value
+  return Object.prototype.hasOwnProperty.call(legacyPhotoTypeDisplayMap, value)
+    ? legacyPhotoTypeDisplayMap[value]
+    : value
+}
+
 const displayTags = computed<DisplayTag[]>(() => {
   if (!props.interpretation) return []
 
@@ -101,11 +121,13 @@ const displayTags = computed<DisplayTag[]>(() => {
       plant: '植物',
       documentary_topic: '纪实主题',
     }
+    const displayValue = displayFacetValue(facetKey, nodeValue)
+    if (!displayValue) continue
     tags.push({
       key: `facet-${facetKey}`,
       type: 'facet',
       label: facetNameMap[facetKey] || facetKey,
-      value: nodeValue,
+      value: displayValue,
       removable: true,
     })
   }

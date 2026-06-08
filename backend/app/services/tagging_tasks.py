@@ -18,6 +18,7 @@ from app.models.taxonomy import PhotoClassification, TaxonomyFacet, TaxonomyNode
 from app.models.tagging_task import TaggingTask, TaggingTaskItem
 from app.models.user import User
 from app.services.taxonomy import (
+    PHOTO_TYPE_COMPAT_VALUES,
     TAXONOMY_GUIDE,
     get_facet_by_key,
     get_node_by_id,
@@ -221,7 +222,6 @@ def _photo_candidate_query(
             "纪实类": ("Documentary", "Activity", "纪实", "活动", "纪实类"),
             "校园风光": ("Landscape", "风光", "风光类", "校园风光"),
             "人文纪实": ("Documentary", "Activity", "纪实", "活动", "纪实类", "人文纪实"),
-            "自然生态": ("Landscape", "自然生态"),
         }.get(photo_type, ())
         type_subquery = (
             select(PhotoClassification.photo_id)

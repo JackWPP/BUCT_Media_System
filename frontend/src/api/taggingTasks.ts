@@ -68,7 +68,7 @@ export interface TaggingTaskBatchCreate {
   selection_mode: 'manual' | 'all' | 'zero_tags'
   status?: string | null
   search?: string
-  photo_type?: '校园风光' | '人文纪实' | '自然生态'
+  photo_type?: '建筑楼宇' | '校区设施' | '自然生态'
   max_photos?: number
 }
 
@@ -92,7 +92,7 @@ export function getTaggingPhotoCandidates(params?: {
   selection_mode?: 'all' | 'zero_tags'
   status?: string | null
   search?: string
-  photo_type?: '校园风光' | '人文纪实' | '自然生态'
+  photo_type?: '建筑楼宇' | '校区设施' | '自然生态'
   skip?: number
   limit?: number
 }) {

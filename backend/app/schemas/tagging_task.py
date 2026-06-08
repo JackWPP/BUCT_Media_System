@@ -28,7 +28,10 @@ class TaggingTaskBatchCreate(BaseModel):
     status: Optional[str] = "approved"
     search: Optional[str] = None
     facet_key: Optional[str] = None
-    photo_type: Optional[str] = Field(default=None, pattern="^(风光类|纪实类|校园风光|人文纪实|自然生态)$")
+    photo_type: Optional[str] = Field(
+        default=None,
+        pattern="^(风光类|纪实类|校园风光|人文纪实|风光|纪实|活动|建筑楼宇|校区设施|自然生态)$",
+    )
     max_photos: int = Field(default=5000, ge=1, le=20000)
 
 

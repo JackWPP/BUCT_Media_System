@@ -23,9 +23,7 @@ from app.services.taxonomy import resolve_taxonomy_node, set_photo_classificatio
 
 # Mapping from English category values (stored in Photo.category) to Chinese taxonomy values
 _CATEGORY_TO_PHOTO_TYPE = {
-    "Landscape": "校园风光",
-    "Documentary": "人文纪实",
-    "Activity": "人文纪实",
+    "Landscape": "建筑楼宇",
 }
 
 _CONTEST_YEAR_MAP = {

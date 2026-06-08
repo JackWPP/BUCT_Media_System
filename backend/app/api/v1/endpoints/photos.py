@@ -335,7 +335,8 @@ async def upload_photo(
         raise HTTPException(status_code=400, detail="Season must be a known legacy or taxonomy season")
     if category and category not in [
         "Landscape", "Portrait", "Activity", "Documentary",
-        "风光", "风光类", "校园风光", "纪实", "纪实类", "活动", "人文纪实", "自然生态", "人像",
+        "风光", "风光类", "校园风光", "建筑楼宇", "校区设施",
+        "纪实", "纪实类", "活动", "人文纪实", "自然生态", "人像",
     ]:
         raise HTTPException(status_code=400, detail="Category must be a known legacy category")
 

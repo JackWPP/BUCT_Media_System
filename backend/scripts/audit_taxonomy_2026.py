@@ -38,14 +38,12 @@ REQUIRED_TABLES = {
     "photo_classifications",
 }
 PHOTO_TYPE_MAP = {
-    "Landscape": "校园风光",
-    "风光": "校园风光",
-    "风光类": "校园风光",
-    "Documentary": "人文纪实",
-    "纪实": "人文纪实",
-    "纪实类": "人文纪实",
-    "Activity": "人文纪实",
-    "活动": "人文纪实",
+    "Landscape": "建筑楼宇",
+    "风光": "建筑楼宇",
+    "风光类": "建筑楼宇",
+    "校园风光": "建筑楼宇",
+    "建筑楼宇": "建筑楼宇",
+    "校区设施": "校区设施",
     "自然生态": "自然生态",
 }
 LEGACY_SEASON_VALUES = {"Spring", "Summer", "Autumn", "Winter", "春季", "夏季", "秋季", "冬季"}

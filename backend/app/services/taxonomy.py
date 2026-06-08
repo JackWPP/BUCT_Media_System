@@ -25,6 +25,8 @@ LEGACY_PHOTO_TYPE_MAP = {
     "风光": "Landscape",
     "风光类": "Landscape",
     "校园风光": "Landscape",
+    "建筑楼宇": "Landscape",
+    "校区设施": "Landscape",
     "人像": "Portrait",
     "活动": "Activity",
     "纪实": "Documentary",
@@ -34,18 +36,17 @@ LEGACY_PHOTO_TYPE_MAP = {
 }
 
 LEGACY_CATEGORY_TO_PHOTO_TYPE = {
-    "Landscape": "校园风光",
-    "风光": "校园风光",
-    "风光类": "校园风光",
-    "校园风光": "校园风光",
-    "Documentary": "人文纪实",
-    "Activity": "人文纪实",
-    "纪实": "人文纪实",
-    "纪实类": "人文纪实",
-    "活动": "人文纪实",
-    "人文纪实": "人文纪实",
+    "Landscape": "建筑楼宇",
+    "风光": "建筑楼宇",
+    "风光类": "建筑楼宇",
+    "校园风光": "建筑楼宇",
+    "建筑楼宇": "建筑楼宇",
+    "校区设施": "校区设施",
     "自然生态": "自然生态",
 }
+
+PHOTO_TYPE_VALUES = {"建筑楼宇", "校区设施", "自然生态"}
+PHOTO_TYPE_COMPAT_VALUES = PHOTO_TYPE_VALUES | {"风光类", "纪实类", "校园风光", "人文纪实", "风光", "纪实", "活动"}
 
 LEGACY_SEASON_TO_TAXONOMY = {
     "Spring": "春季",
@@ -179,10 +180,10 @@ DEFAULT_TAXONOMY = [
         "name": "题材",
         "is_system": True,
         "sort_order": 60,
-        "nodes": ["校园风光", "人文纪实", "自然生态"],
+        "nodes": ["建筑楼宇", "校区设施", "自然生态"],
         "aliases": {
-            "校园风光": ["风光", "风光类", "风景", "风景照", "景色", "风光摄影", "Landscape"],
-            "人文纪实": ["纪实", "纪实类", "活动", "记录", "纪实摄影", "记录片", "Documentary", "Activity"],
+            "建筑楼宇": ["楼宇", "建筑", "建筑物", "建筑楼宇", "风光", "风光类", "校园风光", "Landscape"],
+            "校区设施": ["设施", "校园设施", "校区设施", "室内设施", "户外设施"],
             "自然生态": ["自然", "生态", "动植物", "动物", "植物"],
         },
     },
@@ -304,11 +305,13 @@ LEGACY_NODE_MERGES = {
         "2025年第八届获奖作品": "第八届获奖作品（2025年）",
     },
     "photo_type": {
-        "风光": "校园风光",
-        "风光类": "校园风光",
-        "纪实": "人文纪实",
-        "纪实类": "人文纪实",
-        "活动": "人文纪实",
+        "风光": None,
+        "风光类": None,
+        "校园风光": None,
+        "纪实": None,
+        "纪实类": None,
+        "活动": None,
+        "人文纪实": None,
         "人像": None,
     },
 }
@@ -326,9 +329,9 @@ TAXONOMY_GUIDE = {
             "投稿作品": ["source_type"],
         },
         "photo_type": {
-            "校园风光": ["season", "natural_phenomenon", "technique", "animal", "plant"],
-            "人文纪实": ["documentary_topic"],
-            "自然生态": ["season", "natural_phenomenon", "animal", "plant"],
+            "建筑楼宇": ["building", "landscape", "season", "technique"],
+            "校区设施": ["facility", "landscape", "season", "technique"],
+            "自然生态": ["season", "natural_phenomenon", "landscape", "animal", "plant", "technique"],
         },
     },
     "legacy_query_aliases": {"landmark": "building"},
@@ -506,7 +509,9 @@ async def reconcile_facet_to_seed(db: AsyncSession, facet: TaxonomyFacet, facet_
 
     for source_name, target_name in merge_map.items():
         source = nodes_by_name.get(source_name)
-        if source is None or target_name is None:
+        if source is None:
+            continue
+        if target_name is None:
             continue
         target = nodes_by_name.get(target_name)
         if target is None:
@@ -593,7 +598,7 @@ async def get_facet_by_key(db: AsyncSession, facet_key: str) -> Optional[Taxonom
 async def get_node_by_id(db: AsyncSession, node_id: int) -> Optional[TaxonomyNode]:
     result = await db.execute(
         select(TaxonomyNode)
-        .options(selectinload(TaxonomyNode.aliases))
+        .options(selectinload(TaxonomyNode.aliases), selectinload(TaxonomyNode.facet))
         .where(TaxonomyNode.id == node_id)
     )
     return result.scalar_one_or_none()
@@ -628,6 +633,7 @@ async def resolve_taxonomy_node(
 
     result = await db.execute(
         select(TaxonomyNode)
+        .options(selectinload(TaxonomyNode.facet))
         .where(
             TaxonomyNode.facet_id == facet.id,
             TaxonomyNode.is_active.is_(True),
@@ -640,6 +646,7 @@ async def resolve_taxonomy_node(
 
     result = await db.execute(
         select(TaxonomyNode)
+        .options(selectinload(TaxonomyNode.facet))
         .where(
             TaxonomyNode.facet_id == facet.id,
             TaxonomyNode.is_active.is_(True),
@@ -652,6 +659,7 @@ async def resolve_taxonomy_node(
 
     result = await db.execute(
         select(TaxonomyNode)
+        .options(selectinload(TaxonomyNode.facet))
         .join(TaxonomyAlias)
         .where(
             TaxonomyNode.facet_id == facet.id,

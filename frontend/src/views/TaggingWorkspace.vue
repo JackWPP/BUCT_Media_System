@@ -241,10 +241,10 @@
               </n-space>
             </section>
 
-            <section v-if="isDocumentary" class="question-section">
+            <section class="question-section">
               <div class="section-head">
                 <strong>4. 纪实补充</strong>
-                <n-tag size="small">人文纪实时填写</n-tag>
+                <n-tag size="small">需要时补充</n-tag>
               </div>
               <n-select
                 v-model:value="classificationDraft.documentary_topic"
@@ -394,8 +394,6 @@ const validationMessage = computed(() => {
 })
 
 const selectedSeriesName = computed(() => optionLabel('gallery_series', classificationDraft.gallery_series))
-
-const isDocumentary = computed(() => optionLabel('photo_type', classificationDraft.photo_type) === '人文纪实')
 
 const visibleFineFacets = computed(() =>
   taxonomyFacets.value.filter((facet) => FINE_FACETS.includes(facet.key)),

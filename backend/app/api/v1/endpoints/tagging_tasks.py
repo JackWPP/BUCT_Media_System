@@ -23,6 +23,7 @@ from app.schemas.tagging_task import (
     TaggingTaskResponse,
 )
 from app.services import tagging_tasks as tagging_service
+from app.services.taxonomy import PHOTO_TYPE_COMPAT_VALUES
 
 router = APIRouter()
 
@@ -126,7 +127,7 @@ async def list_photo_candidates(
         raise HTTPException(status_code=400, detail=f"selection_mode must be one of: {', '.join(sorted(allowed_modes))}")
     if selection_mode == "missing_facet" and not facet_key:
         raise HTTPException(status_code=400, detail="facet_key is required for missing_facet")
-    if photo_type and photo_type not in {"风光类", "纪实类", "校园风光", "人文纪实", "自然生态"}:
+    if photo_type and photo_type not in PHOTO_TYPE_COMPAT_VALUES:
         raise HTTPException(status_code=400, detail="photo_type must be a known photo type")
     limit = min(limit, 120)
     try:

@@ -138,7 +138,6 @@ async function loadPhotos() {
     const response = await getPublicPhotos({
       limit: 100,
       gallery_year: '第八届获奖作品（2025年）',
-      photo_type: '校园风光',
     })
     // 按奖项等级排序：特等奖 → 一等奖 → 二等奖 → 优秀奖 → 无奖项
     photos.value = response.items.sort((a, b) => getAwardOrder(a) - getAwardOrder(b))

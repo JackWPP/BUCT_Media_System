@@ -402,6 +402,18 @@ const PILL_COLLAPSE_THRESHOLD = 8
 
 // 需要隐藏的标签（红框标注要删除的）
 const hiddenTags: Record<string, string[]> = {}
+const legacyPhotoTypeDisplayMap: Record<string, string | null> = {
+  Landscape: '建筑楼宇',
+  风光: '建筑楼宇',
+  风光类: '建筑楼宇',
+  校园风光: '建筑楼宇',
+  Documentary: null,
+  Activity: null,
+  纪实: null,
+  纪实类: null,
+  活动: null,
+  人文纪实: null,
+}
 
 const sortOptions = [
   { label: '最新上传', value: 'created_at' },
@@ -528,8 +540,8 @@ function facetOptions(key: string): SelectOption[] {
     }
     if (key === 'photo_type') {
       options = [
-        { label: '校园风光', value: '校园风光' },
-        { label: '人文纪实', value: '人文纪实' },
+        { label: '建筑楼宇', value: '建筑楼宇' },
+        { label: '校区设施', value: '校区设施' },
         { label: '自然生态', value: '自然生态' },
       ]
     }
@@ -541,7 +553,21 @@ function facetOptions(key: string): SelectOption[] {
 }
 
 function filterValueLabel(key: string, value: string) {
+  if (key === 'photo_type') {
+    const normalized = Object.prototype.hasOwnProperty.call(legacyPhotoTypeDisplayMap, value)
+      ? legacyPhotoTypeDisplayMap[value]
+      : value
+    if (!normalized) return '待补充题材'
+    return facetOptions(key).find((option) => option.value === normalized)?.label || normalized
+  }
   return facetOptions(key).find((option) => option.value === value)?.label || value
+}
+
+function normalizeFacetFilterValue(key: string, value: string): string | null {
+  if (key !== 'photo_type') return value
+  return Object.prototype.hasOwnProperty.call(legacyPhotoTypeDisplayMap, value)
+    ? legacyPhotoTypeDisplayMap[value]
+    : value
 }
 
 function facetDisplayLabel(key: string) {
@@ -661,7 +687,7 @@ function applyRouteQuery() {
   photoStore.filters.gallery_series = typeof query.gallery_series === 'string' ? query.gallery_series : null
   photoStore.filters.gallery_year = typeof query.gallery_year === 'string' ? query.gallery_year : null
   photoStore.filters.award_level = typeof query.award_level === 'string' ? query.award_level : null
-  photoStore.filters.photo_type = typeof query.photo_type === 'string' ? query.photo_type : null
+  photoStore.filters.photo_type = typeof query.photo_type === 'string' ? normalizeFacetFilterValue('photo_type', query.photo_type) : null
   photoStore.filters.documentary_topic = typeof query.documentary_topic === 'string' ? query.documentary_topic : null
   photoStore.filters.tag = typeof query.tag === 'string' ? query.tag : null
   photoStore.filters.search = typeof query.search === 'string' ? query.search : ''
@@ -818,7 +844,7 @@ function applyInterpretation(interpretation: SearchInterpretationType) {
       else if (facetKey === 'gallery_series') filters.gallery_series = nodeValue
       else if (facetKey === 'gallery_year') filters.gallery_year = nodeValue
       else if (facetKey === 'award_level') filters.award_level = nodeValue
-      else if (facetKey === 'photo_type') filters.photo_type = nodeValue
+      else if (facetKey === 'photo_type') filters.photo_type = normalizeFacetFilterValue('photo_type', nodeValue)
       else if (facetKey === 'documentary_topic') filters.documentary_topic = nodeValue
     }
     const genericWords = new Set(['照片', '图片', '摄影', '相片', '图', '的', '了', '是', '在', '和'])

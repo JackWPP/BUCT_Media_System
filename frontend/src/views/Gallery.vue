@@ -488,8 +488,8 @@ function facetOptions(key: string): SelectOption[] {
   }
   if (key === 'photo_type') {
     return [
-      { label: '校园风光', value: '校园风光' },
-      { label: '人文纪实', value: '人文纪实' },
+      { label: '建筑楼宇', value: '建筑楼宇' },
+      { label: '校区设施', value: '校区设施' },
       { label: '自然生态', value: '自然生态' },
     ]
   }
