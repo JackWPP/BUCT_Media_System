@@ -6,7 +6,6 @@
         <img src="/hero-banner.jpg" alt="视觉北化" class="hero-bg-image" />
       </div>
       <div class="hero-search-panel">
-        <h1>视觉北化</h1>
         <div class="hero-search">
           <n-input
             v-model:value="heroSearch"
@@ -175,19 +174,10 @@ onMounted(() => {
   position: relative;
   z-index: 2;
   width: min(720px, calc(100% - 32px));
-  margin-top: 120px;
+  margin-top: 56px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 18px;
-}
-
-.hero-search-panel h1 {
-  margin: 0;
-  font-size: 38px;
-  font-weight: 700;
-  color: #fff;
-  text-shadow: 0 3px 14px rgba(0, 0, 0, 0.48), 0 1px 2px rgba(0, 0, 0, 0.36);
 }
 
 .hero-search {
@@ -224,8 +214,8 @@ onMounted(() => {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(8, 22, 52, 0.08) 0%, rgba(8, 22, 52, 0.42) 50%, rgba(8, 22, 52, 0.14) 100%),
-    linear-gradient(90deg, rgba(8, 22, 52, 0.08) 0%, rgba(8, 22, 52, 0.24) 42%, rgba(8, 22, 52, 0.24) 58%, rgba(8, 22, 52, 0.08) 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(8, 22, 52, 0.18) 54%, rgba(255, 255, 255, 0.08) 100%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(8, 22, 52, 0.12) 42%, rgba(8, 22, 52, 0.12) 58%, rgba(255, 255, 255, 0.08) 100%);
 }
 
 /* 底层：首图 */
@@ -279,12 +269,8 @@ onMounted(() => {
   }
 
   .hero-search-panel {
-    margin-top: 64px;
+    margin-top: 32px;
     gap: 12px;
-  }
-
-  .hero-search-panel h1 {
-    font-size: 28px;
   }
 
   .hero-search {

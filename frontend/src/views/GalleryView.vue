@@ -1,5 +1,24 @@
 <template>
   <div class="gallery-view">
+    <section class="gallery-search-panel">
+      <div class="gallery-search-box">
+        <n-input
+          v-model:value="searchKeyword"
+          size="large"
+          placeholder="搜索照片、描述、楼宇或标签"
+          clearable
+          @keyup.enter="submitGallerySearch"
+        >
+          <template #prefix>
+            <n-icon :component="SearchOutline" />
+          </template>
+        </n-input>
+        <n-button type="primary" size="large" class="gallery-search-button" @click="submitGallerySearch">
+          搜索
+        </n-button>
+      </div>
+    </section>
+
     <!-- 搜索结果头部 -->
     <div v-if="isVectorSearch && vectorSearchResults.length > 0" class="search-results-header">
       <div class="search-info">
@@ -27,6 +46,7 @@
           <span v-if="photoStore.filters.search && !isVectorSearch" class="search-term">
             "{{ photoStore.filters.search }}"
           </span>
+          <span v-else>按专区、校区和题材筛选图片</span>
         </div>
 
         <div class="toolbar-actions">
@@ -97,7 +117,7 @@
               class="filter-group"
               :class="{ 'filter-group-child': !primaryFacetKeys.includes(facetKey) }"
             >
-              <span class="filter-label">{{ facetLabelMap[facetKey] }}</span>
+              <span class="filter-label">{{ facetDisplayLabel(facetKey) }}</span>
               <div class="pills-row">
                 <span
                   v-for="opt in getVisibleOptions(facetKey)"
@@ -426,7 +446,17 @@ const visibleFacetKeys = computed(() => {
 const hasAnyFacets = computed(() => visibleFacetKeys.value.length > 0)
 
 const guideVisibleFacetKeys = computed(() => {
-  const keys = [...primaryFacetKeys.value, ...dependentFacetKeys.value, 'tag']
+  const preferred = [
+    'gallery_series',
+    'gallery_year',
+    'award_level',
+    'source_type',
+    'campus',
+    'photo_type',
+    ...dependentFacetKeys.value,
+    'tag',
+  ]
+  const keys = [...preferred, ...primaryFacetKeys.value]
   return [...new Set(keys)].filter((key) => visibleFacetKeys.value.includes(key))
 })
 
@@ -451,13 +481,7 @@ const masonryColumnsConfig = computed(() => {
   return { base: 2, sm: 2, lg: 3, xl: 4, '2xl': 5 }
 })
 
-// 根据图片方向返回高度/宽度比。缺少尺寸时用原图加载后的比例回填，避免本地元数据缺失时全部显示为横屏。
-const getItemRatio = (photo: any) => {
-  if (photo.width && photo.height) {
-    return photo.height / photo.width
-  }
-  return photo._displayRatio || 2 / 3
-}
+const getItemRatio = () => 1
 
 // 获取当前屏幕下的最大列数，用于计算每页数量
 const maxColumnCount = computed(() => {
@@ -518,6 +542,11 @@ function facetOptions(key: string): SelectOption[] {
 
 function filterValueLabel(key: string, value: string) {
   return facetOptions(key).find((option) => option.value === value)?.label || value
+}
+
+function facetDisplayLabel(key: string) {
+  if (key === 'gallery_year') return '届次'
+  return facetLabelMap[key] || key
 }
 
 function shouldShowMore(key: string): boolean {
@@ -647,6 +676,18 @@ async function toggleFilter(key: keyof PhotoFilters, value: string) {
   const current = photoStore.filters[key]
   photoStore.setFilters({ [key]: current === value ? null : value } as Partial<PhotoFilters>)
   await syncQueryAndFetch()
+}
+
+async function submitGallerySearch() {
+  const keyword = searchKeyword.value.trim()
+  if (!keyword) {
+    photoStore.setFilters({ search: '' })
+    currentInterpretation.value = null
+    clearVectorSearch()
+    await syncQueryAndFetch()
+    return
+  }
+  await handleSearchInput(keyword)
 }
 
 async function removeFilter(key: keyof PhotoFilters) {
@@ -974,10 +1015,41 @@ onUnmounted(() => {
 
 <style scoped>
 .gallery-view {
-  padding: 72px 24px 48px;
+  padding: 48px 24px 48px;
   max-width: 1440px;
   margin: 0 auto;
   min-height: 100vh;
+}
+
+.gallery-search-panel {
+  margin-bottom: 18px;
+  padding: 22px;
+  border: 1px solid rgba(0, 86, 166, 0.18);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  box-shadow: 0 10px 28px rgba(15, 40, 78, 0.08);
+}
+
+.gallery-search-box {
+  width: min(780px, 100%);
+  margin: 0 auto;
+  display: flex;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid #d8e6f5;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0, 86, 166, 0.1);
+}
+
+.gallery-search-box :deep(.n-input) {
+  flex: 1;
+}
+
+.gallery-search-button {
+  min-width: 96px;
+  background: #0056a6 !important;
+  border-color: #0056a6 !important;
 }
 
 /* 工具栏 */
@@ -1143,11 +1215,7 @@ onUnmounted(() => {
   overflow: hidden;
   border-radius: 8px;
   background: #f5f5f5;
-  aspect-ratio: 3 / 2;
-}
-
-.photo-card-hover.photo-card-portrait {
-  aspect-ratio: 2 / 3;
+  aspect-ratio: 1 / 1;
 }
 
 .masonry-img {
@@ -1240,7 +1308,20 @@ onUnmounted(() => {
 /* 响应式 */
 @media (max-width: 768px) {
   .gallery-view {
-    padding: 64px 8px 32px;
+    padding: 32px 8px 32px;
+  }
+
+  .gallery-search-panel {
+    padding: 12px;
+  }
+
+  .gallery-search-box {
+    flex-direction: column;
+    padding: 8px;
+  }
+
+  .gallery-search-button {
+    width: 100%;
   }
 
   .toolbar-main {

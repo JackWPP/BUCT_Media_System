@@ -6,35 +6,9 @@
         <img src="/logo.png" alt="视觉北化" class="logo-image" />
       </div>
 
-      <!-- 搜索框 - 仅在非首页或滚动后显示 -->
-      <div
-        v-if="!hideSearch && !isHome"
-        class="header-search-mini"
-      >
-        <n-input
-          v-model:value="localKeyword"
-          placeholder="搜索照片、描述或标签"
-          clearable
-          size="small"
-          @keyup.enter="handleSearch"
-        >
-          <template #prefix>
-            <n-icon :component="SearchOutline" />
-          </template>
-          <template #suffix>
-            <n-button
-              type="primary"
-              size="tiny"
-              class="search-btn-blue"
-              @click="handleSearch"
-            >
-              <n-icon :component="SearchOutline" />
-            </n-button>
-          </template>
-        </n-input>
-      </div>
-      <div v-else-if="isHome" class="header-slogan">
-        北化之美 美在四季
+      <div class="header-slogan">
+        <span>北化之美</span>
+        <span>美在四季</span>
       </div>
 
       <!-- 右侧操作区 -->
@@ -287,65 +261,17 @@ function handleUserMenuSelect(key: string) {
   display: block;
 }
 
-.header-search-mini {
-  flex: 1;
-  max-width: 480px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .header-slogan {
   flex: 1;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 42px;
   font-size: 20px;
   font-weight: 700;
   color: #173d7a;
   letter-spacing: 0;
   white-space: nowrap;
-}
-
-.header-smart-toggle {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.smart-label {
-  font-size: 11px;
-  transition: color 0.3s ease;
-  white-space: nowrap;
-}
-
-.smart-label.smart-active {
-  color: #e60012;
-  font-weight: 500;
-}
-
-.header-search-mini :deep(.n-input) {
-  background: #f5f5f5;
-  border-radius: 20px;
-}
-
-.header-search-mini :deep(.n-input__border) {
-  border: none;
-}
-
-.header-search-mini :deep(.n-input__state-border) {
-  border: none;
-}
-
-.header-search-mini :deep(.n-input__suffix) {
-  padding-right: 4px;
-}
-
-.search-btn-blue {
-  background: #0056a6 !important;
-  border-radius: 50% !important;
-  width: 28px;
-  height: 28px;
-  padding: 0 !important;
 }
 
 .header-actions {
@@ -418,25 +344,13 @@ function handleUserMenuSelect(key: string) {
     display: none;
   }
 
-  .header-search-mini {
-    max-width: 200px;
-    min-width: 0;
-  }
-
   .header-slogan {
     font-size: 15px;
-  }
-
-  .header-search-mini :deep(.n-input) {
-    font-size: 13px;
+    gap: 18px;
   }
 }
 
 @media (max-width: 480px) {
-  .header-search-mini {
-    display: none;
-  }
-
   .header-slogan {
     display: none;
   }
