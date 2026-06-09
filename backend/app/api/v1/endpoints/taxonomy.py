@@ -105,7 +105,7 @@ async def get_taxonomy_insights(
         .join(TaxonomyNode.photo_classifications)
         .join(Photo)
         .where(TaxonomyFacet.is_active.is_(True), TaxonomyNode.is_active.is_(True))
-        .group_by(TaxonomyFacet.key, TaxonomyFacet.name, TaxonomyNode.name)
+        .group_by(TaxonomyFacet.key, TaxonomyFacet.name, TaxonomyFacet.sort_order, TaxonomyNode.name, TaxonomyNode.sort_order)
         .order_by(TaxonomyFacet.sort_order.asc(), func.count(Photo.id).desc(), TaxonomyNode.sort_order.asc())
     )
 

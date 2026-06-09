@@ -761,7 +761,11 @@ async def get_facet_by_key(db: AsyncSession, facet_key: str) -> Optional[Taxonom
 async def get_node_by_id(db: AsyncSession, node_id: int) -> Optional[TaxonomyNode]:
     result = await db.execute(
         select(TaxonomyNode)
-        .options(selectinload(TaxonomyNode.aliases), selectinload(TaxonomyNode.facet))
+        .options(
+            selectinload(TaxonomyNode.aliases),
+            selectinload(TaxonomyNode.facet),
+            selectinload(TaxonomyNode.children),
+        )
         .where(TaxonomyNode.id == node_id)
     )
     return result.scalar_one_or_none()
