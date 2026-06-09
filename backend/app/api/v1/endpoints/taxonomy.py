@@ -60,6 +60,25 @@ def _serialize_facet(facet: TaxonomyFacet) -> TaxonomyFacetResponse:
     return TaxonomyFacetResponse.model_validate(facet)
 
 
+def _serialize_node(node: TaxonomyNode) -> TaxonomyNodeResponse:
+    """Serialize a taxonomy node without triggering async lazy loads."""
+    return TaxonomyNodeResponse(
+        id=node.id,
+        facet_id=node.facet_id,
+        parent_id=node.parent_id,
+        key=node.key,
+        name=node.name,
+        description=node.description,
+        sort_order=node.sort_order,
+        is_active=node.is_active,
+        is_selectable=node.is_selectable,
+        created_at=node.created_at,
+        updated_at=node.updated_at,
+        aliases=list(node.aliases or []),
+        children=[_serialize_node(child) for child in (node.children or [])],
+    )
+
+
 @router.get("/public", response_model=list[TaxonomyFacetResponse])
 async def list_public_taxonomy(
     db: AsyncSession = Depends(get_db),
@@ -99,14 +118,14 @@ async def get_taxonomy_insights(
             TaxonomyFacet.key,
             TaxonomyFacet.name,
             TaxonomyNode.name,
-            func.count(Photo.id),
+            func.count(PhotoClassification.photo_id),
         )
+        .select_from(TaxonomyFacet)
         .join(TaxonomyNode, TaxonomyNode.facet_id == TaxonomyFacet.id)
-        .join(TaxonomyNode.photo_classifications)
-        .join(Photo)
+        .join(PhotoClassification, PhotoClassification.node_id == TaxonomyNode.id)
         .where(TaxonomyFacet.is_active.is_(True), TaxonomyNode.is_active.is_(True))
         .group_by(TaxonomyFacet.key, TaxonomyFacet.name, TaxonomyFacet.sort_order, TaxonomyNode.name, TaxonomyNode.sort_order)
-        .order_by(TaxonomyFacet.sort_order.asc(), func.count(Photo.id).desc(), TaxonomyNode.sort_order.asc())
+        .order_by(TaxonomyFacet.sort_order.asc(), func.count(PhotoClassification.photo_id).desc(), TaxonomyNode.sort_order.asc())
     )
 
     unclassified_exists = (
@@ -214,7 +233,7 @@ async def create_taxonomy_node(
     await replace_node_aliases(db, node, node_in.aliases)
     await db.commit()
     node = await get_node_by_id(db, node.id)
-    return TaxonomyNodeResponse.model_validate(node)
+    return _serialize_node(node)
 
 
 @router.patch("/nodes/{node_id}", response_model=TaxonomyNodeResponse)
@@ -235,7 +254,7 @@ async def update_taxonomy_node(
         await replace_node_aliases(db, node, node_update.aliases)
     await db.commit()
     node = await get_node_by_id(db, node.id)
-    return TaxonomyNodeResponse.model_validate(node)
+    return _serialize_node(node)
 
 
 @router.delete("/nodes/{node_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -761,7 +761,10 @@ async def get_node_by_id(db: AsyncSession, node_id: int) -> Optional[TaxonomyNod
         .options(
             selectinload(TaxonomyNode.aliases),
             selectinload(TaxonomyNode.facet),
-            selectinload(TaxonomyNode.children),
+            selectinload(TaxonomyNode.children).options(
+                selectinload(TaxonomyNode.aliases),
+                selectinload(TaxonomyNode.children),
+            ),
         )
         .where(TaxonomyNode.id == node_id)
     )
