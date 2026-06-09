@@ -169,7 +169,16 @@ def test_public_guide_for_changping_buildings_excludes_chaoyang_buildings(taggin
     assert guide.status_code == 200
     building_sections = guide.json()["campus_category_tree"]["昌平校区"]["建筑楼宇"]
     building_nodes = {node for section in building_sections for node in section["nodes"]}
+    phase_1 = next(section["nodes"] for section in building_sections if section["title"] == "一期项目")
+    phase_2 = next(section["nodes"] for section in building_sections if section["title"] == "二期项目")
     assert "图书馆" in building_nodes
+    assert "实验楼" not in phase_1
+    assert "实验楼" in phase_2
+    assert "第二教学楼" not in phase_1
+    assert "第二教学楼" in phase_2
+    assert "文理楼" in phase_2
+    assert "紫竹餐厅" in phase_1
+    assert "玉兰餐厅" in phase_2
     assert "教学楼（朝阳校区）" not in building_nodes
 
 
