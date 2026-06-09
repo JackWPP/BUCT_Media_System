@@ -103,7 +103,7 @@ CHANGPING_BUILDING_PHASE_2 = [
 ]
 
 CHANGPING_FACILITY_TREE = [
-    {"title": "室外设施", "facet_key": "facility", "nodes": ["运动场/风雨操场", "第二运动场", "足球场", "篮球场", "网球场", "排球场", "素质拓展基地"]},
+    {"title": "户外设施", "facet_key": "facility", "nodes": ["运动场/风雨操场", "第二运动场", "足球场", "篮球场", "网球场", "排球场", "素质拓展基地"]},
     {
         "title": "室内设施",
         "facet_key": "facility",
@@ -280,7 +280,7 @@ DEFAULT_TAXONOMY = [
         "is_system": True,
         "sort_order": 80,
         "nodes": [
-            {"name": "室外设施", "children": ["运动场/风雨操场", "第二运动场", "足球场", "篮球场", "网球场", "排球场", "素质拓展基地"]},
+            {"name": "户外设施", "children": ["运动场/风雨操场", "第二运动场", "足球场", "篮球场", "网球场", "排球场", "素质拓展基地"]},
             *_group_nodes(CHANGPING_FACILITY_TREE[1:]),
         ],
         "aliases": {},

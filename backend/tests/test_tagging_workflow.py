@@ -182,7 +182,7 @@ def test_public_guide_for_changping_facilities_uses_facility_facet_only(tagging_
     facility_sections = guide.json()["campus_category_tree"]["昌平校区"]["校区设施"]
     assert facility_sections
     assert all(section["facet_key"] == "facility" for section in facility_sections)
-    assert facility_sections[0]["title"] == "室外设施"
+    assert facility_sections[0]["title"] == "户外设施"
     assert facility_sections[1]["title"] == "室内设施"
     indoor_titles = [group["title"] for group in facility_sections[1]["groups"]]
     assert indoor_titles == ["教学设施", "体育设施", "美育设施", "实验设施", "办公设施", "会议设施", "其他设施"]
