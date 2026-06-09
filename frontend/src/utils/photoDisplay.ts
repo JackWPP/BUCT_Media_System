@@ -59,6 +59,33 @@ export function parsePhotoAuthor(photo: Photo | null | undefined) {
   return ''
 }
 
+const CONTEST_YEAR_BY_EDITION: Record<string, string> = {
+  第一届: '2018年',
+  第二届: '2019年',
+  第三届: '2020年',
+  第四届: '2021年',
+  第五届: '2022年',
+  第六届: '2023年',
+  第七届: '2024年',
+  第八届: '2025年',
+}
+
+function parseContestEdition(photo: Photo | null | undefined) {
+  const sourceText = [
+    taxonomyValueName(photo?.classifications?.gallery_year),
+    ...descriptionParts(photo),
+    cleanText(photo?.filename),
+  ].join(' ')
+
+  const match = sourceText.match(/(第[一二三四五六七八九十0-9]+届)(?:获奖作品)?(?:昌平校区摄影大赛)?(?:获奖作品)?(?:（(20\d{2}年)）)?/)
+  if (!match) return null
+
+  return {
+    edition: match[1],
+    year: match[2] || CONTEST_YEAR_BY_EDITION[match[1]] || '',
+  }
+}
+
 export function displayPhotoTitle(photo: Photo | null | undefined) {
   if (!photo) return '未知'
   return cleanText(photo.title) || parsePhotoTitle(photo) || photo.filename.replace(/\.[^.]+$/, '')
@@ -72,13 +99,15 @@ export function displayPhotoAuthor(photo: Photo | null | undefined) {
 export function formatPhotoSource(photo: Photo | null | undefined) {
   const classifications = photo?.classifications || {}
   const series = taxonomyValueName(classifications.gallery_series)
-  const galleryYear = taxonomyValueName(classifications.gallery_year)
   const sourceType = taxonomyValueName(classifications.source_type)
 
   if (series === '昌平校区摄影大赛') {
-    const match = galleryYear.match(/^(第.+?届)获奖作品（(.+?)）$/)
-    if (match) return `${match[1]}昌平校区摄影大赛获奖作品（${match[2]}）`
-    return galleryYear || '昌平校区摄影大赛获奖作品'
+    const parsed = parseContestEdition(photo)
+    if (parsed?.edition && parsed.year) {
+      return `${parsed.edition}昌平校区摄影大赛获奖作品（${parsed.year}）`
+    }
+    if (parsed?.edition) return `${parsed.edition}昌平校区摄影大赛获奖作品`
+    return '昌平校区摄影大赛获奖作品'
   }
 
   if (series === '投稿作品') return '投稿作品'

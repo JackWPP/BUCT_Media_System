@@ -143,7 +143,7 @@
                 </div>
                 <div class="meta-item">
                   <span class="meta-label">来源</span>
-                  <span class="meta-value">{{ photoSource }}</span>
+                  <span class="meta-value source-value">{{ photoSource }}</span>
                 </div>
                 <div class="meta-item">
                   <span class="meta-label">地点</span>
@@ -827,11 +827,11 @@ watch(
 }
 
 .meta-item {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
   align-items: flex-start;
   font-size: 13px;
-  gap: 16px;
+  gap: 14px;
 }
 
 .meta-label {
@@ -842,7 +842,13 @@ watch(
 .meta-value {
   color: #333;
   text-align: right;
+  min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.source-value {
+  font-weight: 600;
+  line-height: 1.6;
 }
 
 .photo-description {

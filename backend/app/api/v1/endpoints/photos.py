@@ -2,6 +2,7 @@
 Photo API endpoints.
 """
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -92,11 +93,67 @@ def _photo_free_tags(tags: list) -> list[str]:
     return [tag.name for tag in tags]
 
 
+_META_PART_PATTERNS = (
+    re.compile(r"^作者[:：]"),
+    re.compile(r"^序号[:：]"),
+    re.compile(r"^排名[:：]"),
+    re.compile(r"^评分[:：]"),
+    re.compile(r"^第[一二三四五六七八九十0-9]+届.*摄影大赛"),
+    re.compile(r"^(风光类|纪实类|建筑楼宇|校区设施|自然生态|优秀奖|一等奖|二等奖|三等奖|网络人气奖)$"),
+)
+
+
+def _description_parts(description: str | None) -> list[str]:
+    return [part.strip() for part in (description or "").split("|") if part.strip()]
+
+
+def _clean_author(value: str | None) -> str:
+    return re.sub(
+        r"\s*(?:（教师）|（学生）|（宣传部）|\(教师\)|\(学生\)|\(宣传部\))\s*$",
+        "",
+        re.sub(r"[|].*$", "", re.sub(r"^作者[:：]\s*", "", value or "")),
+    ).strip()
+
+
+def _split_legacy_title_author(part: str) -> tuple[str, str] | None:
+    match = re.match(r"^(.+?)\s*[-－—]\s*(.+)$", part)
+    if not match:
+        return None
+    title = match.group(1).strip()
+    author = _clean_author(match.group(2))
+    if not title or not author:
+        return None
+    return title, author
+
+
+def _parse_photo_title(description: str | None) -> str:
+    for part in _description_parts(description):
+        if any(pattern.search(part) for pattern in _META_PART_PATTERNS):
+            continue
+        legacy = _split_legacy_title_author(part)
+        return (legacy[0] if legacy else re.sub(r"^作品名称[:：]\s*", "", part)).strip()
+    return ""
+
+
+def _parse_photo_author(description: str | None) -> str:
+    parts = _description_parts(description)
+    for part in parts:
+        if re.match(r"^作者[:：]", part):
+            return _clean_author(part)
+    for part in parts:
+        legacy = _split_legacy_title_author(part)
+        if legacy:
+            return legacy[1]
+    return ""
+
+
 async def serialize_photo(db: AsyncSession, photo: Photo) -> PhotoResponse:
     tags = await photo_crud.get_photo_tags(db, photo.id)
     free_tags = _photo_free_tags(tags)
     photo_dict = {**photo.__dict__}
     photo_dict.pop("_sa_instance_state", None)
+    photo_dict["title"] = photo.title or _parse_photo_title(photo.description)
+    photo_dict["author"] = photo.author or _parse_photo_author(photo.description)
     photo_dict["tags"] = free_tags
     photo_dict["free_tags"] = free_tags
     photo_dict["classifications"] = serialize_classifications(photo)

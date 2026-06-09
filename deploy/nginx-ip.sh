@@ -13,7 +13,19 @@ server {
 
     client_max_body_size 25M;
 
+    location = /index.html {
+        add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate" always;
+        try_files $uri =404;
+    }
+
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        try_files $uri =404;
+    }
+
     location / {
+        add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate" always;
         try_files $uri $uri/ /index.html;
     }
 
