@@ -50,8 +50,8 @@
           <n-grid-item>
             <n-space vertical size="large">
               <n-descriptions :column="1" bordered size="small">
-                <n-descriptions-item label="作品名称">{{ photo.title || parsedTitle || photo.filename }}</n-descriptions-item>
-                <n-descriptions-item label="作者">{{ photo.author || parsedAuthor || '未知' }}</n-descriptions-item>
+                <n-descriptions-item label="作品名称">{{ displayTitle }}</n-descriptions-item>
+                <n-descriptions-item label="作者">{{ displayAuthor }}</n-descriptions-item>
                 <n-descriptions-item label="来源">{{ displaySource }}</n-descriptions-item>
                 <n-descriptions-item label="地点">{{ displayCampus }}</n-descriptions-item>
                 <n-descriptions-item label="版权声明">© 北京化工大学 版权所有</n-descriptions-item>
@@ -265,6 +265,7 @@ import { usePhotoStore } from '../../stores/photo'
 import type { Photo, PhotoUpdate, TaxonomyValue } from '../../types/photo'
 import { taxonomyValueName } from '../../types/photo'
 import { getPhotoUrl, getPhotoDownloadUrl } from '../../utils/format'
+import { displayPhotoAuthor, displayPhotoTitle, formatPhotoSource } from '../../utils/photoDisplay'
 import { getPublicTaxonomy, type TaxonomyFacet } from '../../api/taxonomy'
 import { findTaxonomyNode, flattenTaxonomyOptions, isNodeSelectable } from '../../utils/taxonomy'
 
@@ -368,10 +369,12 @@ const classificationList = computed<TaxonomyValue[]>(() => {
   return Object.values(photo.value.classifications).flatMap((value) => Array.isArray(value) ? value : [value])
 })
 
-const parsedTitle = computed(() => parsedDescriptionPart(0))
-const parsedAuthor = computed(() => {
-  const part = parsedDescriptionPart(1)
-  return part.replace(/^作者[:：]\s*/, '')
+const displayTitle = computed(() => {
+  return displayPhotoTitle(photo.value)
+})
+
+const displayAuthor = computed(() => {
+  return displayPhotoAuthor(photo.value)
 })
 
 const displayCampus = computed(() => {
@@ -380,10 +383,7 @@ const displayCampus = computed(() => {
 })
 
 const displaySource = computed(() => {
-  const series = taxonomyValueName(photo.value?.classifications?.gallery_series)
-  if (series === '昌平校区摄影大赛') return '获奖作品'
-  if (series === '投稿作品') return '投稿作品'
-  return series || '未知'
+  return formatPhotoSource(photo.value)
 })
 
 function handleKeydown(event: KeyboardEvent) {
@@ -646,13 +646,6 @@ function getFacetNodeOptions(facetKey: string) {
   const facet = taxonomyFacets.value.find((f) => f.key === facetKey)
   if (!facet) return []
   return flattenTaxonomyOptions(facet.nodes, (node) => node.id)
-}
-
-function parsedDescriptionPart(index: number): string {
-  return (photo.value?.description || '')
-    .split('|')
-    .map((part) => part.trim())
-    .filter(Boolean)[index] || ''
 }
 
 function getUnclassifiedFacets() {

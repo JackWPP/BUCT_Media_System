@@ -221,6 +221,7 @@ import { usePhotoStore } from '../stores/photo'
 import type { Photo } from '../types/photo'
 import { taxonomyValueName } from '../types/photo'
 import { getPhotoUrl, getPhotoDownloadUrl } from '../utils/format'
+import { displayPhotoAuthor, displayPhotoTitle, formatPhotoSource } from '../utils/photoDisplay'
 
 const route = useRoute()
 const router = useRouter()
@@ -287,43 +288,16 @@ const currentIndex = computed(() => {
 const hasPrev = computed(() => currentIndex.value > 0)
 const hasNext = computed(() => currentIndex.value >= 0 && currentIndex.value < contextPhotos.value.length - 1)
 
-const descriptionParts = computed(() => {
-  return (photo.value?.description || '')
-    .split('|')
-    .map((part) => part.trim())
-    .filter(Boolean)
-})
-
 const photoTitle = computed(() => {
-  if (!photo.value) return '未知'
-  if (photo.value.title?.trim()) return photo.value.title.trim()
-  const titlePart = descriptionParts.value.find((part) => !part.includes('作者') && !part.includes('序号'))
-  if (titlePart) return titlePart
-  return photo.value.filename.replace(/\.[^.]+$/, '')
-})
-
-const parsedAuthor = computed(() => {
-  const authorPart = descriptionParts.value.find((part) => part.includes('作者'))
-  const match = authorPart?.match(/作者[：:]\s*(.+)$/)
-  return match?.[1]?.trim() || ''
+  return displayPhotoTitle(photo.value)
 })
 
 const photoAuthor = computed(() => {
-  if (!photo.value) return '未知'
-  if (photo.value.author?.trim()) return photo.value.author.trim()
-  const studentId = photo.value.uploader_student_id
-  const name = photo.value.uploader_name || parsedAuthor.value
-  if (studentId && name) return `学/工号：${studentId} | ${name}`
-  if (studentId) return `学/工号：${studentId}`
-  return name || '未知'
+  return displayPhotoAuthor(photo.value)
 })
 
 const photoSource = computed(() => {
-  const classifications = photo.value?.classifications || {}
-  const series = taxonomyValueName(classifications.gallery_series)
-  if (series === '昌平校区摄影大赛') return '获奖作品'
-  if (series === '投稿作品') return '投稿作品'
-  return series || '未知'
+  return formatPhotoSource(photo.value)
 })
 
 const photoLocation = computed(() => {
