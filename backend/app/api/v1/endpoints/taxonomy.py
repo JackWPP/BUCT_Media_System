@@ -3,12 +3,13 @@ Taxonomy management endpoints.
 """
 from pydantic import BaseModel, ConfigDict
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, inspect, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_auditor_user, get_db
 from app.models.photo import Photo
-from app.models.taxonomy import PhotoClassification, TaxonomyFacet, TaxonomyNode
+from app.models.taxonomy import PhotoClassification, TaxonomyAlias, TaxonomyFacet, TaxonomyNode
 from app.models.user import User
 from app.schemas.taxonomy import (
     TaxonomyFacetCreate,
@@ -62,6 +63,9 @@ def _serialize_facet(facet: TaxonomyFacet) -> TaxonomyFacetResponse:
 
 def _serialize_node(node: TaxonomyNode) -> TaxonomyNodeResponse:
     """Serialize a taxonomy node without triggering async lazy loads."""
+    unloaded = inspect(node).unloaded
+    aliases = [] if "aliases" in unloaded else list(node.aliases or [])
+    children = [] if "children" in unloaded else list(node.children or [])
     return TaxonomyNodeResponse(
         id=node.id,
         facet_id=node.facet_id,
@@ -74,9 +78,55 @@ def _serialize_node(node: TaxonomyNode) -> TaxonomyNodeResponse:
         is_selectable=node.is_selectable,
         created_at=node.created_at,
         updated_at=node.updated_at,
-        aliases=list(node.aliases or []),
-        children=[_serialize_node(child) for child in (node.children or [])],
+        aliases=aliases,
+        children=[_serialize_node(child) for child in children],
     )
+
+
+async def _validate_node_parent(db: AsyncSession, facet_id: int, parent_id: int | None) -> None:
+    if parent_id is None:
+        return
+    parent = await get_node_by_id(db, parent_id)
+    if parent is None:
+        raise HTTPException(status_code=400, detail="Parent node not found")
+    if parent.facet_id != facet_id:
+        raise HTTPException(status_code=400, detail="Parent node must belong to the same facet")
+
+
+async def _assert_node_key_available(
+    db: AsyncSession,
+    facet_id: int,
+    key: str,
+    *,
+    exclude_node_id: int | None = None,
+) -> None:
+    query = select(TaxonomyNode.id).where(TaxonomyNode.facet_id == facet_id, TaxonomyNode.key == key)
+    if exclude_node_id is not None:
+        query = query.where(TaxonomyNode.id != exclude_node_id)
+    exists = await db.execute(query.limit(1))
+    if exists.scalar_one_or_none() is not None:
+        raise HTTPException(status_code=409, detail="Node key already exists in this facet")
+
+
+async def _assert_aliases_available(
+    db: AsyncSession,
+    aliases: list[str],
+    *,
+    exclude_node_id: int | None = None,
+) -> list[str]:
+    cleaned = [alias.strip() for alias in aliases if alias.strip()]
+    if len(cleaned) != len(set(cleaned)):
+        raise HTTPException(status_code=400, detail="Aliases must be unique")
+    if not cleaned:
+        return cleaned
+
+    query = select(TaxonomyAlias.alias).where(TaxonomyAlias.alias.in_(cleaned))
+    if exclude_node_id is not None:
+        query = query.where(TaxonomyAlias.node_id != exclude_node_id)
+    existing = [row[0] for row in (await db.execute(query)).all()]
+    if existing:
+        raise HTTPException(status_code=409, detail=f"Alias already exists: {', '.join(existing)}")
+    return cleaned
 
 
 @router.get("/public", response_model=list[TaxonomyFacetResponse])
@@ -217,6 +267,9 @@ async def create_taxonomy_node(
     facet = await get_facet_by_id(db, facet_id)
     if facet is None:
         raise HTTPException(status_code=404, detail="Facet not found")
+    await _validate_node_parent(db, facet.id, node_in.parent_id)
+    await _assert_node_key_available(db, facet.id, node_in.key)
+    cleaned_aliases = await _assert_aliases_available(db, node_in.aliases)
 
     node = TaxonomyNode(
         facet_id=facet.id,
@@ -228,10 +281,14 @@ async def create_taxonomy_node(
         is_active=node_in.is_active,
         is_selectable=node_in.is_selectable,
     )
-    db.add(node)
-    await db.flush()
-    await replace_node_aliases(db, node, node_in.aliases)
-    await db.commit()
+    try:
+        db.add(node)
+        await db.flush()
+        await replace_node_aliases(db, node, cleaned_aliases)
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="Taxonomy node key or alias already exists") from exc
     node = await get_node_by_id(db, node.id)
     return _serialize_node(node)
 
@@ -248,11 +305,22 @@ async def update_taxonomy_node(
         raise HTTPException(status_code=404, detail="Node not found")
 
     update_data = node_update.model_dump(exclude_unset=True, exclude={"aliases"})
+    if "parent_id" in update_data:
+        await _validate_node_parent(db, node.facet_id, update_data["parent_id"])
+    if "key" in update_data:
+        await _assert_node_key_available(db, node.facet_id, update_data["key"], exclude_node_id=node.id)
+    cleaned_aliases = None
+    if node_update.aliases is not None:
+        cleaned_aliases = await _assert_aliases_available(db, node_update.aliases, exclude_node_id=node.id)
     for field, value in update_data.items():
         setattr(node, field, value)
-    if node_update.aliases is not None:
-        await replace_node_aliases(db, node, node_update.aliases)
-    await db.commit()
+    try:
+        if cleaned_aliases is not None:
+            await replace_node_aliases(db, node, cleaned_aliases)
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="Taxonomy node key or alias already exists") from exc
     node = await get_node_by_id(db, node.id)
     return _serialize_node(node)
 
