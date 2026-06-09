@@ -182,6 +182,25 @@ def test_public_guide_for_changping_facilities_uses_facility_facet_only(tagging_
     facility_sections = guide.json()["campus_category_tree"]["昌平校区"]["校区设施"]
     assert facility_sections
     assert all(section["facet_key"] == "facility" for section in facility_sections)
+    assert facility_sections[0]["title"] == "室外设施"
+    assert facility_sections[1]["title"] == "室内设施"
+    indoor_titles = [group["title"] for group in facility_sections[1]["groups"]]
+    assert indoor_titles == ["教学设施", "体育设施", "美育设施", "实验设施", "办公设施", "会议设施", "其他设施"]
+
+
+def test_public_guide_uses_layered_natural_ecology_for_each_campus(tagging_client):
+    client, _, _ = tagging_client
+
+    guide = client.get("/api/v1/taxonomy/public/guide")
+
+    assert guide.status_code == 200
+    category_tree = guide.json()["campus_category_tree"]
+    for campus in ("昌平校区", "朝阳校区", "海淀校区"):
+        sections = category_tree[campus]["自然生态"]
+        assert [section["title"] for section in sections] == ["四季变化", "校园生态景观", "自然现象"]
+        ecology_groups = [group["title"] for group in sections[1]["groups"]]
+        assert "动物" in ecology_groups
+        assert "植物" in ecology_groups
 
 
 def test_public_guide_lists_all_eight_competition_editions(tagging_client):

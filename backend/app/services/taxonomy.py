@@ -147,6 +147,19 @@ CHANGPING_NATURAL_ECOLOGY = {
 
 CHANGPING_LANDSCAPE_MAINTENANCE = ["校名石", "荷塘", "柳湖", "玉屏山", "北化知行园", "静心亭（柳湖）", "师贤亭（荷塘）", "燕贺亭（玉屏山）", "钟塔（第二教学楼）", "文化墙（第二教学楼）", "质量文化（图书馆）", "中心广场（大学生活动中心）", "枫叶广场（玉屏山）", "校名标识字（玉屏山）", "化彩三台（北化八景）", "馆声凫影（北化八景）", "镜湖书柳（北化八景）", "小荷听书（北化八景）", "花海晴光（北化八景）", "平湖跃金（北化八景）", "花海聆淙（北化八景）", "烟雨玉屏（北化八景）"]
 
+COMMON_NATURAL_ECOLOGY_TREE = [
+    {"title": "四季变化", "facet_key": "season"},
+    {
+        "title": "校园生态景观",
+        "facet_key": "plant",
+        "groups": [
+            {"title": "动物", "facet_key": "animal"},
+            {"title": "植物", "facet_key": "plant"},
+        ],
+    },
+    {"title": "自然现象", "facet_key": "natural_phenomenon"},
+]
+
 DEFAULT_TAXONOMY = [
     {
         "key": "season",
@@ -462,7 +475,7 @@ TAXONOMY_GUIDE = {
             "自然生态": [
                 {"title": "四季变化", "facet_key": "season", "nodes": CHANGPING_NATURAL_ECOLOGY["季节"]},
                 {
-                    "title": "校园生态",
+                    "title": "校园生态景观",
                     "facet_key": "landscape",
                     "groups": [
                         {"title": "景观", "facet_key": "landscape", "nodes": CHANGPING_LANDSCAPE_MAINTENANCE},
@@ -476,22 +489,12 @@ TAXONOMY_GUIDE = {
         "朝阳校区": {
             "建筑楼宇": [{"title": "朝阳校区楼宇", "facet_key": "building", "nodes": CHAOYANG_BUILDINGS}],
             "校区设施": [],
-            "自然生态": [
-                {"title": "季节", "facet_key": "season"},
-                {"title": "自然现象", "facet_key": "natural_phenomenon"},
-                {"title": "动物", "facet_key": "animal"},
-                {"title": "植物", "facet_key": "plant"},
-            ],
+            "自然生态": COMMON_NATURAL_ECOLOGY_TREE,
         },
         "海淀校区": {
             "建筑楼宇": [{"title": "海淀校区楼宇", "facet_key": "building", "nodes": HAIDIAN_BUILDINGS}],
             "校区设施": [],
-            "自然生态": [
-                {"title": "季节", "facet_key": "season"},
-                {"title": "自然现象", "facet_key": "natural_phenomenon"},
-                {"title": "动物", "facet_key": "animal"},
-                {"title": "植物", "facet_key": "plant"},
-            ],
+            "自然生态": COMMON_NATURAL_ECOLOGY_TREE,
         },
     },
     "legacy_query_aliases": {"landmark": "building"},

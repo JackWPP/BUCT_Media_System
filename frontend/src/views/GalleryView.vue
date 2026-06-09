@@ -159,8 +159,8 @@
                   :key="group.key"
                   class="standard-tag-subgroup"
                 >
-                  <span class="standard-tag-title">{{ group.title }}</span>
-                  <div class="pills-row">
+                  <span class="standard-tag-title standard-tag-title-top">{{ group.title }}</span>
+                  <div v-if="group.options.length" class="pills-row">
                     <span
                       v-for="opt in group.options"
                       :key="`${group.facetKey}-${opt.value}`"
@@ -168,8 +168,26 @@
                       :class="{ active: photoStore.filters[group.facetKey] === opt.value, disabled: opt.disabled }"
                       @click="!opt.disabled && toggleFilter(group.facetKey as keyof PhotoFilters, opt.value as string)"
                     >
-                      {{ opt.label }}
+                      {{ displayOptionLabel(opt) }}
                     </span>
+                  </div>
+                  <div
+                    v-for="child in group.children"
+                    :key="child.key"
+                    class="standard-tag-child"
+                  >
+                    <span class="standard-tag-title">{{ child.title }}</span>
+                    <div v-if="child.options.length" class="pills-row">
+                      <span
+                        v-for="opt in child.options"
+                        :key="`${child.facetKey}-${opt.value}`"
+                        class="tag-pill"
+                        :class="{ active: photoStore.filters[child.facetKey] === opt.value, disabled: opt.disabled }"
+                        @click="!opt.disabled && toggleFilter(child.facetKey as keyof PhotoFilters, opt.value as string)"
+                      >
+                        {{ displayOptionLabel(opt) }}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -578,9 +596,11 @@ function filterValueLabel(key: string, value: string) {
       ? legacyPhotoTypeDisplayMap[value]
       : value
     if (!normalized) return '待补充题材'
-    return facetOptions(key).find((option) => option.value === normalized)?.label || normalized
+    const option = facetOptions(key).find((item) => item.value === normalized)
+    return option ? displayOptionLabel(option) : normalized
   }
-  return facetOptions(key).find((option) => option.value === value)?.label || value
+  const option = facetOptions(key).find((item) => item.value === value)
+  return option ? displayOptionLabel(option) : value
 }
 
 interface StandardTagGroup {
@@ -588,28 +608,44 @@ interface StandardTagGroup {
   title: string
   facetKey: string
   options: SelectOption[]
+  children: StandardTagGroup[]
 }
 
-function collectGuideGroups(groups: TaxonomyGuideGroup[] | undefined, parentTitle = ''): StandardTagGroup[] {
+function displayOptionLabel(option: SelectOption) {
+  const nodeName = (option as SelectOption & { node?: { name?: string } }).node?.name
+  const label = nodeName || String(option.label || '')
+  return label.replace(/（(?:朝阳|昌平|海淀)校区）$/u, '')
+}
+
+function optionsForGuideGroup(group: TaxonomyGuideGroup): SelectOption[] {
+  const nodeNames = group.nodes || []
+  if (!nodeNames.length && group.groups?.length) return []
+  const query = standardTagSearch.value.trim().toLowerCase()
+  return facetOptions(group.facet_key)
+    .filter((option) => {
+      const nodeName = (option as SelectOption & { node?: { name?: string } }).node?.name
+      if (nodeNames.length && !nodeNames.includes(option.label as string) && !nodeNames.includes(option.value as string) && (!nodeName || !nodeNames.includes(nodeName))) {
+        return false
+      }
+      return !query || option.searchText.includes(query) || String(option.label).toLowerCase().includes(query) || displayOptionLabel(option).toLowerCase().includes(query)
+    })
+}
+
+function collectGuideGroups(groups: TaxonomyGuideGroup[] | undefined): StandardTagGroup[] {
   if (!groups?.length) return []
-  return groups.flatMap((group) => {
-    const title = parentTitle ? `${parentTitle} / ${group.title}` : group.title
-    const children = collectGuideGroups(group.groups, title)
-    const nodeNames = group.nodes || []
-    const query = standardTagSearch.value.trim().toLowerCase()
-    const options = facetOptions(group.facet_key)
-      .filter((option) => {
-        const nodeName = (option as SelectOption & { node?: { name?: string } }).node?.name
-        if (nodeNames.length && !nodeNames.includes(option.label) && !nodeNames.includes(option.value as string) && (!nodeName || !nodeNames.includes(nodeName))) {
-          return false
-        }
-        return !query || option.searchText.includes(query) || String(option.label).toLowerCase().includes(query)
-      })
-    const current = options.length
-      ? [{ key: `${group.facet_key}-${title}`, title, facetKey: group.facet_key, options }]
-      : []
-    return [...current, ...children]
-  })
+  return groups
+    .map((group) => {
+      const children = collectGuideGroups(group.groups)
+      const options = optionsForGuideGroup(group)
+      return {
+        key: `${group.facet_key}-${group.title}`,
+        title: group.title,
+        facetKey: group.facet_key,
+        options,
+        children,
+      }
+    })
+    .filter((group) => group.options.length || group.children.length)
 }
 
 const campusCategoryGroups = computed(() => {
@@ -623,11 +659,13 @@ const campusCategoryGroups = computed(() => {
 
 const currentAllowedFineValues = computed(() => {
   const allowed = new Map<string, Set<string>>()
-  campusCategoryGroups.value.forEach((group) => {
+  const visit = (group: StandardTagGroup) => {
     const values = allowed.get(group.facetKey) || new Set<string>()
     group.options.forEach((option) => values.add(String(option.value)))
     allowed.set(group.facetKey, values)
-  })
+    group.children.forEach(visit)
+  }
+  campusCategoryGroups.value.forEach(visit)
   return allowed
 })
 
@@ -1315,6 +1353,46 @@ onUnmounted(() => {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+
+.standard-tag-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.standard-tag-search {
+  max-width: 420px;
+}
+
+.standard-tag-subgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.standard-tag-child {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 14px;
+  border-left: 2px solid #e5eef8;
+}
+
+.standard-tag-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.standard-tag-title-top {
+  color: #0f3f72;
 }
 
 .tag-pill.disabled {

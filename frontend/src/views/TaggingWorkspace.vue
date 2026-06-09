@@ -220,17 +220,36 @@
                   :name="group.key"
                 >
                   <n-checkbox-group v-model:value="multiClassificationDraft[group.facetKey]">
-                    <div class="check-grid">
+                    <div v-if="group.options.length" class="check-grid">
                       <n-checkbox
                         v-for="option in group.options"
                         :key="option.value"
                         :value="option.value"
                         :disabled="option.disabled"
                       >
-                        {{ option.label }}
+                        {{ displayOptionLabel(option) }}
                       </n-checkbox>
                     </div>
                   </n-checkbox-group>
+                  <div
+                    v-for="child in group.children"
+                    :key="child.key"
+                    class="fine-child-group"
+                  >
+                    <div class="fine-child-title">{{ child.name }}</div>
+                    <n-checkbox-group v-model:value="multiClassificationDraft[child.facetKey]">
+                      <div class="check-grid">
+                        <n-checkbox
+                          v-for="option in child.options"
+                          :key="option.value"
+                          :value="option.value"
+                          :disabled="option.disabled"
+                        >
+                          {{ displayOptionLabel(option) }}
+                        </n-checkbox>
+                      </div>
+                    </n-checkbox-group>
+                  </div>
                 </n-collapse-item>
               </n-collapse>
               <n-space v-if="selectedFineLabels.length" wrap>
@@ -381,24 +400,7 @@ const guideFineGroups = computed(() => {
 })
 
 const visibleFineGroups = computed(() => {
-  const query = fineSearch.value.trim().toLowerCase()
-  return guideFineGroups.value
-    .filter((group) => FINE_FACETS.includes(group.facetKey))
-    .map((group) => {
-      const options = optionsFor(group.facetKey).filter((option) => {
-        if (group.nodeNames.length && !group.nodeNames.includes(option.label) && !group.nodeNames.includes(option.node.name)) {
-          return false
-        }
-        return !query || option.searchText.includes(query) || String(option.label).toLowerCase().includes(query)
-      })
-      return {
-        key: `${group.facetKey}-${group.title}`,
-        name: group.title,
-        facetKey: group.facetKey,
-        options,
-      }
-    })
-    .filter((group) => group.options.length)
+  return guideFineGroups.value.filter((group) => group.options.length || group.children.length)
 })
 
 const existingClassificationSummary = computed(() => {
@@ -520,21 +522,28 @@ function hydrateDraft() {
 }
 
 interface FineGuideGroup {
-  title: string
+  key: string
+  name: string
   facetKey: string
-  nodeNames: string[]
+  options: SelectOption[]
+  children: FineGuideGroup[]
 }
 
 function collectGuideGroups(groups: TaxonomyGuideGroup[] | undefined): FineGuideGroup[] {
   if (!groups?.length) return []
-  return groups.flatMap((group) => [
-    {
-      title: group.title,
-      facetKey: group.facet_key,
-      nodeNames: group.nodes || [],
-    },
-    ...collectGuideGroups(group.groups),
-  ])
+  return groups
+    .map((group) => {
+      const children = collectGuideGroups(group.groups)
+      const options = FINE_FACETS.includes(group.facet_key) ? filteredOptionsForGuideGroup(group) : []
+      return {
+        key: `${group.facet_key}-${group.title}`,
+        name: group.title,
+        facetKey: group.facet_key,
+        options,
+        children,
+      }
+    })
+    .filter((group) => group.options.length || group.children.length)
 }
 
 function optionsFor(facetKey: string): SelectOption[] {
@@ -542,17 +551,20 @@ function optionsFor(facetKey: string): SelectOption[] {
   return facet ? flattenOptions(facet.nodes) : []
 }
 
-function filteredOptionsFor(facetKey: string): SelectOption[] {
+function filteredOptionsForGuideGroup(group: TaxonomyGuideGroup): SelectOption[] {
   const query = fineSearch.value.trim().toLowerCase()
-  const allowed = guideFineGroups.value
-    .filter((group) => group.facetKey === facetKey)
-    .flatMap((group) => group.nodeNames)
-  const options = optionsFor(facetKey).filter((option) => {
-    if (!allowed.length) return true
-    return allowed.includes(option.label) || allowed.includes(option.node.name)
+  const allowed = group.nodes || []
+  if (!allowed.length && group.groups?.length) return []
+  return optionsFor(group.facet_key).filter((option) => {
+    if (allowed.length && !allowed.includes(option.label as string) && !allowed.includes(option.node.name)) {
+      return false
+    }
+    return !query || option.searchText.includes(query) || String(option.label).toLowerCase().includes(query) || displayOptionLabel(option).toLowerCase().includes(query)
   })
-  if (!query) return options
-  return options.filter((option) => option.searchText.includes(query))
+}
+
+function displayOptionLabel(option: SelectOption) {
+  return (option.node?.name || String(option.label || '')).replace(/（(?:朝阳|昌平|海淀)校区）$/u, '')
 }
 
 function flattenOptions(nodes: TaxonomyNode[], prefix = ''): SelectOption[] {
@@ -570,7 +582,8 @@ function extractNodeIds(value: any): number[] {
 
 function optionLabel(facetKey: string, value: number | null | undefined) {
   if (!value) return ''
-  return optionsFor(facetKey).find((option) => option.value === value)?.label || ''
+  const option = optionsFor(facetKey).find((item) => item.value === value)
+  return option ? displayOptionLabel(option) : ''
 }
 
 function referenceValue(facetKey: string) {
@@ -854,6 +867,19 @@ REFERENCE_FACETS.forEach((key) => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px 12px;
+}
+
+.fine-child-group {
+  margin-top: 12px;
+  padding-left: 12px;
+  border-left: 2px solid #e5eef8;
+}
+
+.fine-child-title {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b5563;
 }
 
 .reference-grid {
